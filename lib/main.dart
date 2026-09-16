@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:madebyhands/features/auth/presentation/ui/welcome_screen.dart';
 import 'package:madebyhands/init_dependencies.dart';
 
 void main() async {
@@ -28,11 +29,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'MadeByHand',
       theme: AppTheme.lightThemeMode,
-      home: const Scaffold(
-        body: Center(
-          child: Text('MadeByHand: Artisan Marketplace'),
-        ),
-      ),
+      home: const WelcomeScreen(),
     );
   }
 }
