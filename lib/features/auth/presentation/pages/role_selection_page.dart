@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:madebyhands/features/auth/presentation/widgets/auth_button.dart';
 
 class RoleSelectionPage extends StatelessWidget {
   final UserEntity tempUser;
@@ -11,56 +10,81 @@ class RoleSelectionPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Join MADEBYHANDS')),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Welcome, how would you like to join us?',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+      appBar: AppBar(
+        title: const Text('Join MADEBYHANDS'),
+        actions: [
+          IconButton(
+            onPressed: () {
+              context.read<AuthBloc>().add(AuthLogoutRequested());
+            },
+            icon: const Icon(Icons.logout),
+          ),
+        ],
+      ),
+      body: BlocConsumer<AuthBloc, AuthState>(
+        listener: (context, state) {
+          if (state is AuthFailure) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.message)),
+            );
+          }
+        },
+        builder: (context, state) {
+          if (state is AuthLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          return Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Welcome, how would you like to join us?',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Select a role to get started with your journey.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+                const SizedBox(height: 40),
+                _RoleCard(
+                  title: 'Continue as Buyer',
+                  description: 'Discover and purchase unique, authentic handmade products directly from creators.',
+                  onPressed: () {
+                    context.read<AuthBloc>().add(
+                          AuthSignUpWithRoleRequested(
+                            uid: tempUser.uid,
+                            email: tempUser.email,
+                            name: tempUser.name,
+                            role: 'buyer',
+                          ),
+                        );
+                  },
+                ),
+                const SizedBox(height: 20),
+                _RoleCard(
+                  title: 'Continue as Creator',
+                  description: 'Establish your identity, showcase your portfolio, and list your products for sale.',
+                  onPressed: () {
+                    context.read<AuthBloc>().add(
+                          AuthSignUpWithRoleRequested(
+                            uid: tempUser.uid,
+                            email: tempUser.email,
+                            name: tempUser.name,
+                            role: 'creator',
+                          ),
+                        );
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            const Text(
-              'Select a role to get started with your journey.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-            const SizedBox(height: 40),
-            _RoleCard(
-              title: 'I want to Buy (Consumer)',
-              description: 'Discover and purchase unique, authentic handmade products directly from creators.',
-              onPressed: () {
-                context.read<AuthBloc>().add(
-                      AuthSignUpWithRoleRequested(
-                        uid: tempUser.uid,
-                        email: tempUser.email,
-                        name: tempUser.name,
-                        role: 'buyer',
-                      ),
-                    );
-              },
-            ),
-            const SizedBox(height: 20),
-            _RoleCard(
-              title: 'I want to Create (Artisan)',
-              description: 'Establish your identity, showcase your portfolio, and list your products for sale.',
-              onPressed: () {
-                context.read<AuthBloc>().add(
-                      AuthSignUpWithRoleRequested(
-                        uid: tempUser.uid,
-                        email: tempUser.email,
-                        name: tempUser.name,
-                        role: 'creator',
-                      ),
-                    );
-              },
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
