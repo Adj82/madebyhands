@@ -13,6 +13,7 @@ Use one dated section per workday so the three role-based branches can be merged
 - In-memory saved-items and cart flows, quantity controls, subtotal, and empty states.
 - Shared beige, sage, terracotta, and cream theme tokens for cross-team visual consistency.
 - Buyer widget tests for catalogue search and saved products.
+- Buyer-only preview entry point for running the UI without Firebase during frontend development.
 
 ### Integration notes
 
@@ -20,6 +21,7 @@ Use one dated section per workday so the three role-based branches can be merged
 - Cart and saved-item state is local UI state for the initial screen milestone. Move it to Bloc/repositories when backend collections are agreed.
 - Checkout currently shows an informational message. Payment selection and order creation should be integrated jointly by the team.
 - Existing authentication accepts `buyer`, `creator`, and `admin`; the dashboard router also tolerates `seller` for future role naming alignment.
+- Run `flutter run -t lib/features/buyer/buyer_preview.dart` to preview only the buyer UI; this does not initialize Firebase or replace the production app entry point.
 
 ### Next buyer tasks
 
