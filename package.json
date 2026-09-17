@@ -1,0 +1,7 @@
+{
+  "name": "madebyhands",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "bash vercel-build.sh"
+  }
+}
