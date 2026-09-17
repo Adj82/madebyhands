@@ -46,7 +46,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       // Admin emails list - add your admin emails here
       const adminEmails = [
         'admin@madebyhands.com',
-        'adj@madebyhands.com', // Placeholder for Adhiraj Jain
+        'adj@madebyhands.com',
       ];
       final String userEmail = user.email ?? '';
 
@@ -71,8 +71,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           role: '', // Triggers Role Selection UI
         );
       }
+    } on FirebaseAuthException catch (e) {
+      throw Exception(e.message ?? 'A Firebase authentication error occurred.');
     } catch (e) {
-      throw Exception(e.toString());
+      throw Exception('An unexpected error occurred during Google sign-in.');
     }
   }
 
@@ -93,8 +95,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
       await firestore.collection('users').doc(uid).set(userModel.toJson());
       return userModel;
+    } on FirebaseException catch (e) {
+      throw Exception(e.message ?? 'A Firestore error occurred while creating user.');
     } catch (e) {
-      throw Exception(e.toString());
+      throw Exception('An unexpected error occurred during role assignment.');
     }
   }
 
@@ -110,13 +114,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
       return null;
     } catch (e) {
-      throw Exception(e.toString());
+      return null;
     }
   }
 
   @override
   Future<void> signOut() async {
-    await googleSignIn.signOut();
-    await firebaseAuth.signOut();
+    try {
+      await googleSignIn.signOut();
+      await firebaseAuth.signOut();
+    } catch (e) {
+      throw Exception('Error signing out.');
+    }
   }
 }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "745060405583",
+    "project_id": "madebyhands-77f87",
+    "storage_bucket": "madebyhands-77f87.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:745060405583:android:753ddc6d86c2553c76353a",
+        "android_client_info": {
+          "package_name": "com.example.madebyhands"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBtXLSd4e2cuf26PjLQ2KsUUsT6KHnt16g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
