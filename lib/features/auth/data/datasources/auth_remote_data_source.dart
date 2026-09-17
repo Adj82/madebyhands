@@ -43,8 +43,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       if (user == null) return null;
 
-      // Admin emails list - add your admin email here
-      const adminEmails = ['admin@madebyhands.com'];
+      // Admin emails list - add your admin emails here
+      const adminEmails = [
+        'admin@madebyhands.com',
+        'adj@madebyhands.com', // Placeholder for Adhiraj Jain
+      ];
       final String userEmail = user.email ?? '';
 
       // Check if user exists in Firestore

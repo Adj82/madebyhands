@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -11,8 +12,13 @@ import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 final serviceLocator = GetIt.instance;
 
 Future<void> initDependencies() async {
-  // Initialize Firebase
-  await Firebase.initializeApp();
+  try {
+    // Initialize Firebase
+    // Note: For Web, you should ideally pass DefaultFirebaseOptions.currentPlatform
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint("Firebase initialization failed: $e");
+  }
 
   // Core
   serviceLocator.registerLazySingleton(() => FirebaseAuth.instance);
