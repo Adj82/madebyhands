@@ -4,6 +4,7 @@ import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/presentation/pages/login_page.dart';
 import 'package:madebyhands/features/auth/presentation/pages/role_selection_page.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:madebyhands/features/buyer/presentation/pages/buyer_dashboard_page.dart';
 import 'package:madebyhands/init_dependencies.dart';
 
 void main() async {
@@ -35,14 +36,23 @@ class MyApp extends StatelessWidget {
           if (state is AuthSuccess) {
             // Check role and return appropriate dashboard
             if (state.user.role == 'admin') {
-              return const Scaffold(body: Center(child: Text('Admin Dashboard')));
-            } else if (state.user.role == 'creator') {
-              return const Scaffold(body: Center(child: Text('Creator Dashboard')));
+              return const Scaffold(
+                body: Center(child: Text('Admin Dashboard')),
+              );
+            } else if (state.user.role == 'creator' ||
+                state.user.role == 'seller') {
+              return const Scaffold(
+                body: Center(child: Text('Creator Dashboard')),
+              );
             } else {
-              return const Scaffold(body: Center(child: Text('Buyer Dashboard')));
+              return BuyerDashboardPage(
+                user: state.user,
+                onLogout: () =>
+                    context.read<AuthBloc>().add(AuthLogoutRequested()),
+              );
             }
           }
-          
+
           if (state is AuthNeedsRoleSelection) {
             return RoleSelectionPage(tempUser: state.tempUser);
           }
