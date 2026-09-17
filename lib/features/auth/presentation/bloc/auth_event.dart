@@ -7,24 +7,22 @@ sealed class AuthEvent extends Equatable {
   List<Object> get props => [];
 }
 
-final class AuthSignUp extends AuthEvent {
+final class AuthGoogleSignInRequested extends AuthEvent {}
+
+final class AuthSignUpWithRoleRequested extends AuthEvent {
+  final String uid;
   final String email;
-  final String password;
   final String name;
+  final String role;
 
-  const AuthSignUp({
+  const AuthSignUpWithRoleRequested({
+    required this.uid,
     required this.email,
-    required this.password,
     required this.name,
+    required this.role,
   });
 }
 
-final class AuthLogin extends AuthEvent {
-  final String email;
-  final String password;
+final class AuthIsUserLoggedIn extends AuthEvent {}
 
-  const AuthLogin({
-    required this.email,
-    required this.password,
-  });
-}
+final class AuthLogoutRequested extends AuthEvent {}
