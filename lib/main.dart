@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/presentation/pages/welcome_screen.dart';
 import 'package:madebyhands/features/auth/presentation/pages/role_selection_page.dart';
-import 'package:madebyhands/features/home/presentation/pages/admin_dashboard.dart';
+import 'package:madebyhands/features/admin/presentation/pages/admin_dashboard_page.dart';
 import 'package:madebyhands/features/home/presentation/pages/creator_dashboard.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/buyer_dashboard_page.dart';
@@ -44,7 +44,7 @@ class MyApp extends StatelessWidget {
             // Check role and return appropriate dashboard
             final role = state.user.role.toLowerCase();
             if (role == 'admin') {
-              return const AdminDashboard();
+              return const AdminDashboardPage();
             } else if (role == 'creator' || role == 'seller') {
               return const CreatorDashboard();
             } else {
