@@ -23,18 +23,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     'Support Tickets',
     'Moderation',
     'Payouts & Finance',
+    'Admin Settings',
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_titles[_selectedIndex], style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(_titles[_selectedIndex],
+            style: const TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             onPressed: () {
               // Simulate refresh
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Refreshing data...')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Refreshing data...')));
             },
             icon: const Icon(Icons.refresh),
           ),
@@ -56,10 +59,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.admin_panel_settings, size: 50, color: Colors.white),
+                    const Icon(Icons.admin_panel_settings,
+                        size: 50, color: Colors.white),
                     const SizedBox(height: 10),
-                    const Text('MADEBYHANDS ADMIN', 
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                    const Text('MADEBYHANDS ADMIN',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2)),
                   ],
                 ),
               ),
@@ -77,16 +84,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   _buildDrawerTile(6, Icons.support_agent_outlined, Icons.support_agent, 'Support'),
                   _buildDrawerTile(7, Icons.gavel_outlined, Icons.gavel, 'Moderation'),
                   _buildDrawerTile(8, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'Payouts'),
+                  _buildDrawerTile(9, Icons.settings_outlined, Icons.settings, 'Settings'),
                 ],
               ),
             ),
             const Divider(),
-            ListTile(
-              leading: const Icon(Icons.settings_outlined),
-              title: const Text('Admin Settings'),
-              onTap: () {},
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('Version 1.0.0', style: TextStyle(color: AppColors.mutedText, fontSize: 12)),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
           ],
         ),
       ),
@@ -102,6 +109,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           _SupportTicketsView(),
           _ModerationView(),
           _FinanceView(),
+          _AdminSettingsView(),
         ],
       ),
     );
@@ -463,6 +471,103 @@ class _FinanceView extends StatelessWidget {
   }
 }
 
+class _AdminSettingsView extends StatefulWidget {
+  @override
+  State<_AdminSettingsView> createState() => _AdminSettingsViewState();
+}
+
+class _AdminSettingsViewState extends State<_AdminSettingsView> {
+  bool _maintenanceMode = false;
+  bool _emailNotifications = true;
+  double _flatFee = 50.0;
+  double _percentFee = 5.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const _SettingsSection(title: 'Platform Economics'),
+        _buildConfigTile(
+          'Flat Platform Fee',
+          'Currently ₹$_flatFee charged per sale',
+          Icons.payments_outlined,
+          trailing: TextButton(onPressed: () {}, child: const Text('Change')),
+        ),
+        _buildConfigTile(
+          'Transaction Fee (%)',
+          'Currently $_percentFee% for orders > ₹999',
+          Icons.percent,
+          trailing: TextButton(onPressed: () {}, child: const Text('Change')),
+        ),
+        const SizedBox(height: 20),
+        const _SettingsSection(title: 'System Control'),
+        SwitchListTile(
+          title: const Text('Maintenance Mode', style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: const Text('Block all user access while performing updates'),
+          value: _maintenanceMode,
+          activeTrackColor: AppColors.primary,
+          onChanged: (val) => setState(() => _maintenanceMode = val),
+        ),
+        SwitchListTile(
+          title: const Text('Admin Email Alerts', style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: const Text('Get notified about new creator applications'),
+          value: _emailNotifications,
+          activeTrackColor: AppColors.primary,
+          onChanged: (val) => setState(() => _emailNotifications = val),
+        ),
+        const SizedBox(height: 20),
+        const _SettingsSection(title: 'Security'),
+        _buildConfigTile(
+          'Authorized Admins',
+          '1 active admin account',
+          Icons.admin_panel_settings_outlined,
+          trailing: const Icon(Icons.chevron_right),
+        ),
+        _buildConfigTile(
+          'API Configuration',
+          'Manage Firebase & Google keys',
+          Icons.key_outlined,
+          trailing: const Icon(Icons.chevron_right),
+        ),
+        const SizedBox(height: 40),
+        FilledButton(
+          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Settings saved successfully')),
+          ),
+          child: const Text('Save Global Changes'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConfigTile(String title, String subtitle, IconData icon, {Widget? trailing}) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        leading: Icon(icon, color: AppColors.primary),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(subtitle),
+        trailing: trailing,
+      ),
+    );
+  }
+}
+
+class _SettingsSection extends StatelessWidget {
+  final String title;
+  const _SettingsSection({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Text(title.toUpperCase(), 
+        style: const TextStyle(color: AppColors.mutedText, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+    );
+  }
+}
+
 class _SmallStat extends StatelessWidget {
   final String label;
   final String value;
@@ -539,11 +644,25 @@ class _UserManagementView extends StatelessWidget {
     return ListView.builder(
       itemCount: 20,
       itemBuilder: (context, index) {
-        return ListTile(
-          leading: const CircleAvatar(child: Icon(Icons.person)),
-          title: Text('User $index'),
-          subtitle: Text('user$index@gmail.com'),
-          trailing: IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
+        final isCreator = index % 3 == 0;
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: isCreator ? AppColors.primary.withAlpha(50) : AppColors.outline,
+              child: Icon(isCreator ? Icons.palette : Icons.person, size: 20, color: isCreator ? AppColors.primary : AppColors.mutedText),
+            ),
+            title: Text('User $index', style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('user$index@gmail.com • ${isCreator ? 'Creator' : 'Buyer'}'),
+            trailing: PopupMenuButton(
+              itemBuilder: (context) => [
+                const PopupMenuItem(value: 'view', child: Text('View Profile')),
+                const PopupMenuItem(value: 'suspend', child: Text('Suspend User', style: TextStyle(color: Colors.redAccent))),
+                const PopupMenuItem(value: 'role', child: Text('Change Role')),
+              ],
+              onSelected: (val) {},
+            ),
+          ),
         );
       },
     );
