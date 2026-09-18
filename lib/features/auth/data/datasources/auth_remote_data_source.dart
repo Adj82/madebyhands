@@ -29,31 +29,39 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<UserModel?> signInWithGoogle() async {
     try {
+      // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       if (googleUser == null) return null;
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
       final AuthCredential credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      final UserCredential userCredential = await firebaseAuth.signInWithCredential(credential);
+      // Once signed in, return the UserCredential
+      final UserCredential userCredential =
+          await firebaseAuth.signInWithCredential(credential);
       final User? user = userCredential.user;
 
       if (user == null) return null;
 
-      // Admin emails list - add your admin emails here
+      // Admin emails list
       const adminEmails = [
         'admin@madebyhands.com',
         'adj@madebyhands.com',
+        'adhirajjain@madebyhands.com',
       ];
       final String userEmail = user.email ?? '';
 
       // Check if user exists in Firestore
       final userDoc = await firestore.collection('users').doc(user.uid).get();
-      if (userDoc.exists) {
-        return UserModel.fromJson(userDoc.data()!);
+      final userData = userDoc.data();
+      
+      if (userDoc.exists && userData != null) {
+        return UserModel.fromJson(userData);
       } else if (adminEmails.contains(userEmail)) {
         // Automatically create admin profile if it's a preset admin email
         return await signUpWithRole(
@@ -109,8 +117,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       if (user == null) return null;
 
       final userDoc = await firestore.collection('users').doc(user.uid).get();
-      if (userDoc.exists) {
-        return UserModel.fromJson(userDoc.data()!);
+      final userData = userDoc.data();
+      if (userDoc.exists && userData != null) {
+        return UserModel.fromJson(userData);
       }
       return null;
     } catch (e) {
