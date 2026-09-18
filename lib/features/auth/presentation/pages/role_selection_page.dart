@@ -1,3 +1,4 @@
+import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
@@ -108,9 +109,9 @@ class _RoleCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: const Color.fromRGBO(107, 142, 35, 1), width: 1.5),
+          border: Border.all(color: AppColors.primary, width: 1.5),
           boxShadow: [
             BoxShadow(
               color: Colors.grey.withAlpha(25),
@@ -127,13 +128,13 @@ class _RoleCard extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color.fromRGBO(107, 142, 35, 1),
+                color: AppColors.primary,
               ),
             ),
             const SizedBox(height: 8),
-            Text(
+            const Text(
               description,
-              style: const TextStyle(fontSize: 14, color: Colors.black87),
+              style: TextStyle(fontSize: 14, color: AppColors.text),
             ),
           ],
         ),

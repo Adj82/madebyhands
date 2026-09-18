@@ -1,3 +1,4 @@
+import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
@@ -97,7 +98,7 @@ class WelcomeScreen extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 34,
                           fontWeight: FontWeight.w900,
-                          color: Colors.black,
+                          color: AppColors.text,
                           letterSpacing: -0.5,
                         ),
                       ),
