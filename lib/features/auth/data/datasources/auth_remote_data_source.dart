@@ -29,31 +29,39 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<UserModel?> signInWithGoogle() async {
     try {
+      // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       if (googleUser == null) return null;
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
       final AuthCredential credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      final UserCredential userCredential = await firebaseAuth.signInWithCredential(credential);
+      // Once signed in, return the UserCredential
+      final UserCredential userCredential =
+          await firebaseAuth.signInWithCredential(credential);
       final User? user = userCredential.user;
 
       if (user == null) return null;
 
-      // Admin emails list - add your admin emails here
+      // Admin emails list
       const adminEmails = [
         'admin@madebyhands.com',
-        'adj@madebyhands.com', // Placeholder for Adhiraj Jain
+        'adj@madebyhands.com',
+        'adhirajjain@madebyhands.com',
       ];
       final String userEmail = user.email ?? '';
 
       // Check if user exists in Firestore
       final userDoc = await firestore.collection('users').doc(user.uid).get();
-      if (userDoc.exists) {
-        return UserModel.fromJson(userDoc.data()!);
+      final userData = userDoc.data();
+      
+      if (userDoc.exists && userData != null) {
+        return UserModel.fromJson(userData);
       } else if (adminEmails.contains(userEmail)) {
         // Automatically create admin profile if it's a preset admin email
         return await signUpWithRole(
@@ -71,8 +79,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           role: '', // Triggers Role Selection UI
         );
       }
+    } on FirebaseAuthException catch (e) {
+      throw Exception(e.message ?? 'A Firebase authentication error occurred.');
     } catch (e) {
-      throw Exception(e.toString());
+      throw Exception('Google sign-in error: $e');
     }
   }
 
@@ -93,8 +103,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
       await firestore.collection('users').doc(uid).set(userModel.toJson());
       return userModel;
+    } on FirebaseException catch (e) {
+      throw Exception(e.message ?? 'A Firestore error occurred while creating user.');
     } catch (e) {
-      throw Exception(e.toString());
+      throw Exception('An unexpected error occurred during role assignment.');
     }
   }
 
@@ -105,18 +117,31 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       if (user == null) return null;
 
       final userDoc = await firestore.collection('users').doc(user.uid).get();
-      if (userDoc.exists) {
-        return UserModel.fromJson(userDoc.data()!);
+      final userData = userDoc.data();
+      if (userDoc.exists && userData != null) {
+        return UserModel.fromJson(userData);
       }
-      return null;
+      
+      // If user is authenticated in Firebase but no profile in Firestore, 
+      // trigger role selection by returning a UserModel with empty role.
+      return UserModel(
+        uid: user.uid,
+        email: user.email ?? '',
+        name: user.displayName ?? '',
+        role: '',
+      );
     } catch (e) {
-      throw Exception(e.toString());
+      return null;
     }
   }
 
   @override
   Future<void> signOut() async {
-    await googleSignIn.signOut();
-    await firebaseAuth.signOut();
+    try {
+      await googleSignIn.signOut();
+      await firebaseAuth.signOut();
+    } catch (e) {
+      throw Exception('Error signing out.');
+    }
   }
 }

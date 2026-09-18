@@ -1,3 +1,4 @@
+import 'package:madebyhands/firebase_options.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,9 +14,10 @@ final serviceLocator = GetIt.instance;
 
 Future<void> initDependencies() async {
   try {
-    // Initialize Firebase
-    // Note: For Web, you should ideally pass DefaultFirebaseOptions.currentPlatform
-    await Firebase.initializeApp();
+    // Initialize Firebase with generated options
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
   } catch (e) {
     debugPrint("Firebase initialization failed: $e");
   }
@@ -23,7 +25,10 @@ Future<void> initDependencies() async {
   // Core
   serviceLocator.registerLazySingleton(() => FirebaseAuth.instance);
   serviceLocator.registerLazySingleton(() => FirebaseFirestore.instance);
-  serviceLocator.registerLazySingleton(() => GoogleSignIn());
+  serviceLocator.registerLazySingleton(() => GoogleSignIn(
+        clientId:
+            '471666575216-ouudhhl87o8arveq68ic6vq9eed25o66.apps.googleusercontent.com',
+      ));
 
   // Auth Feature
   _initAuth();

@@ -43,7 +43,11 @@ class LoginPage extends StatelessWidget {
                 const SizedBox(height: 50),
                 AuthButton(
                   text: 'Sign in with Google',
-                  icon: const Icon(Icons.login),
+                  isLoading: state is AuthLoading,
+                  icon: Image.network(
+                    'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_\"G\"_logo.svg/768px-Google_\"G\"_logo.svg.png',
+                    height: 25,
+                  ),
                   onPressed: () {
                     context.read<AuthBloc>().add(AuthGoogleSignInRequested());
                   },
