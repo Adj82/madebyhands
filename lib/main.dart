@@ -4,9 +4,10 @@ import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/presentation/pages/welcome_screen.dart';
 import 'package:madebyhands/features/auth/presentation/pages/role_selection_page.dart';
 import 'package:madebyhands/features/admin/presentation/pages/admin_dashboard_page.dart';
-import 'package:madebyhands/features/home/presentation/pages/creator_dashboard.dart';
+import 'package:madebyhands/features/creator/presentation/pages/creator_flow_wrapper.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/buyer_dashboard_page.dart';
+import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 import 'package:madebyhands/init_dependencies.dart';
 
 void main() async {
@@ -17,6 +18,9 @@ void main() async {
       providers: [
         BlocProvider(
           create: (_) => serviceLocator<AuthBloc>()..add(AuthIsUserLoggedIn()),
+        ),
+        BlocProvider(
+          create: (_) => serviceLocator<CreatorBloc>(),
         ),
       ],
       child: const MyApp(),
@@ -41,12 +45,12 @@ class MyApp extends StatelessWidget {
             );
           }
           if (state is AuthSuccess) {
-            // Check role and return appropriate dashboard
+            // Check role and return appropriate dashboard or flow
             final role = state.user.role.toLowerCase();
             if (role == 'admin') {
               return const AdminDashboardPage();
             } else if (role == 'creator' || role == 'seller') {
-              return const CreatorDashboard();
+              return CreatorFlowWrapper(user: state.user);
             } else {
               return BuyerDashboardPage(
                 user: state.user,
