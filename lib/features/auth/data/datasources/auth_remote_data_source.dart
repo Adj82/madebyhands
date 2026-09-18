@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:madebyhands/features/auth/data/models/user_model.dart';
 
@@ -29,19 +30,27 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<UserModel?> signInWithGoogle() async {
     try {
-      // Trigger the authentication flow
+      debugPrint("Starting Google Sign-In flow...");
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      if (googleUser == null) return null;
+      if (googleUser == null) {
+        debugPrint("Google Sign-In: User cancelled the flow.");
+        return null;
+      }
 
-      // Obtain the auth details from the request
+      debugPrint("Google Sign-In: Fetching authentication details...");
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
+      
+      if (googleAuth.idToken == null && googleAuth.accessToken == null) {
+        throw Exception('Both idToken and accessToken are null. Check your Google Cloud Console configuration.');
+      }
+
       final AuthCredential credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // Once signed in, return the UserCredential
+      debugPrint("Firebase: Signing in with Google credentials...");
       final UserCredential userCredential =
           await firebaseAuth.signInWithCredential(credential);
       final User? user = userCredential.user;
@@ -50,9 +59,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       // Admin emails list
       const adminEmails = [
-        'admin@madebyhands.com',
-        'adj@madebyhands.com',
-        'adhirajjain@madebyhands.com',
+        'adhirajjain364@gmail.com',
+        'mayankjaisw8673@gmail.com',
+        'suhanimahajan2810@gmail.com',
+        'majumdarpayal50@gmail.com',
+        'reshob.rc12345@gmail.com',
       ];
       final String userEmail = user.email ?? '';
 
@@ -81,7 +92,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
     } on FirebaseAuthException catch (e) {
       throw Exception(e.message ?? 'A Firebase authentication error occurred.');
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint("Google Sign-In Detailed Error: $e");
+      debugPrint("Stacktrace: $stackTrace");
       throw Exception('Google sign-in error: $e');
     }
   }

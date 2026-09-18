@@ -29,7 +29,7 @@ void main() {
     expect(find.text('Hello, Suhani'), findsOneWidget);
     expect(find.text('Handpicked for you'), findsOneWidget);
 
-    await tester.tap(find.text('Explore').last);
+    await tester.tap(find.text('Shop').last);
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'pottery');
     await tester.pump();

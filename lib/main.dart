@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/presentation/pages/welcome_screen.dart';
 import 'package:madebyhands/features/auth/presentation/pages/role_selection_page.dart';
-import 'package:madebyhands/features/home/presentation/pages/admin_dashboard.dart';
+import 'package:madebyhands/features/admin/presentation/pages/admin_dashboard_page.dart';
 import 'package:madebyhands/features/home/presentation/pages/creator_dashboard.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/buyer_dashboard_page.dart';
@@ -44,10 +44,10 @@ class MyApp extends StatelessWidget {
           }
           if (state is AuthSuccess) {
             // Check role and return appropriate dashboard
-            if (state.user.role == 'admin') {
-              return const AdminDashboard();
-            } else if (state.user.role == 'creator' ||
-                state.user.role == 'seller') {
+            final role = state.user.role.toLowerCase();
+            if (role == 'admin') {
+              return const AdminDashboardPage();
+            } else if (role == 'creator' || role == 'seller') {
               return const CreatorDashboard();
             } else {
               return BuyerDashboardPage(
