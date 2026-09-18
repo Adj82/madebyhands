@@ -9,21 +9,23 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppColors.primary,
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthFailure) {
             showDialog(
               context: context,
               builder: (context) => AlertDialog(
-                title: const Text('Authentication Error'),
+                backgroundColor: AppColors.surface,
+                title: const Text('Authentication Error', 
+                  style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
                 content: SingleChildScrollView(
-                  child: Text(state.message),
+                  child: Text(state.message, style: const TextStyle(color: AppColors.text)),
                 ),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('OK'),
+                    child: const Text('OK', style: TextStyle(color: AppColors.primary)),
                   ),
                 ],
               ),
@@ -33,12 +35,12 @@ class WelcomeScreen extends StatelessWidget {
         builder: (context, state) {
           return Column(
             children: [
-              // Top illustration section
+              // Top illustration section (Primary Theme Color)
               Expanded(
                 flex: 5,
                 child: Container(
                   width: double.infinity,
-                  color: Colors.black,
+                  color: AppColors.primary,
                   child: Center(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 40),
@@ -51,13 +53,13 @@ class WelcomeScreen extends StatelessWidget {
                                 width: constraints.maxWidth * 0.8,
                                 height: constraints.maxHeight * 0.8,
                                 decoration: BoxDecoration(
-                                  color: Colors.grey[900],
+                                  color: AppColors.primaryDark.withAlpha(100),
                                   borderRadius: BorderRadius.circular(24),
                                 ),
                                 child: const Center(
                                   child: Icon(
-                                    Icons.image_outlined,
-                                    color: Colors.white24,
+                                    Icons.auto_awesome,
+                                    color: Colors.white54,
                                     size: 80,
                                   ),
                                 ),
@@ -65,8 +67,13 @@ class WelcomeScreen extends StatelessWidget {
                               const Positioned(
                                 bottom: 20,
                                 child: Text(
-                                  'Illustration Placeholder',
-                                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                                  'CREATING ARTISANS',
+                                  style: TextStyle(
+                                    color: Colors.white70, 
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 2,
+                                  ),
                                 ),
                               ),
                             ],
@@ -77,13 +84,13 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              // Bottom white section with rounded top
+              // Bottom beige section with rounded top (Theme Background)
               Expanded(
                 flex: 4,
                 child: Container(
                   width: double.infinity,
                   decoration: const BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.background,
                     borderRadius: BorderRadius.only(
                       topLeft: Radius.elliptical(300, 100),
                       topRight: Radius.elliptical(300, 100),
@@ -115,16 +122,16 @@ class WelcomeScreen extends StatelessWidget {
                           height: 60,
                           width: double.infinity,
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: AppColors.surface,
                             borderRadius: BorderRadius.circular(30),
                             border: Border.all(
-                              color: Colors.grey.shade300,
+                              color: AppColors.outline,
                               width: 1.5,
                             ),
                           ),
                           child: Center(
                             child: state is AuthLoading
-                                ? const CircularProgressIndicator()
+                                ? const CircularProgressIndicator(color: AppColors.primary)
                                 : Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
@@ -133,6 +140,15 @@ class WelcomeScreen extends StatelessWidget {
                                         height: 28,
                                         errorBuilder: (context, error, stackTrace) =>
                                             const Icon(Icons.g_mobiledata, size: 40, color: Colors.blue),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      const Text(
+                                        'Sign in with Google',
+                                        style: TextStyle(
+                                          color: AppColors.text,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -144,17 +160,17 @@ class WelcomeScreen extends StatelessWidget {
                         padding: const EdgeInsets.only(bottom: 30),
                         child: Column(
                           children: [
-                            Text(
+                            const Text(
                               'By continuing you agree MadeByHands',
                               style: TextStyle(
-                                color: Colors.grey[600],
+                                color: AppColors.mutedText,
                                 fontSize: 13,
                               ),
                             ),
                             const Text(
                               'Terms of services & Privacy Policy',
                               style: TextStyle(
-                                color: Colors.black,
+                                color: AppColors.text,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
                               ),
