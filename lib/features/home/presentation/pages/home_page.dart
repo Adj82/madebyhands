@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -22,8 +24,7 @@ class HomePage extends StatelessWidget {
           ),
           IconButton(
             onPressed: () {
-              // Simple logout simulation
-              Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+              context.read<AuthBloc>().add(AuthLogoutRequested());
             },
             icon: const Icon(Icons.logout),
           ),
