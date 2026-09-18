@@ -30,19 +30,27 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<UserModel?> signInWithGoogle() async {
     try {
-      // Trigger the authentication flow
+      debugPrint("Starting Google Sign-In flow...");
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      if (googleUser == null) return null;
+      if (googleUser == null) {
+        debugPrint("Google Sign-In: User cancelled the flow.");
+        return null;
+      }
 
-      // Obtain the auth details from the request
+      debugPrint("Google Sign-In: Fetching authentication details...");
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
+      
+      if (googleAuth.idToken == null && googleAuth.accessToken == null) {
+        throw Exception('Both idToken and accessToken are null. Check your Google Cloud Console configuration.');
+      }
+
       final AuthCredential credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // Once signed in, return the UserCredential
+      debugPrint("Firebase: Signing in with Google credentials...");
       final UserCredential userCredential =
           await firebaseAuth.signInWithCredential(credential);
       final User? user = userCredential.user;
