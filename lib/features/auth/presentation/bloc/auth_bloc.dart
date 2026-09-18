@@ -64,7 +64,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     res.fold(
       (l) => emit(AuthInitial()),
-      (r) => emit(AuthSuccess(r)),
+      (r) {
+        if (r.role.isEmpty) {
+          emit(AuthNeedsRoleSelection(r));
+        } else {
+          emit(AuthSuccess(r));
+        }
+      },
     );
   }
 

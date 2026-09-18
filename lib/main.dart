@@ -55,6 +55,32 @@ class MyApp extends StatelessWidget {
             return RoleSelectionPage(tempUser: state.tempUser);
           }
 
+          if (state is AuthFailure) {
+            return Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('Error: ${state.message}'),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        context.read<AuthBloc>().add(AuthIsUserLoggedIn());
+                      },
+                      child: const Text('Retry'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        context.read<AuthBloc>().add(AuthLogoutRequested());
+                      },
+                      child: const Text('Back to Login'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
           return const LoginPage();
         },
       ),

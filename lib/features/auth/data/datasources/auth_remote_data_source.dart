@@ -121,7 +121,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       if (userDoc.exists && userData != null) {
         return UserModel.fromJson(userData);
       }
-      return null;
+      
+      // If user is authenticated in Firebase but no profile in Firestore, 
+      // trigger role selection by returning a UserModel with empty role.
+      return UserModel(
+        uid: user.uid,
+        email: user.email ?? '',
+        name: user.displayName ?? '',
+        role: '',
+      );
     } catch (e) {
       return null;
     }
