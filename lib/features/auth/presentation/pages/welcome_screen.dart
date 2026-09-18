@@ -12,8 +12,20 @@ class WelcomeScreen extends StatelessWidget {
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthFailure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message)),
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Authentication Error'),
+                content: SingleChildScrollView(
+                  child: Text(state.message),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
             );
           }
         },

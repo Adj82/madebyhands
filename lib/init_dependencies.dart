@@ -27,7 +27,7 @@ Future<void> initDependencies() async {
   serviceLocator.registerLazySingleton(() => FirebaseFirestore.instance);
   serviceLocator.registerLazySingleton(() => GoogleSignIn(
         clientId:
-            '471666575216-ouudhhl87o8arveq68ic6vq9eed25o66.apps.googleusercontent.com',
+            '745060405583-fulnte2av4ooagafe1gfdo3rvjkqnpgd.apps.googleusercontent.com',
       ));
 
   // Auth Feature
