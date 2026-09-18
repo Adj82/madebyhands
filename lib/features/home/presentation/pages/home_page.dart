@@ -5,7 +5,7 @@ import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
-  static route() => MaterialPageRoute(
+  static MaterialPageRoute<void> route() => MaterialPageRoute(
         builder: (context) => const HomePage(),
       );
 

@@ -1,6 +1,25 @@
-# madebyhands
+# MadeByHands
 
-A new Flutter project.
+A Flutter marketplace connecting buyers with independent artisans and handmade products.
+
+## App areas
+
+- Buyer: catalogue discovery, saved pieces, cart, orders, and profile.
+- Seller/creator: product and order management (in progress).
+- Admin: platform moderation and operations (in progress).
+
+The app uses a shared cream, sage, and terracotta visual theme from `lib/core/theme/app_theme.dart`.
+
+## Development
+
+```sh
+flutter pub get
+flutter analyze
+flutter test
+flutter run
+```
+
+Daily team changes and integration notes are recorded in `docs/daily-log.md`.
 
 ## Getting Started
 

@@ -4,9 +4,9 @@ import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/presentation/pages/welcome_screen.dart';
 import 'package:madebyhands/features/auth/presentation/pages/role_selection_page.dart';
 import 'package:madebyhands/features/home/presentation/pages/admin_dashboard.dart';
-import 'package:madebyhands/features/home/presentation/pages/buyer_dashboard.dart';
 import 'package:madebyhands/features/home/presentation/pages/creator_dashboard.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:madebyhands/features/buyer/presentation/pages/buyer_dashboard_page.dart';
 import 'package:madebyhands/init_dependencies.dart';
 
 void main() async {
@@ -44,10 +44,15 @@ class MyApp extends StatelessWidget {
             // Check role and return appropriate dashboard
             if (state.user.role == 'admin') {
               return const AdminDashboard();
-            } else if (state.user.role == 'creator') {
+            } else if (state.user.role == 'creator' ||
+                state.user.role == 'seller') {
               return const CreatorDashboard();
             } else {
-              return const BuyerDashboard();
+              return BuyerDashboardPage(
+                user: state.user,
+                onLogout: () =>
+                    context.read<AuthBloc>().add(AuthLogoutRequested()),
+              );
             }
           }
 
