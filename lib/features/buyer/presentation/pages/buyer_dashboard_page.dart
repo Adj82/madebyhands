@@ -1,19 +1,25 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
-import 'package:madebyhands/features/buyer/data/mock_products.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
+import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
+import 'package:madebyhands/features/buyer/presentation/pages/order_history_page.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/product_details_page.dart';
+import 'package:madebyhands/features/buyer/presentation/pages/saved_addresses_page.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
 
 class BuyerDashboardPage extends StatefulWidget {
   final UserEntity user;
   final VoidCallback onLogout;
+  final BuyerRepository repository;
 
   const BuyerDashboardPage({
     super.key,
     required this.user,
     required this.onLogout,
+    required this.repository,
   });
 
   @override
@@ -24,16 +30,80 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
   int _selectedIndex = 0;
   final Set<String> _savedProductIds = {};
   final Map<String, int> _cartQuantities = {};
+  List<Product> _products = const [];
+  bool _isLoadingProducts = true;
+  String? _catalogueError;
+  StreamSubscription<List<Product>>? _productSubscription;
+  StreamSubscription<Set<String>>? _favoriteSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _productSubscription = widget.repository.watchProducts().listen(
+      (products) {
+        if (!mounted) return;
+        setState(() {
+          _products = products;
+          _isLoadingProducts = false;
+          _catalogueError = null;
+        });
+      },
+      onError: (Object error) {
+        if (!mounted) return;
+        setState(() {
+          _isLoadingProducts = false;
+          _catalogueError = error.toString();
+        });
+      },
+    );
+    _favoriteSubscription = widget.repository
+        .watchFavoriteProductIds(widget.user.uid)
+        .listen((favorites) {
+          if (!mounted) return;
+          setState(() {
+            _savedProductIds
+              ..clear()
+              ..addAll(favorites);
+          });
+        });
+  }
+
+  @override
+  void dispose() {
+    _productSubscription?.cancel();
+    _favoriteSubscription?.cancel();
+    super.dispose();
+  }
 
   int get _cartCount =>
       _cartQuantities.values.fold(0, (total, quantity) => total + quantity);
 
-  void _toggleSaved(Product product) {
+  Future<void> _toggleSaved(Product product) async {
+    final wasSaved = _savedProductIds.contains(product.id);
     setState(() {
-      if (!_savedProductIds.add(product.id)) {
+      if (wasSaved) {
         _savedProductIds.remove(product.id);
+      } else {
+        _savedProductIds.add(product.id);
       }
     });
+    try {
+      await widget.repository.setFavorite(
+        userId: widget.user.uid,
+        productId: product.id,
+        isFavorite: !wasSaved,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        wasSaved
+            ? _savedProductIds.add(product.id)
+            : _savedProductIds.remove(product.id);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update saved items: $error')),
+      );
+    }
   }
 
   void _addToCart(Product product) {
@@ -64,23 +134,27 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
     final pages = [
       _HomeTab(
         userName: widget.user.name,
+        products: _products,
         savedProductIds: _savedProductIds,
         onProductTap: _openProduct,
         onSave: _toggleSaved,
         onBrowseAll: () => setState(() => _selectedIndex = 1),
       ),
       _SearchTab(
+        products: _products,
         savedProductIds: _savedProductIds,
         onProductTap: _openProduct,
         onSave: _toggleSaved,
       ),
       _SavedTab(
+        products: _products,
         savedProductIds: _savedProductIds,
         onProductTap: _openProduct,
         onSave: _toggleSaved,
         onBrowse: () => setState(() => _selectedIndex = 1),
       ),
       _CartTab(
+        products: _products,
         quantities: _cartQuantities,
         onQuantityChanged: (product, quantity) {
           setState(() {
@@ -93,13 +167,40 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
         },
         onBrowse: () => setState(() => _selectedIndex = 1),
       ),
-      _ProfileTab(user: widget.user, onLogout: widget.onLogout),
+      _ProfileTab(
+        user: widget.user,
+        onLogout: widget.onLogout,
+        onOrders: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => OrderHistoryPage(
+              userId: widget.user.uid,
+              repository: widget.repository,
+            ),
+          ),
+        ),
+        onAddresses: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SavedAddressesPage(
+              userId: widget.user.uid,
+              repository: widget.repository,
+            ),
+          ),
+        ),
+      ),
     ];
 
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: IndexedStack(index: _selectedIndex, children: pages),
+        child: _isLoadingProducts
+            ? const Center(child: CircularProgressIndicator())
+            : _catalogueError != null
+            ? _EmptyState(
+                icon: Icons.cloud_off_outlined,
+                title: 'Could not load the catalogue',
+                message: _catalogueError!,
+              )
+            : IndexedStack(index: _selectedIndex, children: pages),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
@@ -146,6 +247,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
 
 class _HomeTab extends StatelessWidget {
   final String userName;
+  final List<Product> products;
   final Set<String> savedProductIds;
   final ValueChanged<Product> onProductTap;
   final ValueChanged<Product> onSave;
@@ -153,6 +255,7 @@ class _HomeTab extends StatelessWidget {
 
   const _HomeTab({
     required this.userName,
+    required this.products,
     required this.savedProductIds,
     required this.onProductTap,
     required this.onSave,
@@ -295,18 +398,18 @@ class _HomeTab extends StatelessWidget {
               mainAxisSpacing: 12,
               childAspectRatio: 0.67,
             ),
-            delegate: SliverChildBuilderDelegate(childCount: 4, (
-              context,
-              index,
-            ) {
-              final product = mockProducts[index];
-              return ProductCard(
-                product: product,
-                isSaved: savedProductIds.contains(product.id),
-                onTap: () => onProductTap(product),
-                onSave: () => onSave(product),
-              );
-            }),
+            delegate: SliverChildBuilderDelegate(
+              childCount: products.length.clamp(0, 4),
+              (context, index) {
+                final product = products[index];
+                return ProductCard(
+                  product: product,
+                  isSaved: savedProductIds.contains(product.id),
+                  onTap: () => onProductTap(product),
+                  onSave: () => onSave(product),
+                );
+              },
+            ),
           ),
         ),
       ],
@@ -315,11 +418,13 @@ class _HomeTab extends StatelessWidget {
 }
 
 class _SearchTab extends StatefulWidget {
+  final List<Product> products;
   final Set<String> savedProductIds;
   final ValueChanged<Product> onProductTap;
   final ValueChanged<Product> onSave;
 
   const _SearchTab({
+    required this.products,
     required this.savedProductIds,
     required this.onProductTap,
     required this.onSave,
@@ -344,7 +449,7 @@ class _SearchTabState extends State<_SearchTab> {
       'Wellness',
       'Gifts',
     ];
-    final products = mockProducts.where((product) {
+    final products = widget.products.where((product) {
       final normalizedQuery = _query.trim().toLowerCase();
       final matchesCategory =
           _category == 'All' || product.category == _category;
@@ -447,12 +552,14 @@ class _SearchTabState extends State<_SearchTab> {
 }
 
 class _SavedTab extends StatelessWidget {
+  final List<Product> products;
   final Set<String> savedProductIds;
   final ValueChanged<Product> onProductTap;
   final ValueChanged<Product> onSave;
   final VoidCallback onBrowse;
 
   const _SavedTab({
+    required this.products,
     required this.savedProductIds,
     required this.onProductTap,
     required this.onSave,
@@ -461,7 +568,7 @@ class _SavedTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final products = mockProducts
+    final products = this.products
         .where((product) => savedProductIds.contains(product.id))
         .toList();
     return Column(
@@ -511,11 +618,13 @@ class _SavedTab extends StatelessWidget {
 }
 
 class _CartTab extends StatelessWidget {
+  final List<Product> products;
   final Map<String, int> quantities;
   final void Function(Product, int) onQuantityChanged;
   final VoidCallback onBrowse;
 
   const _CartTab({
+    required this.products,
     required this.quantities,
     required this.onQuantityChanged,
     required this.onBrowse,
@@ -523,7 +632,7 @@ class _CartTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final products = mockProducts
+    final products = this.products
         .where((product) => quantities.containsKey(product.id))
         .toList();
     final subtotal = products.fold<int>(
@@ -680,8 +789,15 @@ class _CartTab extends StatelessWidget {
 class _ProfileTab extends StatelessWidget {
   final UserEntity user;
   final VoidCallback onLogout;
+  final VoidCallback onOrders;
+  final VoidCallback onAddresses;
 
-  const _ProfileTab({required this.user, required this.onLogout});
+  const _ProfileTab({
+    required this.user,
+    required this.onLogout,
+    required this.onOrders,
+    required this.onAddresses,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -741,15 +857,17 @@ class _ProfileTab extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        const _ProfileTile(
+        _ProfileTile(
           icon: Icons.receipt_long_outlined,
           title: 'My orders',
           subtitle: 'Track, return or buy again',
+          onTap: onOrders,
         ),
-        const _ProfileTile(
+        _ProfileTile(
           icon: Icons.location_on_outlined,
           title: 'Saved addresses',
           subtitle: 'Manage delivery locations',
+          onTap: onAddresses,
         ),
         const _ProfileTile(
           icon: Icons.support_agent_outlined,
@@ -898,11 +1016,13 @@ class _ProfileTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final VoidCallback? onTap;
 
   const _ProfileTile({
     required this.icon,
     required this.title,
     required this.subtitle,
+    this.onTap,
   });
 
   @override
@@ -914,9 +1034,11 @@ class _ProfileTile extends StatelessWidget {
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
       subtitle: Text(subtitle),
       trailing: const Icon(Icons.chevron_right),
-      onTap: () => ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('$title screen is coming next.'))),
+      onTap:
+          onTap ??
+          () => ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$title screen is coming next.')),
+          ),
     ),
   );
 }
