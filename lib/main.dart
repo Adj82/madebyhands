@@ -42,10 +42,10 @@ class MyApp extends StatelessWidget {
           }
           if (state is AuthSuccess) {
             // Check role and return appropriate dashboard
-            if (state.user.role == 'admin') {
+            final role = state.user.role.toLowerCase();
+            if (role == 'admin') {
               return const AdminDashboard();
-            } else if (state.user.role == 'creator' ||
-                state.user.role == 'seller') {
+            } else if (role == 'creator' || role == 'seller') {
               return const CreatorDashboard();
             } else {
               return BuyerDashboardPage(

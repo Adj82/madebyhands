@@ -59,9 +59,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       // Admin emails list
       const adminEmails = [
-        'admin@madebyhands.com',
-        'adj@madebyhands.com',
-        'adhirajjain@madebyhands.com',
+        'adhirajjain364@gmail.com',
       ];
       final String userEmail = user.email ?? '';
 

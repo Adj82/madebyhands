@@ -35,54 +35,60 @@ class RoleSelectionPage extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          return Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Welcome, how would you like to join us?',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Select a role to get started with your journey.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
-                ),
-                const SizedBox(height: 40),
-                _RoleCard(
-                  title: 'Continue as Buyer',
-                  description: 'Discover and purchase unique, authentic handmade products directly from creators.',
-                  onPressed: () {
-                    context.read<AuthBloc>().add(
-                          AuthSignUpWithRoleRequested(
-                            uid: tempUser.uid,
-                            email: tempUser.email,
-                            name: tempUser.name,
-                            role: 'buyer',
-                          ),
-                        );
-                  },
-                ),
-                const SizedBox(height: 20),
-                _RoleCard(
-                  title: 'Continue as Creator',
-                  description: 'Establish your identity, showcase your portfolio, and list your products for sale.',
-                  onPressed: () {
-                    context.read<AuthBloc>().add(
-                          AuthSignUpWithRoleRequested(
-                            uid: tempUser.uid,
-                            email: tempUser.email,
-                            name: tempUser.name,
-                            role: 'creator',
-                          ),
-                        );
-                  },
-                ),
-              ],
+          return SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Welcome, how would you like to join us?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Select a role to get started with your journey.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 40),
+                  _RoleCard(
+                    title: 'Continue as Buyer',
+                    description:
+                        'Discover and purchase unique, authentic handmade products directly from creators.',
+                    onPressed: () {
+                      context.read<AuthBloc>().add(
+                            AuthSignUpWithRoleRequested(
+                              uid: tempUser.uid,
+                              email: tempUser.email,
+                              name: tempUser.name,
+                              role: 'buyer',
+                            ),
+                          );
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  _RoleCard(
+                    title: 'Continue as Creator',
+                    description:
+                        'Establish your identity, showcase your portfolio, and list your products for sale.',
+                    onPressed: () {
+                      context.read<AuthBloc>().add(
+                            AuthSignUpWithRoleRequested(
+                              uid: tempUser.uid,
+                              email: tempUser.email,
+                              name: tempUser.name,
+                              role: 'creator',
+                            ),
+                          );
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
           );
         },
