@@ -17,8 +17,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     'Overview',
     'Creator Verifications',
     'Product Approvals',
+    'Categories',
+    'Orders',
     'User Management',
+    'Support Tickets',
     'Moderation',
+    'Payouts & Finance',
   ];
 
   @override
@@ -60,12 +64,22 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
               ),
             ),
-            _buildDrawerTile(0, Icons.dashboard_outlined, Icons.dashboard, 'Overview'),
-            _buildDrawerTile(1, Icons.verified_user_outlined, Icons.verified_user, 'Verifications'),
-            _buildDrawerTile(2, Icons.shopping_bag_outlined, Icons.shopping_bag, 'Products'),
-            _buildDrawerTile(3, Icons.people_outline, Icons.people, 'Users'),
-            _buildDrawerTile(4, Icons.gavel_outlined, Icons.gavel, 'Moderation'),
-            const Spacer(),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  _buildDrawerTile(0, Icons.dashboard_outlined, Icons.dashboard, 'Overview'),
+                  _buildDrawerTile(1, Icons.verified_user_outlined, Icons.verified_user, 'Verifications'),
+                  _buildDrawerTile(2, Icons.shopping_bag_outlined, Icons.shopping_bag, 'Products'),
+                  _buildDrawerTile(3, Icons.category_outlined, Icons.category, 'Categories'),
+                  _buildDrawerTile(4, Icons.receipt_long_outlined, Icons.receipt_long, 'Orders'),
+                  _buildDrawerTile(5, Icons.people_outline, Icons.people, 'Users'),
+                  _buildDrawerTile(6, Icons.support_agent_outlined, Icons.support_agent, 'Support'),
+                  _buildDrawerTile(7, Icons.gavel_outlined, Icons.gavel, 'Moderation'),
+                  _buildDrawerTile(8, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'Payouts'),
+                ],
+              ),
+            ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.settings_outlined),
@@ -82,8 +96,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           _OverviewView(),
           _VerificationView(),
           _ProductApprovalView(),
+          _CategoryManagementView(),
+          _OrderManagementView(),
           _UserManagementView(),
+          _SupportTicketsView(),
           _ModerationView(),
+          _FinanceView(),
         ],
       ),
     );
@@ -137,7 +155,7 @@ class _OverviewView extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: 5,
-            separatorBuilder: (_, __) => const Divider(),
+            separatorBuilder: (context, index) => const Divider(),
             itemBuilder: (context, index) {
               return ListTile(
                 leading: const CircleAvatar(backgroundColor: AppColors.outline, child: Icon(Icons.notifications_none, size: 20)),
@@ -189,7 +207,10 @@ class _VerificationView extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    OutlinedButton(onPressed: () {}, child: const Text('View Documents')),
+                    OutlinedButton(
+                      onPressed: () => _showDocumentReview(context, index), 
+                      child: const Text('View Documents')
+                    ),
                     const SizedBox(width: 10),
                     FilledButton(onPressed: () {}, style: FilledButton.styleFrom(backgroundColor: AppColors.primary), child: const Text('Verify')),
                   ],
@@ -199,6 +220,262 @@ class _VerificationView extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  void _showDocumentReview(BuildContext context, int index) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.background,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(25),
+        height: MediaQuery.of(context).size.height * 0.8,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Verification Documents', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 5),
+            Text('Artisan ID: MBH-CRT-00$index', style: const TextStyle(color: AppColors.mutedText)),
+            const SizedBox(height: 25),
+            Expanded(
+              child: ListView(
+                children: [
+                  _DocItem(title: 'Identity Proof (PAN/Aadhar)', subtitle: 'Uploaded on 12 Sep 2026'),
+                  const SizedBox(height: 15),
+                  _DocItem(title: 'Address Proof', subtitle: 'Utility Bill / Bank Statement'),
+                  const SizedBox(height: 15),
+                  _DocItem(title: 'Portfolio Link', subtitle: 'https://behance.net/artisan$index', isLink: true),
+                ],
+              ),
+            ),
+            const Divider(),
+            Row(
+              children: [
+                Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Reject Application'))),
+                const SizedBox(width: 15),
+                Expanded(child: FilledButton(onPressed: () => Navigator.pop(context), style: FilledButton.styleFrom(backgroundColor: AppColors.primary), child: const Text('Approve Creator'))),
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DocItem extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool isLink;
+  const _DocItem({required this.title, required this.subtitle, this.isLink = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: AppColors.outline)),
+      child: Row(
+        children: [
+          Icon(isLink ? Icons.link : Icons.description, color: AppColors.primary),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(subtitle, style: const TextStyle(fontSize: 12, color: AppColors.mutedText)),
+              ],
+            ),
+          ),
+          IconButton(onPressed: () {}, icon: const Icon(Icons.open_in_new, size: 20)),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryManagementView extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final categories = ['Pottery', 'Jewellery', 'Home Decor', 'Textiles', 'Gifts', 'Paintings', 'Digital Art'];
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {},
+        backgroundColor: AppColors.primary,
+        icon: const Icon(Icons.add),
+        label: const Text('New Category'),
+      ),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(15),
+        itemCount: categories.length,
+        itemBuilder: (context, index) {
+          return Card(
+            child: ListTile(
+              leading: const CircleAvatar(backgroundColor: AppColors.outline, child: Icon(Icons.category, size: 20)),
+              title: Text(categories[index]),
+              subtitle: Text('${index * 12 + 5} products listed'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(onPressed: () {}, icon: const Icon(Icons.edit_outlined)),
+                  IconButton(onPressed: () {}, icon: const Icon(Icons.delete_outline, color: Colors.redAccent)),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _OrderManagementView extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(15),
+      itemCount: 10,
+      itemBuilder: (context, index) {
+        return Card(
+          margin: const EdgeInsets.only(bottom: 15),
+          child: ExpansionTile(
+            title: Text('Order #MBH-102$index', style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('Status: ${index % 2 == 0 ? 'Processing' : 'Shipped'} • Total: ₹2,450'),
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(15.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Order Items:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 5),
+                    const Text('• Blue Ceramic Vase x 1'),
+                    const Text('• Handmade Soap Set x 2'),
+                    const Divider(),
+                    const Text('Timeline:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text('18 Sep: Order Confirmed'),
+                    if (index % 2 != 0) const Text('19 Sep: Shipped by Creator'),
+                    const SizedBox(height: 15),
+                    Row(
+                      children: [
+                        const Spacer(),
+                        OutlinedButton(onPressed: () {}, child: const Text('Contact Buyer')),
+                        const SizedBox(width: 10),
+                        OutlinedButton(onPressed: () {}, child: const Text('Contact Creator')),
+                      ],
+                    )
+                  ],
+                ),
+              )
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SupportTicketsView extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(15),
+      itemCount: 6,
+      itemBuilder: (context, index) {
+        final isOpen = index < 3;
+        return Card(
+          child: ListTile(
+            leading: Icon(Icons.help_center, color: isOpen ? Colors.orange : Colors.green),
+            title: Text('Support Ticket #78$index'),
+            subtitle: Text('Issue: ${index % 2 == 0 ? 'Payment failed' : 'Product damaged'}'),
+            trailing: Chip(
+              label: Text(isOpen ? 'Open' : 'Resolved', style: const TextStyle(fontSize: 10)),
+              backgroundColor: isOpen ? Colors.orange.withAlpha(50) : Colors.green.withAlpha(50),
+            ),
+            onTap: () {},
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _FinanceView extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Financial Summary', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(25),
+            width: double.infinity,
+            decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(25)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Platform Balance', style: TextStyle(color: Colors.white70)),
+                const Text('₹1,42,850.00', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    _SmallStat(label: 'Total Fees', value: '₹12,400'),
+                    const SizedBox(width: 40),
+                    _SmallStat(label: 'Pending Payouts', value: '₹5,200'),
+                  ],
+                )
+              ],
+            ),
+          ),
+          const SizedBox(height: 30),
+          const Text('Pending Creator Payouts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 15),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 4,
+            itemBuilder: (context, index) {
+              return Card(
+                child: ListTile(
+                  title: Text('Artisan $index'),
+                  subtitle: const Text('Request Date: 17 Sep 2026'),
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text('₹4,500', style: TextStyle(fontWeight: FontWeight.bold)),
+                      TextButton(onPressed: () {}, style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero), child: const Text('Release Payout', style: TextStyle(fontSize: 12))),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SmallStat extends StatelessWidget {
+  final String label;
+  final String value;
+  const _SmallStat({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+        Text(value, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+      ],
     );
   }
 }
@@ -283,13 +560,84 @@ class _ModerationView extends StatelessWidget {
         return Card(
           child: ListTile(
             leading: const Icon(Icons.report_problem, color: Colors.red),
-            title: Text('Report #$index: Inappropriate content'),
-            subtitle: const Text('Reported by Buyer12 on Product "Handmade Pot"'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {},
+            title: Text('Report #$index: Contact Info Exchange'),
+            subtitle: const Text('Reported by System on Conversation #CRT-BYR-102'),
+            trailing: TextButton(
+              onPressed: () => _showChatModeration(context, index),
+              child: const Text('Review Chat'),
+            ),
           ),
         );
       },
+    );
+  }
+
+  void _showChatModeration(BuildContext context, int index) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.background,
+        title: const Text('Moderation Review', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('System flagged potential contact sharing in this chat:', 
+                style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
+              const SizedBox(height: 15),
+              Container(
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
+                child: Column(
+                  children: [
+                    _ChatMessage(sender: 'Artisan', message: 'Hello! Thanks for your order.', isFlagged: false),
+                    _ChatMessage(sender: 'Buyer', message: 'Can we talk on WhatsApp? 9876543210', isFlagged: true),
+                    _ChatMessage(sender: 'Artisan', message: 'I am not sure if that is allowed here.', isFlagged: false),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Ignore')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context), 
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Warn User'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChatMessage extends StatelessWidget {
+  final String sender;
+  final String message;
+  final bool isFlagged;
+  const _ChatMessage({required this.sender, required this.message, required this.isFlagged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('$sender: ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+          Expanded(
+            child: Text(message, 
+              style: TextStyle(
+                fontSize: 12, 
+                color: isFlagged ? Colors.red : Colors.black,
+                backgroundColor: isFlagged ? Colors.red.withAlpha(20) : null,
+              )
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
