@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
-import 'package:madebyhands/features/auth/presentation/pages/login_page.dart';
+import 'package:madebyhands/features/auth/presentation/pages/welcome_screen.dart';
 import 'package:madebyhands/features/auth/presentation/pages/role_selection_page.dart';
 import 'package:madebyhands/features/home/presentation/pages/admin_dashboard.dart';
 import 'package:madebyhands/features/home/presentation/pages/creator_dashboard.dart';
@@ -86,7 +86,7 @@ class MyApp extends StatelessWidget {
             );
           }
 
-          return const LoginPage();
+          return const WelcomeScreen();
         },
       ),
     );
