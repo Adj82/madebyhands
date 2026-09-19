@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
+import 'package:madebyhands/features/buyer/data/mock_buyer_repository.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/buyer_dashboard_page.dart';
 
 void main() {
@@ -17,6 +18,7 @@ class BuyerPreviewApp extends StatelessWidget {
       title: 'MadeByHands Buyer Preview',
       theme: AppTheme.lightThemeMode,
       home: BuyerDashboardPage(
+        repository: MockBuyerRepository(),
         user: UserEntity(
           uid: 'buyer-preview',
           email: 'suhani@buyer.preview',

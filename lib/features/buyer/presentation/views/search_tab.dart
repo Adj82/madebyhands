@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
-import 'package:madebyhands/features/buyer/data/mock_products.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_empty_state.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
 
 class SearchTab extends StatefulWidget {
+  final List<Product> products;
   final Set<String> savedProductIds;
   final ValueChanged<Product> onProductTap;
   final ValueChanged<Product> onSave;
 
   const SearchTab({
     super.key,
+    required this.products,
     required this.savedProductIds,
     required this.onProductTap,
     required this.onSave,
@@ -20,7 +21,6 @@ class SearchTab extends StatefulWidget {
   @override
   State<SearchTab> createState() => _SearchTabState();
 }
-
 class _SearchTabState extends State<SearchTab> {
   String _query = '';
   String _category = 'All';
@@ -36,7 +36,7 @@ class _SearchTabState extends State<SearchTab> {
       'Wellness',
       'Gifts',
     ];
-    final products = mockProducts.where((product) {
+    final products = widget.products.where((product) {
       final normalizedQuery = _query.trim().toLowerCase();
       final matchesCategory =
           _category == 'All' || product.category == _category;
@@ -137,5 +137,3 @@ class _SearchTabState extends State<SearchTab> {
     );
   }
 }
-
-

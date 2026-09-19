@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/presentation/pages/welcome_screen.dart';
 import 'package:madebyhands/features/auth/presentation/pages/role_selection_page.dart';
@@ -54,6 +55,9 @@ class MyApp extends StatelessWidget {
             } else {
               return BuyerDashboardPage(
                 user: state.user,
+                repository: FirestoreBuyerRepository(
+                  firestore: FirebaseFirestore.instance,
+                ),
                 onLogout: () =>
                     context.read<AuthBloc>().add(AuthLogoutRequested()),
               );

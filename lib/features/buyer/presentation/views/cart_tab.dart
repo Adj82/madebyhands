@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
-import 'package:madebyhands/features/buyer/data/mock_products.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_empty_state.dart';
 
 class CartTab extends StatelessWidget {
+  final List<Product> products;
   final Map<String, int> quantities;
   final void Function(Product, int) onQuantityChanged;
   final VoidCallback onBrowse;
 
   const CartTab({
     super.key,
+    required this.products,
     required this.quantities,
     required this.onQuantityChanged,
     required this.onBrowse,
@@ -19,7 +20,7 @@ class CartTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final products = mockProducts
+    final products = this.products
         .where((product) => quantities.containsKey(product.id))
         .toList();
     final subtotal = products.fold<int>(
@@ -172,5 +173,3 @@ class CartTab extends StatelessWidget {
     );
   }
 }
-
-

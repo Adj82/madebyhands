@@ -29,3 +29,20 @@ Use one dated section per workday so the three role-based branches can be merged
 - Add order history/detail and saved-address screens.
 - Agree cart/order schema with the seller and admin implementations.
 - Integrate payment only after the shared order lifecycle is finalized.
+
+## 18 September 2026 — Buyer data and account screens (Suhani)
+
+### Added
+
+- Firestore-backed live product catalogue and per-user favourites.
+- Buyer repository contract with Firestore and in-memory preview implementations.
+- Order history and order detail screens.
+- Saved-address list plus add, edit, delete, and make-default actions.
+- Buyer Firestore collection/field contract in `docs/buyer-firestore-schema.md`.
+- Widget coverage for order history/details and saved addresses.
+
+### Integration notes
+
+- Cart and checkout remain local and unchanged.
+- The seller/admin teams should write products and orders using the documented buyer contract.
+- Firestore security rules must enforce user ownership for favourites, addresses, and orders.

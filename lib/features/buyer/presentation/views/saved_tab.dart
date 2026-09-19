@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:madebyhands/features/buyer/data/mock_products.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_empty_state.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
 
 class SavedTab extends StatelessWidget {
+  final List<Product> products;
   final Set<String> savedProductIds;
   final ValueChanged<Product> onProductTap;
   final ValueChanged<Product> onSave;
@@ -12,6 +12,7 @@ class SavedTab extends StatelessWidget {
 
   const SavedTab({
     super.key,
+    required this.products,
     required this.savedProductIds,
     required this.onProductTap,
     required this.onSave,
@@ -20,7 +21,7 @@ class SavedTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final products = mockProducts
+    final products = this.products
         .where((product) => savedProductIds.contains(product.id))
         .toList();
     return Column(
@@ -68,5 +69,3 @@ class SavedTab extends StatelessWidget {
     );
   }
 }
-
-

@@ -4,9 +4,17 @@ import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 
 class ProfileTab extends StatelessWidget {
   final UserEntity user;
+  final VoidCallback onOrders;
+  final VoidCallback onAddresses;
   final VoidCallback onLogout;
 
-  const ProfileTab({super.key, required this.user, required this.onLogout});
+  const ProfileTab({
+    super.key,
+    required this.user,
+    required this.onOrders,
+    required this.onAddresses,
+    required this.onLogout,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -66,15 +74,17 @@ class ProfileTab extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        const _ProfileTile(
+        _ProfileTile(
           icon: Icons.receipt_long_outlined,
           title: 'My orders',
           subtitle: 'Track, return or buy again',
+          onTap: onOrders,
         ),
-        const _ProfileTile(
+        _ProfileTile(
           icon: Icons.location_on_outlined,
           title: 'Saved addresses',
           subtitle: 'Manage delivery locations',
+          onTap: onAddresses,
         ),
         const _ProfileTile(
           icon: Icons.support_agent_outlined,
@@ -124,11 +134,13 @@ class _ProfileTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final VoidCallback? onTap;
 
   const _ProfileTile({
     required this.icon,
     required this.title,
     required this.subtitle,
+    this.onTap,
   });
 
   @override
@@ -140,9 +152,11 @@ class _ProfileTile extends StatelessWidget {
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
       subtitle: Text(subtitle),
       trailing: const Icon(Icons.chevron_right),
-      onTap: () => ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('$title screen is coming next.'))),
+      onTap:
+          onTap ??
+          () => ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$title screen is coming next.')),
+          ),
     ),
   );
 }

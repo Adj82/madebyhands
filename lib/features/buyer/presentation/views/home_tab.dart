@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
-import 'package:madebyhands/features/buyer/data/mock_products.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
 
 class HomeTab extends StatelessWidget {
   final String userName;
+  final List<Product> products;
   final Set<String> savedProductIds;
   final ValueChanged<Product> onProductTap;
   final ValueChanged<Product> onSave;
@@ -14,6 +14,7 @@ class HomeTab extends StatelessWidget {
   const HomeTab({
     super.key,
     required this.userName,
+    required this.products,
     required this.savedProductIds,
     required this.onProductTap,
     required this.onSave,
@@ -156,18 +157,18 @@ class HomeTab extends StatelessWidget {
               mainAxisSpacing: 12,
               childAspectRatio: 0.67,
             ),
-            delegate: SliverChildBuilderDelegate(childCount: 4, (
-              context,
-              index,
-            ) {
-              final product = mockProducts[index];
-              return ProductCard(
-                product: product,
-                isSaved: savedProductIds.contains(product.id),
-                onTap: () => onProductTap(product),
-                onSave: () => onSave(product),
-              );
-            }),
+            delegate: SliverChildBuilderDelegate(
+              childCount: products.length < 4 ? products.length : 4,
+              (context, index) {
+                final product = products[index];
+                return ProductCard(
+                  product: product,
+                  isSaved: savedProductIds.contains(product.id),
+                  onTap: () => onProductTap(product),
+                  onSave: () => onSave(product),
+                );
+              },
+            ),
           ),
         ),
       ],
