@@ -2,7 +2,9 @@ import 'dart:io';
 import 'package:fpdart/fpdart.dart';
 import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/features/creator/data/datasources/creator_remote_data_source.dart';
+import 'package:madebyhands/features/creator/data/models/creator_product_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_profile_model.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
 
@@ -146,6 +148,89 @@ class CreatorRepositoryImpl implements CreatorRepository {
   Future<Either<Failure, void>> updateVerificationStatus(String uid, String status) async {
     try {
       await remoteDataSource.updateVerificationStatus(uid, status);
+      return right(null);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> addProduct({
+    required String name,
+    required String description,
+    required List<File> imageFiles,
+    required String category,
+    required double price,
+    required int stock,
+    required String materials,
+    required String dimensions,
+    required String weight,
+    required String shippingInfo,
+    required String creatorUid,
+    required String creatorName,
+  }) async {
+    try {
+      final profile = await remoteDataSource.getCreatorProfile(creatorUid);
+      if (profile == null || profile.verificationStatus != 'Verified') {
+        return left(Failure('You must be a Verified Creator to add products.'));
+      }
+
+      final imageUrls = await remoteDataSource.uploadProductImages(
+        images: imageFiles,
+        uid: creatorUid,
+        productName: name,
+      );
+
+      final newProduct = CreatorProductModel(
+        id: '', 
+        name: name,
+        description: description,
+        images: imageUrls,
+        category: category,
+        price: price,
+        stock: stock,
+        materials: materials,
+        dimensions: dimensions,
+        weight: weight,
+        shippingInfo: shippingInfo,
+        creatorUid: creatorUid,
+        creatorName: creatorName,
+        status: 'Pending Approval',
+        isActive: false,
+        createdAt: DateTime.now(),
+      );
+
+      await remoteDataSource.addProduct(newProduct);
+      return right(null);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<CreatorProduct>>> getPendingProducts() async {
+    try {
+      final products = await remoteDataSource.getPendingProducts();
+      return right(products);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<CreatorProduct>>> getCreatorProducts(String uid) async {
+    try {
+      final products = await remoteDataSource.getCreatorProducts(uid);
+      return right(products);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> updateProductStatus(String productId, String status) async {
+    try {
+      await remoteDataSource.updateProductStatus(productId, status);
       return right(null);
     } catch (e) {
       return left(Failure(e.toString()));

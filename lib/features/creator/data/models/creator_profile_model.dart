@@ -55,4 +55,23 @@ class CreatorProfileModel extends CreatorProfile {
       idCard: json['idCard'] ?? '',
     );
   }
+
+  factory CreatorProfileModel.fromEntity(CreatorProfile entity) {
+    return CreatorProfileModel(
+      uid: entity.uid,
+      name: entity.name,
+      profileImage: entity.profileImage,
+      bio: entity.bio,
+      category: entity.category,
+      location: entity.location,
+      socialLinks: entity.socialLinks,
+      portfolio: entity.portfolio,
+      story: entity.story,
+      verificationStatus: entity.verificationStatus,
+      businessName: entity.businessName,
+      address: entity.address,
+      latestPhoto: entity.latestPhoto,
+      idCard: entity.idCard,
+    );
+  }
 }

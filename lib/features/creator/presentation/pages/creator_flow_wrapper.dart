@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 import 'package:madebyhands/features/creator/presentation/pages/creator_dashboard_page.dart';
 import 'package:madebyhands/features/creator/presentation/pages/creator_onboarding_page.dart';
@@ -14,6 +15,8 @@ class CreatorFlowWrapper extends StatefulWidget {
 }
 
 class _CreatorFlowWrapperState extends State<CreatorFlowWrapper> {
+  CreatorProfile? _cachedProfile;
+
   @override
   void initState() {
     super.initState();
@@ -28,11 +31,24 @@ class _CreatorFlowWrapperState extends State<CreatorFlowWrapper> {
   Widget build(BuildContext context) {
     return BlocConsumer<CreatorBloc, CreatorState>(
       listener: (context, state) {
-        if (state is CreatorOnboardingSuccess) {
+        if (state is CreatorProfileLoaded) {
+          _cachedProfile = state.profile;
+        }
+        if (state is CreatorOnboardingSuccess || 
+            state is CreatorVerificationSuccess || 
+            state is CreatorAddProductSuccess) {
           _checkProfile();
         }
       },
       builder: (context, state) {
+        // If we have a cached profile, we stay on the dashboard even during generic loading or success states
+        if (_cachedProfile != null) {
+          if (state is CreatorFailure) {
+             return _buildErrorScreen(context, state.message);
+          }
+          return CreatorDashboardPage(profile: _cachedProfile!);
+        }
+
         if (state is CreatorLoading) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }

@@ -21,6 +21,10 @@ class _VerificationViewState extends State<VerificationView> {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<CreatorBloc, CreatorState>(
+      buildWhen: (previous, current) {
+        // Only rebuild the main view if it is relevant to full lists or failure states
+        return current is CreatorAllProfilesLoaded || current is CreatorFailure || current is CreatorLoading;
+      },
       builder: (context, state) {
         if (state is CreatorLoading) {
           return const Center(child: CircularProgressIndicator());
@@ -32,88 +36,109 @@ class _VerificationViewState extends State<VerificationView> {
               .toList();
 
           if (pendingProfiles.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(20.0),
-                child: Text(
-                  'No pending creator verifications found.',
-                  style: TextStyle(color: AppColors.mutedText, fontSize: 16),
+            return RefreshIndicator(
+              onRefresh: () async {
+                context.read<CreatorBloc>().add(CreatorFetchAllProfiles());
+              },
+              child: const SingleChildScrollView(
+                physics: AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: 400,
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(20.0),
+                      child: Text(
+                        'No pending creator verifications found.',
+                        style: TextStyle(color: AppColors.mutedText, fontSize: 16),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             );
           }
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(15),
-            itemCount: pendingProfiles.length,
-            physics: const AlwaysScrollableScrollPhysics(),
-            separatorBuilder: (context, index) => const SizedBox(height: 10),
-            itemBuilder: (context, index) {
-              final profile = pendingProfiles[index];
-              return Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                child: Padding(
-                  padding: const EdgeInsets.all(15),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 25,
-                            backgroundColor: AppColors.primary,
-                            backgroundImage: profile.profileImage.isNotEmpty
-                                ? NetworkImage(profile.profileImage)
-                                : null,
-                            child: profile.profileImage.isEmpty
-                                ? const Icon(Icons.person, color: Colors.white)
-                                : null,
-                          ),
-                          const SizedBox(width: 15),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  profile.businessName.isNotEmpty ? profile.businessName : profile.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                ),
-                                Text(
-                                  profile.category,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(color: AppColors.mutedText),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Chip(
-                            label: Text('In-Process', style: TextStyle(fontSize: 10, color: Colors.orange)),
-                            backgroundColor: Color(0xFFFFF3E0),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 15),
-                      Text('Bio: "${profile.bio}"', maxLines: 2, overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 15),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            onPressed: () => _showDocumentReview(context, profile),
-                            child: const Text('Review Docs & Take Action'),
-                          ),
-                        ],
-                      )
-                    ],
-                  ),
-                ),
-              );
+          return RefreshIndicator(
+            onRefresh: () async {
+              context.read<CreatorBloc>().add(CreatorFetchAllProfiles());
             },
+            child: ListView.separated(
+              padding: const EdgeInsets.all(15),
+              itemCount: pendingProfiles.length,
+              physics: const AlwaysScrollableScrollPhysics(),
+              separatorBuilder: (context, index) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final profile = pendingProfiles[index];
+                return Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(15),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 25,
+                              backgroundColor: AppColors.primary,
+                              backgroundImage: profile.profileImage.isNotEmpty
+                                  ? NetworkImage(profile.profileImage)
+                                  : null,
+                              child: profile.profileImage.isEmpty
+                                  ? const Icon(Icons.person, color: Colors.white)
+                                  : null,
+                            ),
+                            const SizedBox(width: 15),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    profile.businessName.isNotEmpty
+                                        ? profile.businessName
+                                        : profile.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                  Text(
+                                    profile.category,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(color: AppColors.mutedText),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Chip(
+                              label: Text('In-Process',
+                                  style: TextStyle(fontSize: 10, color: Colors.orange)),
+                              backgroundColor: Color(0xFFFFF3E0),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 15),
+                        Text('Bio: "${profile.bio}"',
+                            maxLines: 2, overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 15),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () => _showDocumentReview(context, profile),
+                              child: const Text('Review Docs & Take Action'),
+                            ),
+                          ],
+                        )
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
           );
         }
 

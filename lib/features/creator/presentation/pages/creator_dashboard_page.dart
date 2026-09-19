@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
+import 'package:madebyhands/features/creator/presentation/pages/add_product_page.dart';
+import 'package:madebyhands/features/creator/presentation/pages/creator_listings_page.dart';
 import 'package:madebyhands/features/creator/presentation/pages/creator_verification_page.dart';
 
 class CreatorDashboardPage extends StatelessWidget {
@@ -53,7 +55,10 @@ class _ProfileHeader extends StatelessWidget {
         color: AppColors.primary,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5)),
+          BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 5)),
         ],
       ),
       child: Row(
@@ -78,7 +83,10 @@ class _ProfileHeader extends StatelessWidget {
                       const Icon(Icons.verified, color: Colors.white, size: 20),
                   ],
                 ),
-                Text(profile.category, style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14)),
+                Text(profile.category,
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 14)),
               ],
             ),
           ),
@@ -214,9 +222,21 @@ class _QuickActionsGrid extends StatelessWidget {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$actionName feature coming soon for verified creators!')),
-    );
+    if (actionName == 'Add Product') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => AddProductPage(profile: profile)),
+      );
+    } else if (actionName == 'Listings') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => CreatorListingsPage(profile: profile)),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$actionName feature coming soon for verified creators!')),
+      );
+    }
   }
 
   @override
@@ -312,9 +332,22 @@ class _CreatorDrawer extends StatelessWidget {
       );
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$actionName feature coming soon for verified creators!')),
-    );
+
+    if (actionName == 'Add Product') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => AddProductPage(profile: profile)),
+      );
+    } else if (actionName == 'Listings') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => CreatorListingsPage(profile: profile)),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$actionName feature coming soon for verified creators!')),
+      );
+    }
   }
 
   @override

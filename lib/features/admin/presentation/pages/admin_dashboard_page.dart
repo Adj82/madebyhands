@@ -13,6 +13,7 @@ import 'package:madebyhands/features/admin/presentation/views/support_tickets_vi
 import 'package:madebyhands/features/admin/presentation/views/verification_view.dart';
 import 'package:madebyhands/features/admin/presentation/views/user_management_view.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 
 class AdminDashboardPage extends StatelessWidget {
   const AdminDashboardPage({super.key});
@@ -46,6 +47,11 @@ class AdminDashboardPage extends StatelessWidget {
               actions: [
                 IconButton(
                   onPressed: () {
+                    if (selectedIndex == 1) {
+                      context.read<CreatorBloc>().add(CreatorFetchAllProfiles());
+                    } else if (selectedIndex == 2) {
+                      context.read<CreatorBloc>().add(CreatorFetchPendingProducts());
+                    }
                     ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Refreshing data...')));
                   },

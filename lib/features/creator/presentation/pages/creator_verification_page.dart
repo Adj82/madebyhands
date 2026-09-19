@@ -72,6 +72,36 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
     }
   }
 
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 10),
+            Text('Request Submitted'),
+          ],
+        ),
+        content: const Text(
+          'Your verification details have been successfully submitted for review. Our admin team will verify your documents shortly. You can check your status on the dashboard.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+              // Trigger profile refresh to show In-Process status
+              this.context.read<CreatorBloc>().add(CreatorCheckProfileExists(widget.profile.uid));
+              Navigator.pop(this.context); // Back to Creator Studio
+            },
+            child: const Text('Back to Studio'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -81,12 +111,7 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
       body: BlocConsumer<CreatorBloc, CreatorState>(
         listener: (context, state) {
           if (state is CreatorVerificationSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Verification documents submitted successfully!')),
-            );
-            // Reload the profile to reflect In-Process status
-            context.read<CreatorBloc>().add(CreatorCheckProfileExists(widget.profile.uid));
-            Navigator.pop(context);
+            _showSuccessDialog();
           } else if (state is CreatorFailure) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.message)),

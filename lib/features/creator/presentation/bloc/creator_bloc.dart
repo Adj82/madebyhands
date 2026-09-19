@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
 
@@ -19,6 +20,10 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
     on<CreatorSubmitVerification>(_onSubmitVerification);
     on<CreatorFetchAllProfiles>(_onFetchAllProfiles);
     on<CreatorUpdateVerificationStatus>(_onUpdateVerificationStatus);
+    on<CreatorAddProduct>(_onAddProduct);
+    on<CreatorFetchPendingProducts>(_onFetchPendingProducts);
+    on<CreatorFetchCreatorProducts>(_onFetchCreatorProducts);
+    on<CreatorUpdateProductStatus>(_onUpdateProductStatus);
   }
 
   void _onCheckProfileExists(
@@ -88,7 +93,9 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
     CreatorFetchAllProfiles event,
     Emitter<CreatorState> emit,
   ) async {
-    emit(CreatorLoading());
+    if (state is! CreatorAllProfilesLoaded) {
+      emit(CreatorLoading());
+    }
     final res = await _creatorRepository.getAllCreatorProfiles();
     res.fold(
       (l) => emit(CreatorFailure(l.message)),
@@ -100,11 +107,118 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
     CreatorUpdateVerificationStatus event,
     Emitter<CreatorState> emit,
   ) async {
-    emit(CreatorLoading());
+    final currentState = state;
+    final List<CreatorProfile> previousProfiles = currentState is CreatorAllProfilesLoaded ? currentState.profiles : [];
+    
+    // Do not emit full CreatorLoading, as it puts screens into a spin loop
     final res = await _creatorRepository.updateVerificationStatus(event.uid, event.status);
     res.fold(
       (l) => emit(CreatorFailure(l.message)),
-      (r) => add(CreatorFetchAllProfiles()), // Refresh the list for Admin
+      (r) {
+        if (previousProfiles.isNotEmpty) {
+          final updatedProfiles = previousProfiles.map((p) {
+            if (p.uid == event.uid) {
+              return CreatorProfile(
+                uid: p.uid,
+                name: p.name,
+                profileImage: p.profileImage,
+                bio: p.bio,
+                category: p.category,
+                location: p.location,
+                socialLinks: p.socialLinks,
+                portfolio: p.portfolio,
+                story: p.story,
+                verificationStatus: event.status,
+                businessName: p.businessName,
+                address: p.address,
+                latestPhoto: p.latestPhoto,
+                idCard: p.idCard,
+              );
+            }
+            return p;
+          }).toList();
+          emit(CreatorAllProfilesLoaded(updatedProfiles));
+        } else {
+          add(CreatorFetchAllProfiles());
+        }
+      },
+    );
+  }
+
+  void _onAddProduct(
+    CreatorAddProduct event,
+    Emitter<CreatorState> emit,
+  ) async {
+    emit(CreatorLoading());
+    final res = await _creatorRepository.addProduct(
+      name: event.name,
+      description: event.description,
+      imageFiles: event.imageFiles,
+      category: event.category,
+      price: event.price,
+      stock: event.stock,
+      materials: event.materials,
+      dimensions: event.dimensions,
+      weight: event.weight,
+      shippingInfo: event.shippingInfo,
+      creatorUid: event.creatorUid,
+      creatorName: event.creatorName,
+    );
+
+    res.fold(
+      (l) => emit(CreatorFailure(l.message)),
+      (r) => emit(CreatorAddProductSuccess()),
+    );
+  }
+
+  void _onFetchPendingProducts(
+    CreatorFetchPendingProducts event,
+    Emitter<CreatorState> emit,
+  ) async {
+    if (state is! CreatorPendingProductsLoaded) {
+      emit(CreatorLoading());
+    }
+    final res = await _creatorRepository.getPendingProducts();
+    res.fold(
+      (l) => emit(CreatorFailure(l.message)),
+      (r) => emit(CreatorPendingProductsLoaded(r)),
+    );
+  }
+
+  void _onFetchCreatorProducts(
+    CreatorFetchCreatorProducts event,
+    Emitter<CreatorState> emit,
+  ) async {
+    if (state is! CreatorMyProductsLoaded) {
+      emit(CreatorLoading());
+    }
+    final res = await _creatorRepository.getCreatorProducts(event.uid);
+    res.fold(
+      (l) => emit(CreatorFailure(l.message)),
+      (r) => emit(CreatorMyProductsLoaded(r)),
+    );
+  }
+
+  void _onUpdateProductStatus(
+    CreatorUpdateProductStatus event,
+    Emitter<CreatorState> emit,
+  ) async {
+    final currentState = state;
+    final List<CreatorProduct> previousProducts = currentState is CreatorPendingProductsLoaded ? currentState.products : [];
+
+    final res = await _creatorRepository.updateProductStatus(event.productId, event.status);
+    res.fold(
+      (l) => emit(CreatorFailure(l.message)),
+      (r) {
+        if (previousProducts.isNotEmpty) {
+          final updatedProducts = previousProducts
+              .where((p) => p.id != event.productId)
+              .toList();
+          emit(CreatorPendingProductsLoaded(updatedProducts));
+        } else {
+          add(CreatorFetchPendingProducts());
+        }
+      },
     );
   }
 }

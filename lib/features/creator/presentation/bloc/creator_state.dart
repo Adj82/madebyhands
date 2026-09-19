@@ -23,6 +23,18 @@ final class CreatorAllProfilesLoaded extends CreatorState {
   CreatorAllProfilesLoaded(this.profiles);
 }
 
+final class CreatorAddProductSuccess extends CreatorState {}
+
+final class CreatorPendingProductsLoaded extends CreatorState {
+  final List<CreatorProduct> products;
+  CreatorPendingProductsLoaded(this.products);
+}
+
+final class CreatorMyProductsLoaded extends CreatorState {
+  final List<CreatorProduct> products;
+  CreatorMyProductsLoaded(this.products);
+}
+
 final class CreatorFailure extends CreatorState {
   final String message;
   CreatorFailure(this.message);
