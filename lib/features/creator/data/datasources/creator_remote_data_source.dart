@@ -59,20 +59,30 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
       if (!await image.exists()) {
         throw Exception("Source file does not exist at ${image.path}");
       }
+      
+      // Use a deterministic path based on UID
       final ref = firebaseStorage.ref().child('creator_profiles/$uid/profile_image.jpg');
       
-      // Upload the file
-      final uploadTask = await ref.putFile(
+      // Start upload
+      final uploadTask = ref.putFile(
         image,
         SettableMetadata(contentType: 'image/jpeg'),
       );
 
-      if (uploadTask.state == TaskState.success) {
-        return await ref.getDownloadURL();
+      // Wait for completion
+      final snapshot = await uploadTask;
+
+      if (snapshot.state == TaskState.success) {
+        // Only call getDownloadURL after success on the same reference
+        return await snapshot.ref.getDownloadURL();
       } else {
-        throw Exception("Upload failed with state: ${uploadTask.state}");
+        throw Exception("Upload failed with state: ${snapshot.state}");
       }
     } on FirebaseException catch (e) {
+      // Catch specific Storage errors
+      if (e.code == 'object-not-found') {
+        throw Exception('Firebase Storage Error: The profile image could not be found after upload. (Code: ${e.code})');
+      }
       throw Exception('Firebase Storage Error: ${e.message} (Code: ${e.code})');
     } catch (e) {
       throw Exception('Error uploading profile image: $e');
@@ -93,19 +103,21 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
             .ref()
             .child('creator_profiles/$uid/portfolio/image_${DateTime.now().millisecondsSinceEpoch}_$i.jpg');
         
-        final uploadTask = await ref.putFile(
+        final uploadTask = ref.putFile(
           images[i],
           SettableMetadata(contentType: 'image/jpeg'),
         );
 
-        if (uploadTask.state == TaskState.success) {
-          final url = await ref.getDownloadURL();
+        final snapshot = await uploadTask;
+
+        if (snapshot.state == TaskState.success) {
+          final url = await snapshot.ref.getDownloadURL();
           urls.add(url);
         }
       }
       return urls;
     } on FirebaseException catch (e) {
-      throw Exception('Firebase Storage Error: ${e.message}');
+      throw Exception('Firebase Storage Error: ${e.message} (Code: ${e.code})');
     } catch (e) {
       throw Exception('Error uploading portfolio images: $e');
     }

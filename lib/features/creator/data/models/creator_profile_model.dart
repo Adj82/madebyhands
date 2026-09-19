@@ -40,18 +40,4 @@ class CreatorProfileModel extends CreatorProfile {
       story: json['story'] ?? '',
     );
   }
-
-  factory CreatorProfileModel.fromEntity(CreatorProfile entity) {
-    return CreatorProfileModel(
-      uid: entity.uid,
-      name: entity.name,
-      profileImage: entity.profileImage,
-      bio: entity.bio,
-      category: entity.category,
-      location: entity.location,
-      socialLinks: entity.socialLinks,
-      portfolio: entity.portfolio,
-      story: entity.story,
-    );
-  }
 }
