@@ -9,7 +9,7 @@ export PATH="`pwd`/flutter/bin:$PATH"
 # 3. Build for Web
 flutter config --enable-web
 flutter pub get
-flutter build web --release --dart-define=GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
+flutter build web --release --no-tree-shake-icons --dart-define=GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
 
 # 4. Move build to a folder Vercel can see easily if needed
 # (Optional, but helps if you set output directory to 'build/web')
