@@ -7,16 +7,28 @@ class VerificationView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
+    const itemCount = 8;
+    
+    if (itemCount == 0) {
+      return const Center(
+        child: Text('No pending verifications'),
+      );
+    }
+
+    return ListView.separated(
       padding: const EdgeInsets.all(15),
-      itemCount: 8,
+      itemCount: itemCount,
+      physics: const AlwaysScrollableScrollPhysics(),
+      separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         return Card(
-          margin: const EdgeInsets.only(bottom: 15),
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
           child: Padding(
             padding: const EdgeInsets.all(15),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
                   children: [
@@ -31,12 +43,20 @@ class VerificationView extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Artisan Name $index',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          const Text('Pottery & Ceramics', style: TextStyle(color: AppColors.mutedText)),
+                          const Text('Pottery & Ceramics', 
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: AppColors.mutedText)),
                         ],
                       ),
                     ),
-                    const Chip(label: Text('Pending'), backgroundColor: Color(0xFFFFF3E0)),
+                    const Chip(
+                      label: Text('Pending', style: TextStyle(fontSize: 10)), 
+                      backgroundColor: Color(0xFFFFF3E0),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 15),
@@ -48,14 +68,17 @@ class VerificationView extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    OutlinedButton(
+                    TextButton(
                       onPressed: () => _showDocumentReview(context, index),
-                      child: const Text('View Documents'),
+                      child: const Text('Review Docs'),
                     ),
                     const SizedBox(width: 10),
                     FilledButton(
                       onPressed: () {},
-                      style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                      ),
                       child: const Text('Verify'),
                     ),
                   ],

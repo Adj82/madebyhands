@@ -38,8 +38,11 @@ class AdminDashboardPage extends StatelessWidget {
         builder: (context, selectedIndex) {
           return Scaffold(
             appBar: AppBar(
-              title: Text(_titles[selectedIndex],
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              title: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(_titles[selectedIndex],
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
               actions: [
                 IconButton(
                   onPressed: () {

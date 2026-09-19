@@ -20,7 +20,7 @@ class OverviewView extends StatelessWidget {
             crossAxisCount: 2,
             crossAxisSpacing: 15,
             mainAxisSpacing: 15,
-            childAspectRatio: 1.5,
+            childAspectRatio: 1.3, // Adjusted for better fit on various screens
             children: const [
               AdminStatCard(title: 'Total Users', value: '1,284', icon: Icons.people, color: Colors.blue),
               AdminStatCard(title: 'Active Creators', value: '142', icon: Icons.palette, color: AppColors.primary),

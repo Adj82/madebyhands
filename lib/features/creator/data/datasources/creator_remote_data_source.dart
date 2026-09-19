@@ -56,11 +56,26 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
     required String uid,
   }) async {
     try {
+      if (!await image.exists()) {
+        throw Exception("Source file does not exist at ${image.path}");
+      }
       final ref = firebaseStorage.ref().child('creator_profiles/$uid/profile_image.jpg');
-      await ref.putFile(image);
-      return await ref.getDownloadURL();
+      
+      // Upload the file
+      final uploadTask = await ref.putFile(
+        image,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+
+      if (uploadTask.state == TaskState.success) {
+        return await ref.getDownloadURL();
+      } else {
+        throw Exception("Upload failed with state: ${uploadTask.state}");
+      }
+    } on FirebaseException catch (e) {
+      throw Exception('Firebase Storage Error: ${e.message} (Code: ${e.code})');
     } catch (e) {
-      throw Exception(e.toString());
+      throw Exception('Error uploading profile image: $e');
     }
   }
 
@@ -72,15 +87,27 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
     try {
       List<String> urls = [];
       for (var i = 0; i < images.length; i++) {
+        if (!await images[i].exists()) continue;
+
         final ref = firebaseStorage
             .ref()
-            .child('creator_profiles/$uid/portfolio/image_$i.jpg');
-        await ref.putFile(images[i]);
-        urls.add(await ref.getDownloadURL());
+            .child('creator_profiles/$uid/portfolio/image_${DateTime.now().millisecondsSinceEpoch}_$i.jpg');
+        
+        final uploadTask = await ref.putFile(
+          images[i],
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+
+        if (uploadTask.state == TaskState.success) {
+          final url = await ref.getDownloadURL();
+          urls.add(url);
+        }
       }
       return urls;
+    } on FirebaseException catch (e) {
+      throw Exception('Firebase Storage Error: ${e.message}');
     } catch (e) {
-      throw Exception(e.toString());
+      throw Exception('Error uploading portfolio images: $e');
     }
   }
 }

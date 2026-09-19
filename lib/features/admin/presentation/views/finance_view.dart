@@ -43,19 +43,27 @@ class FinanceView extends StatelessWidget {
             itemCount: 4,
             itemBuilder: (context, index) {
               return Card(
-                child: ListTile(
-                  title: Text('Artisan $index'),
-                  subtitle: const Text('Request Date: 17 Sep 2026'),
-                  trailing: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const Text('₹4,500', style: TextStyle(fontWeight: FontWeight.bold)),
-                      TextButton(
-                          onPressed: () {},
-                          style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
-                          child: const Text('Release Payout', style: TextStyle(fontSize: 12))),
-                    ],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: ListTile(
+                    title: Text('Artisan $index', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Request Date: 17 Sep 2026', style: TextStyle(fontSize: 12)),
+                    trailing: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const Text('₹4,500', style: TextStyle(fontWeight: FontWeight.w900)),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Release Payout',
+                          style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                    onTap: () {
+                      // Trigger payout logic
+                    },
                   ),
                 ),
               );
