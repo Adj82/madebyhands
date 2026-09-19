@@ -15,79 +15,82 @@ class VerificationView extends StatelessWidget {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(15),
-      itemCount: itemCount,
-      physics: const AlwaysScrollableScrollPhysics(),
-      separatorBuilder: (context, index) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        return Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          child: Padding(
-            padding: const EdgeInsets.all(15),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    const CircleAvatar(
-                      radius: 25,
-                      backgroundColor: AppColors.primary,
-                      child: Icon(Icons.person, color: Colors.white),
-                    ),
-                    const SizedBox(width: 15),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Artisan Name $index',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          const Text('Pottery & Ceramics', 
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: AppColors.mutedText)),
-                        ],
-                      ),
-                    ),
-                    const Chip(
-                      label: Text('Pending', style: TextStyle(fontSize: 10)), 
-                      backgroundColor: Color(0xFFFFF3E0),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 15),
-                const Text(
-                    'Bio: "Passionate ceramicist with 10 years of experience crafting handmade vases and dinnerware."',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 15),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => _showDocumentReview(context, index),
-                      child: const Text('Review Docs'),
-                    ),
-                    const SizedBox(width: 10),
-                    FilledButton(
-                      onPressed: () {},
-                      style: FilledButton.styleFrom(
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: ListView.separated(
+        padding: const EdgeInsets.all(15),
+        itemCount: itemCount,
+        physics: const BouncingScrollPhysics(), // Better feel on Android
+        separatorBuilder: (context, index) => const SizedBox(height: 10),
+        itemBuilder: (context, index) {
+          return Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            child: Padding(
+              padding: const EdgeInsets.all(15),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 25,
                         backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Icon(Icons.person, color: Colors.white),
                       ),
-                      child: const Text('Verify'),
-                    ),
-                  ],
-                )
-              ],
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Artisan Name $index',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            const Text('Pottery & Ceramics', 
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: AppColors.mutedText)),
+                          ],
+                        ),
+                      ),
+                      const Chip(
+                        label: Text('Pending', style: TextStyle(fontSize: 10)), 
+                        backgroundColor: Color(0xFFFFF3E0),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+                  const Text(
+                      'Bio: "Passionate ceramicist with 10 years of experience crafting handmade vases and dinnerware."',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 15),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => _showDocumentReview(context, index),
+                        child: const Text('Review Docs'),
+                      ),
+                      const SizedBox(width: 10),
+                      FilledButton(
+                        onPressed: () {},
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                        ),
+                        child: const Text('Verify'),
+                      ),
+                    ],
+                  )
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 

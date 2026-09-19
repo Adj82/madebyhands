@@ -11,10 +11,14 @@ class OrderManagementView extends StatelessWidget {
       itemBuilder: (context, index) {
         return Card(
           margin: const EdgeInsets.only(bottom: 15),
-          child: ExpansionTile(
-            title: Text('Order #MBH-102$index', style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('Status: ${index % 2 == 0 ? 'Processing' : 'Shipped'} • Total: ₹2,450'),
-            children: [
+          child: Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              shape: const Border(),
+              collapsedShape: const Border(),
+              title: Text('Order #MBH-102$index', style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text('Status: ${index % 2 == 0 ? 'Processing' : 'Shipped'} • Total: ₹2,450'),
+              children: [
               Padding(
                 padding: const EdgeInsets.all(15.0),
                 child: Column(
@@ -41,6 +45,7 @@ class OrderManagementView extends StatelessWidget {
                 ),
               )
             ],
+            ),
           ),
         );
       },
