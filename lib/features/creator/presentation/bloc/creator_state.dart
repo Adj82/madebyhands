@@ -16,6 +16,13 @@ final class CreatorProfileNotFound extends CreatorState {}
 
 final class CreatorOnboardingSuccess extends CreatorState {}
 
+final class CreatorVerificationSuccess extends CreatorState {}
+
+final class CreatorAllProfilesLoaded extends CreatorState {
+  final List<CreatorProfile> profiles;
+  CreatorAllProfilesLoaded(this.profiles);
+}
+
 final class CreatorFailure extends CreatorState {
   final String message;
   CreatorFailure(this.message);

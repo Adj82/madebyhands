@@ -18,4 +18,16 @@ abstract interface class CreatorRepository {
     String? existingProfileImageUrl,
     List<String>? existingPortfolioUrls,
   });
+  Future<Either<Failure, void>> submitVerification({
+    required String uid,
+    required String creatorName,
+    required String businessName,
+    required String address,
+    required File? latestPhotoFile,
+    required File? idCardFile,
+    required String existingLatestPhotoUrl,
+    required String existingIdCardUrl,
+  });
+  Future<Either<Failure, List<CreatorProfile>>> getAllCreatorProfiles();
+  Future<Either<Failure, void>> updateVerificationStatus(String uid, String status);
 }

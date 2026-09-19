@@ -71,4 +71,84 @@ class CreatorRepositoryImpl implements CreatorRepository {
       return left(Failure(e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, void>> submitVerification({
+    required String uid,
+    required String creatorName,
+    required String businessName,
+    required String address,
+    required File? latestPhotoFile,
+    required File? idCardFile,
+    required String existingLatestPhotoUrl,
+    required String existingIdCardUrl,
+  }) async {
+    try {
+      final existingProfile = await remoteDataSource.getCreatorProfile(uid);
+      if (existingProfile == null) {
+        return left(Failure('Creator profile not found. Please complete onboarding first.'));
+      }
+
+      String latestPhotoUrl = existingLatestPhotoUrl;
+      if (latestPhotoFile != null) {
+        latestPhotoUrl = await remoteDataSource.uploadVerificationFile(
+          file: latestPhotoFile,
+          uid: uid,
+          fileName: 'latest_photo.jpg',
+        );
+      }
+
+      String idCardUrl = existingIdCardUrl;
+      if (idCardFile != null) {
+        idCardUrl = await remoteDataSource.uploadVerificationFile(
+          file: idCardFile,
+          uid: uid,
+          fileName: 'id_card.jpg',
+        );
+      }
+
+      final updatedProfile = CreatorProfileModel(
+        uid: uid,
+        name: creatorName,
+        profileImage: existingProfile.profileImage,
+        bio: existingProfile.bio,
+        category: existingProfile.category,
+        location: existingProfile.location,
+        socialLinks: existingProfile.socialLinks,
+        portfolio: existingProfile.portfolio,
+        story: existingProfile.story,
+        verificationStatus: 'In-Process',
+        businessName: businessName,
+        address: address,
+        latestPhoto: latestPhotoUrl,
+        idCard: idCardUrl,
+      );
+
+      await remoteDataSource.saveCreatorProfile(updatedProfile);
+      await remoteDataSource.updateVerificationStatus(uid, 'In-Process');
+      return right(null);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<CreatorProfile>>> getAllCreatorProfiles() async {
+    try {
+      final profiles = await remoteDataSource.getAllCreatorProfiles();
+      return right(profiles);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> updateVerificationStatus(String uid, String status) async {
+    try {
+      await remoteDataSource.updateVerificationStatus(uid, status);
+      return right(null);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
 }

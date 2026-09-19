@@ -16,6 +16,9 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
         super(CreatorInitial()) {
     on<CreatorCheckProfileExists>(_onCheckProfileExists);
     on<CreatorSubmitOnboarding>(_onSubmitOnboarding);
+    on<CreatorSubmitVerification>(_onSubmitVerification);
+    on<CreatorFetchAllProfiles>(_onFetchAllProfiles);
+    on<CreatorUpdateVerificationStatus>(_onUpdateVerificationStatus);
   }
 
   void _onCheckProfileExists(
@@ -56,6 +59,52 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
     res.fold(
       (l) => emit(CreatorFailure(l.message)),
       (r) => emit(CreatorOnboardingSuccess()),
+    );
+  }
+
+  void _onSubmitVerification(
+    CreatorSubmitVerification event,
+    Emitter<CreatorState> emit,
+  ) async {
+    emit(CreatorLoading());
+    final res = await _creatorRepository.submitVerification(
+      uid: event.uid,
+      creatorName: event.creatorName,
+      businessName: event.businessName,
+      address: event.address,
+      latestPhotoFile: event.latestPhotoFile,
+      idCardFile: event.idCardFile,
+      existingLatestPhotoUrl: event.existingLatestPhotoUrl,
+      existingIdCardUrl: event.existingIdCardUrl,
+    );
+
+    res.fold(
+      (l) => emit(CreatorFailure(l.message)),
+      (r) => emit(CreatorVerificationSuccess()),
+    );
+  }
+
+  void _onFetchAllProfiles(
+    CreatorFetchAllProfiles event,
+    Emitter<CreatorState> emit,
+  ) async {
+    emit(CreatorLoading());
+    final res = await _creatorRepository.getAllCreatorProfiles();
+    res.fold(
+      (l) => emit(CreatorFailure(l.message)),
+      (r) => emit(CreatorAllProfilesLoaded(r)),
+    );
+  }
+
+  void _onUpdateVerificationStatus(
+    CreatorUpdateVerificationStatus event,
+    Emitter<CreatorState> emit,
+  ) async {
+    emit(CreatorLoading());
+    final res = await _creatorRepository.updateVerificationStatus(event.uid, event.status);
+    res.fold(
+      (l) => emit(CreatorFailure(l.message)),
+      (r) => add(CreatorFetchAllProfiles()), // Refresh the list for Admin
     );
   }
 }

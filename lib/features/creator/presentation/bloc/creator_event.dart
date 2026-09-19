@@ -31,3 +31,33 @@ final class CreatorSubmitOnboarding extends CreatorEvent {
     required this.story,
   });
 }
+
+final class CreatorSubmitVerification extends CreatorEvent {
+  final String uid;
+  final String creatorName;
+  final String businessName;
+  final String address;
+  final File? latestPhotoFile;
+  final File? idCardFile;
+  final String existingLatestPhotoUrl;
+  final String existingIdCardUrl;
+
+  CreatorSubmitVerification({
+    required this.uid,
+    required this.creatorName,
+    required this.businessName,
+    required this.address,
+    required this.latestPhotoFile,
+    required this.idCardFile,
+    required this.existingLatestPhotoUrl,
+    required this.existingIdCardUrl,
+  });
+}
+
+final class CreatorFetchAllProfiles extends CreatorEvent {}
+
+final class CreatorUpdateVerificationStatus extends CreatorEvent {
+  final String uid;
+  final String status;
+  CreatorUpdateVerificationStatus({required this.uid, required this.status});
+}

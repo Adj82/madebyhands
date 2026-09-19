@@ -14,6 +14,13 @@ abstract interface class CreatorRemoteDataSource {
     required List<File> images,
     required String uid,
   });
+  Future<String> uploadVerificationFile({
+    required File file,
+    required String uid,
+    required String fileName,
+  });
+  Future<List<CreatorProfileModel>> getAllCreatorProfiles();
+  Future<void> updateVerificationStatus(String uid, String status);
 }
 
 class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
@@ -120,6 +127,67 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
       throw Exception('Firebase Storage Error: ${e.message} (Code: ${e.code})');
     } catch (e) {
       throw Exception('Error uploading portfolio images: $e');
+    }
+  }
+
+  @override
+  Future<String> uploadVerificationFile({
+    required File file,
+    required String uid,
+    required String fileName,
+  }) async {
+    try {
+      if (!await file.exists()) {
+        throw Exception("Source file does not exist at ${file.path}");
+      }
+      final ref = firebaseStorage.ref().child('creator_profiles/$uid/verification/$fileName');
+      final uploadTask = ref.putFile(file);
+      final snapshot = await uploadTask;
+      if (snapshot.state == TaskState.success) {
+        return await snapshot.ref.getDownloadURL();
+      } else {
+        throw Exception("Upload failed with state: ${snapshot.state}");
+      }
+    } catch (e) {
+      throw Exception('Error uploading verification file: $e');
+    }
+  }
+
+  @override
+  Future<List<CreatorProfileModel>> getAllCreatorProfiles() async {
+    try {
+      final snapshot = await firestore.collection('creator_profiles').get();
+      return snapshot.docs
+          .map((doc) => CreatorProfileModel.fromJson(doc.data()))
+          .toList();
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<void> updateVerificationStatus(String uid, String status) async {
+    try {
+      await firestore
+          .collection('creator_profiles')
+          .doc(uid)
+          .update({'verificationStatus': status});
+
+      // Business/Data Layer enforcement: Hide products if creator is not Verified
+      final isVerified = status == 'Verified';
+      final p1 = await firestore.collection('products').where('creatorUid', isEqualTo: uid).get();
+      final p2 = await firestore.collection('products').where('sellerId', isEqualTo: uid).get();
+      
+      final batch = firestore.batch();
+      for (final doc in p1.docs) {
+        batch.update(doc.reference, {'isActive': isVerified});
+      }
+      for (final doc in p2.docs) {
+        batch.update(doc.reference, {'isActive': isVerified});
+      }
+      await batch.commit();
+    } catch (e) {
+      throw Exception(e.toString());
     }
   }
 }
