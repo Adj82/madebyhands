@@ -12,11 +12,18 @@ class OrderManagementView extends StatelessWidget {
         return Card(
           margin: const EdgeInsets.only(bottom: 15),
           child: Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            data: Theme.of(context).copyWith(
+              dividerColor: Colors.transparent,
+              expansionTileTheme: const ExpansionTileThemeData(
+                shape: Border(),
+                collapsedShape: Border(),
+              ),
+            ),
             child: ExpansionTile(
               shape: const Border(),
               collapsedShape: const Border(),
-              title: Text('Order #MBH-102$index', style: const TextStyle(fontWeight: FontWeight.bold)),
+              title: Text('Order #MBH-102$index',
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Text('Status: ${index % 2 == 0 ? 'Processing' : 'Shipped'} • Total: ₹2,450'),
               children: [
               Padding(
