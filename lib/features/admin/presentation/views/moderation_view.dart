@@ -57,7 +57,10 @@ class ModerationView extends StatelessWidget {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Ignore')),
           FilledButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Warning sent to user.')));
+              Navigator.pop(context);
+            },
             style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
             child: const Text('Warn User'),
           ),

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/admin/presentation/pages/details/creator_profile_review_page.dart';
 import 'package:madebyhands/features/admin/presentation/widgets/doc_item.dart';
 
 class VerificationView extends StatelessWidget {
@@ -7,93 +10,102 @@ class VerificationView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const itemCount = 8;
+    return BlocBuilder<AdminBloc, AdminState>(
+      builder: (context, state) {
+        final applications = state.creatorApplications;
 
-    return Material(
-      color: Colors.transparent,
-      child: itemCount == 0
-          ? const Center(child: Text('No pending verifications'))
-          : ListView.separated(
-              padding: const EdgeInsets.all(15),
-              itemCount: itemCount,
-              physics: const AlwaysScrollableScrollPhysics(),
-              separatorBuilder: (context, index) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                return Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(15),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            const CircleAvatar(
-                              radius: 25,
-                              backgroundColor: AppColors.primary,
-                              child: Icon(Icons.person, color: Colors.white),
-                            ),
-                            const SizedBox(width: 15),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Artisan Name $index',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16)),
-                                  const Text('Pottery & Ceramics',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                          color: AppColors.mutedText)),
-                                ],
+        return Material(
+          color: Colors.transparent,
+          child: Column(
+            children: [
+              if (state.isLoading) const LinearProgressIndicator(),
+              Expanded(
+                child: applications.isEmpty
+                    ? const Center(child: Text('No pending verifications'))
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(15),
+                        itemCount: applications.length,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        separatorBuilder: (context, index) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final app = applications[index];
+                          return Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(15),
+                              onTap: () => Navigator.push(
+                                  context, MaterialPageRoute(builder: (_) => CreatorProfileReviewPage(index: index))),
+                              child: Padding(
+                                padding: const EdgeInsets.all(15),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const CircleAvatar(
+                                          radius: 25,
+                                          backgroundColor: AppColors.primary,
+                                          child: Icon(Icons.person, color: Colors.white),
+                                        ),
+                                        const SizedBox(width: 15),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(app.name,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                              Text(app.category,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(color: AppColors.mutedText)),
+                                            ],
+                                          ),
+                                        ),
+                                        const Chip(
+                                          label: Text('Pending', style: TextStyle(fontSize: 10)),
+                                          backgroundColor: Color(0xFFFFF3E0),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 15),
+                                    Text(app.bio, maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    const SizedBox(height: 15),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        TextButton(
+                                          onPressed: () => _showDocumentReview(context, index),
+                                          child: const Text('Review Docs'),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        FilledButton(
+                                          onPressed: () {
+                                            context.read<AdminBloc>().add(AdminApproveCreatorRequested(app.id));
+                                          },
+                                          style: FilledButton.styleFrom(
+                                            backgroundColor: AppColors.primary,
+                                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                                          ),
+                                          child: const Text('Verify'),
+                                        ),
+                                      ],
+                                    )
+                                  ],
+                                ),
                               ),
                             ),
-                            const Chip(
-                              label: Text('Pending',
-                                  style: TextStyle(fontSize: 10)),
-                              backgroundColor: Color(0xFFFFF3E0),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 15),
-                        const Text(
-                            'Bio: "Passionate ceramicist with 10 years of experience crafting handmade vases and dinnerware."',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis),
-                        const SizedBox(height: 15),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton(
-                              onPressed: () =>
-                                  _showDocumentReview(context, index),
-                              child: const Text('Review Docs'),
-                            ),
-                            const SizedBox(width: 10),
-                            FilledButton(
-                              onPressed: () {},
-                              style: FilledButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 20),
-                              ),
-                              child: const Text('Verify'),
-                            ),
-                          ],
-                        )
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

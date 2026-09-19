@@ -4,6 +4,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/presentation/pages/welcome_screen.dart';
 import 'package:madebyhands/features/auth/presentation/pages/role_selection_page.dart';
+import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
+import 'package:madebyhands/features/admin/presentation/bloc/admin_cubit.dart';
 import 'package:madebyhands/features/admin/presentation/pages/admin_dashboard_page.dart';
 import 'package:madebyhands/features/creator/presentation/pages/creator_flow_wrapper.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
@@ -26,6 +28,12 @@ void main() async {
         ),
         BlocProvider(
           create: (_) => serviceLocator<BuyerBloc>(),
+        ),
+        BlocProvider(
+          create: (_) => AdminCubit(),
+        ),
+        BlocProvider(
+          create: (_) => AdminBloc()..add(AdminLoadDataRequested()),
         ),
       ],
       child: const MyApp(),
