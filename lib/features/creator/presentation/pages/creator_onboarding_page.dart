@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';

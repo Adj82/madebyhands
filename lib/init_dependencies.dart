@@ -10,6 +10,10 @@ import 'package:madebyhands/features/auth/data/datasources/auth_remote_data_sour
 import 'package:madebyhands/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:madebyhands/features/auth/domain/repositories/auth_repository.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:madebyhands/features/buyer/data/firestore_buyer_repository.dart';
+import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
+import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
+import 'package:madebyhands/features/buyer/presentation/bloc/buyer_cubit.dart';
 import 'package:madebyhands/features/creator/data/datasources/creator_remote_data_source.dart';
 import 'package:madebyhands/features/creator/data/repositories/creator_repository_impl.dart';
 import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
@@ -39,6 +43,8 @@ Future<void> initDependencies() async {
   _initAuth();
   // Creator Feature
   _initCreator();
+  // Buyer Feature
+  _initBuyer();
 }
 
 void _initAuth() {
@@ -79,5 +85,21 @@ void _initCreator() {
   // Bloc
   serviceLocator.registerLazySingleton(
     () => CreatorBloc(creatorRepository: serviceLocator()),
+  );
+}
+
+void _initBuyer() {
+  // Repository
+  serviceLocator.registerLazySingleton<BuyerRepository>(
+    () => FirestoreBuyerRepository(firestore: serviceLocator()),
+  );
+
+  // Cubit/Bloc
+  serviceLocator.registerFactory(
+    () => BuyerCubit(),
+  );
+
+  serviceLocator.registerLazySingleton(
+    () => BuyerBloc(repository: serviceLocator()),
   );
 }

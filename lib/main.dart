@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/presentation/pages/welcome_screen.dart';
 import 'package:madebyhands/features/auth/presentation/pages/role_selection_page.dart';
@@ -8,6 +7,7 @@ import 'package:madebyhands/features/admin/presentation/pages/admin_dashboard_pa
 import 'package:madebyhands/features/creator/presentation/pages/creator_flow_wrapper.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/buyer_dashboard_page.dart';
+import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 import 'package:madebyhands/init_dependencies.dart';
 
@@ -22,6 +22,9 @@ void main() async {
         ),
         BlocProvider(
           create: (_) => serviceLocator<CreatorBloc>(),
+        ),
+        BlocProvider(
+          create: (_) => serviceLocator<BuyerBloc>(),
         ),
       ],
       child: const MyApp(),
@@ -46,7 +49,7 @@ class MyApp extends StatelessWidget {
             );
           }
           if (state is AuthSuccess) {
-            // Check role and return appropriate dashboard or flow
+            // Intelligent Routing based on User Role
             final role = state.user.role.toLowerCase();
             if (role == 'admin') {
               return const AdminDashboardPage();
@@ -55,9 +58,6 @@ class MyApp extends StatelessWidget {
             } else {
               return BuyerDashboardPage(
                 user: state.user,
-                repository: FirestoreBuyerRepository(
-                  firestore: FirebaseFirestore.instance,
-                ),
                 onLogout: () =>
                     context.read<AuthBloc>().add(AuthLogoutRequested()),
               );
@@ -74,9 +74,10 @@ class MyApp extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('Error: ${state.message}'),
+                    Text('Error: ${state.message}',
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 16),
-                    ElevatedButton(
+                    FilledButton(
                       onPressed: () {
                         context.read<AuthBloc>().add(AuthIsUserLoggedIn());
                       },
