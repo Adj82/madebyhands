@@ -34,42 +34,24 @@ class AdminDashboardPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => AdminCubit(),
-      child: BlocBuilder<AdminCubit, int>(
-        builder: (context, selectedIndex) {
-          return Scaffold(
-            appBar: AppBar(
-              title: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(_titles[selectedIndex],
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-              ),
-              actions: [
-                IconButton(
-                  onPressed: () {
-                    if (selectedIndex == 1) {
-                      context.read<CreatorBloc>().add(CreatorFetchAllProfiles());
-                    } else if (selectedIndex == 2) {
-                      context.read<CreatorBloc>().add(CreatorFetchPendingProducts());
-                    }
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Refreshing data...')));
-                  },
-                  icon: const Icon(Icons.refresh),
-                ),
-                IconButton(
-                  onPressed: () {
-                    context.read<AuthBloc>().add(AuthLogoutRequested());
-                  },
-                  icon: const Icon(Icons.logout),
-                ),
-              ],
+    return BlocBuilder<AdminCubit, int>(
+      builder: (context, selectedIndex) {
+        return Scaffold(
+          appBar: AppBar(
+            title: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(_titles[selectedIndex],
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
             actions: [
               IconButton(
                 onPressed: () {
                   context.read<AdminBloc>().add(AdminLoadDataRequested());
+                  if (selectedIndex == 1) {
+                    context.read<CreatorBloc>().add(CreatorFetchAllProfiles());
+                  } else if (selectedIndex == 2) {
+                    context.read<CreatorBloc>().add(CreatorFetchPendingProducts());
+                  }
                   ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Refreshing data...')));
                 },

@@ -3,10 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
-import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/admin/presentation/pages/details/creator_profile_review_page.dart';
-import 'package:madebyhands/features/admin/presentation/widgets/doc_item.dart';
 
 class VerificationView extends StatefulWidget {
   const VerificationView({super.key});
@@ -24,32 +21,41 @@ class _VerificationViewState extends State<VerificationView> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AdminBloc, AdminState>(
+    return BlocBuilder<CreatorBloc, CreatorState>(
       builder: (context, state) {
-        final applications = state.creatorApplications;
+        List<CreatorProfile> profiles = [];
+        bool isLoading = false;
+
+        if (state is CreatorLoading) {
+          isLoading = true;
+        } else if (state is CreatorAllProfilesLoaded) {
+          profiles = state.profiles
+              .where((p) => p.verificationStatus != 'Verified')
+              .toList();
+        }
 
         return Material(
           color: Colors.transparent,
           child: Column(
             children: [
-              if (state.isLoading) const LinearProgressIndicator(),
+              if (isLoading) const LinearProgressIndicator(),
               Expanded(
-                child: applications.isEmpty
+                child: profiles.isEmpty && !isLoading
                     ? const Center(child: Text('No pending verifications'))
                     : ListView.separated(
                         padding: const EdgeInsets.all(15),
-                        itemCount: applications.length,
+                        itemCount: profiles.length,
                         physics: const AlwaysScrollableScrollPhysics(),
                         separatorBuilder: (context, index) => const SizedBox(height: 10),
                         itemBuilder: (context, index) {
-                          final app = applications[index];
+                          final profile = profiles[index];
                           return Card(
                             elevation: 2,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(15),
                               onTap: () => Navigator.push(
-                                  context, MaterialPageRoute(builder: (_) => CreatorProfileReviewPage(index: index))),
+                                  context, MaterialPageRoute(builder: (_) => CreatorProfileReviewPage(profile: profile))),
                               child: Padding(
                                 padding: const EdgeInsets.all(15),
                                 child: Column(
@@ -58,47 +64,49 @@ class _VerificationViewState extends State<VerificationView> {
                                   children: [
                                     Row(
                                       children: [
-                                        const CircleAvatar(
+                                        CircleAvatar(
                                           radius: 25,
                                           backgroundColor: AppColors.primary,
-                                          child: Icon(Icons.person, color: Colors.white),
+                                          backgroundImage: profile.profileImage.isNotEmpty ? NetworkImage(profile.profileImage) : null,
+                                          child: profile.profileImage.isEmpty ? const Icon(Icons.person, color: Colors.white) : null,
                                         ),
                                         const SizedBox(width: 15),
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text(app.name,
+                                              Text(profile.name,
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
                                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                              Text(app.category,
+                                              Text(profile.category,
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
                                                   style: const TextStyle(color: AppColors.mutedText)),
                                             ],
                                           ),
                                         ),
-                                        const Chip(
-                                          label: Text('Pending', style: TextStyle(fontSize: 10)),
-                                          backgroundColor: Color(0xFFFFF3E0),
+                                        Chip(
+                                          label: Text(profile.verificationStatus, style: const TextStyle(fontSize: 10)),
+                                          backgroundColor: const Color(0xFFFFF3E0),
                                         ),
                                       ],
                                     ),
                                     const SizedBox(height: 15),
-                                    Text(app.bio, maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    Text(profile.bio, maxLines: 2, overflow: TextOverflow.ellipsis),
                                     const SizedBox(height: 15),
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.end,
                                       children: [
                                         TextButton(
-                                          onPressed: () => _showDocumentReview(context, index),
+                                          onPressed: () => _showDocumentReview(context, profile),
                                           child: const Text('Review Docs'),
                                         ),
                                         const SizedBox(width: 10),
                                         FilledButton(
                                           onPressed: () {
-                                            context.read<AdminBloc>().add(AdminApproveCreatorRequested(app.id));
+                                            context.read<CreatorBloc>().add(
+                                                CreatorUpdateVerificationStatus(uid: profile.uid, status: 'Verified'));
                                           },
                                           style: FilledButton.styleFrom(
                                             backgroundColor: AppColors.primary,
@@ -151,7 +159,7 @@ class _VerificationViewState extends State<VerificationView> {
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: AppColors.outline),
                     ),
-                    child: Text(profile.address),
+                    child: Text(profile.address.isEmpty ? 'No address provided' : profile.address),
                   ),
                   const SizedBox(height: 20),
                   const Text('Latest Portrait Photo:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),

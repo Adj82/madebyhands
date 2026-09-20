@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_cubit.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/admin/presentation/widgets/admin_stat_card.dart';
 
 class OverviewView extends StatelessWidget {
@@ -36,13 +36,14 @@ class OverviewView extends StatelessWidget {
           const SizedBox(height: 15),
           BlocBuilder<AdminBloc, AdminState>(
             builder: (context, state) {
+              final applications = state.creatorApplications;
               return ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: state.creatorApplications.take(5).length,
+                itemCount: applications.take(5).length,
                 separatorBuilder: (context, index) => const Divider(),
                 itemBuilder: (context, index) {
-                  final application = state.creatorApplications[index];
+                  final application = applications[index];
                   return ListTile(
                     leading: const CircleAvatar(backgroundColor: AppColors.outline, child: Icon(Icons.notifications_none, size: 20)),
                     title: Text('New application from "${application.name}"'),
