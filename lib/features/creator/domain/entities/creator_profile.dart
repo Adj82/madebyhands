@@ -8,6 +8,11 @@ class CreatorProfile {
   final List<String> socialLinks;
   final List<String> portfolio;
   final String story;
+  final String verificationStatus; // 'Unverified', 'In-Process', 'Verified'
+  final String businessName;
+  final String address;
+  final String latestPhoto;
+  final String idCard;
 
   CreatorProfile({
     required this.uid,
@@ -19,5 +24,10 @@ class CreatorProfile {
     required this.socialLinks,
     required this.portfolio,
     required this.story,
+    this.verificationStatus = 'Unverified',
+    this.businessName = '',
+    this.address = '',
+    this.latestPhoto = '',
+    this.idCard = '',
   });
 }

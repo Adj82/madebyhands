@@ -11,6 +11,11 @@ class CreatorProfileModel extends CreatorProfile {
     required super.socialLinks,
     required super.portfolio,
     required super.story,
+    super.verificationStatus,
+    super.businessName,
+    super.address,
+    super.latestPhoto,
+    super.idCard,
   });
 
   Map<String, dynamic> toJson() {
@@ -24,6 +29,11 @@ class CreatorProfileModel extends CreatorProfile {
       'socialLinks': socialLinks,
       'portfolio': portfolio,
       'story': story,
+      'verificationStatus': verificationStatus,
+      'businessName': businessName,
+      'address': address,
+      'latestPhoto': latestPhoto,
+      'idCard': idCard,
     };
   }
 
@@ -38,6 +48,11 @@ class CreatorProfileModel extends CreatorProfile {
       socialLinks: List<String>.from(json['socialLinks'] ?? []),
       portfolio: List<String>.from(json['portfolio'] ?? []),
       story: json['story'] ?? '',
+      verificationStatus: json['verificationStatus'] ?? 'Unverified',
+      businessName: json['businessName'] ?? '',
+      address: json['address'] ?? '',
+      latestPhoto: json['latestPhoto'] ?? '',
+      idCard: json['idCard'] ?? '',
     );
   }
 
@@ -52,6 +67,11 @@ class CreatorProfileModel extends CreatorProfile {
       socialLinks: entity.socialLinks,
       portfolio: entity.portfolio,
       story: entity.story,
+      verificationStatus: entity.verificationStatus,
+      businessName: entity.businessName,
+      address: entity.address,
+      latestPhoto: entity.latestPhoto,
+      idCard: entity.idCard,
     );
   }
 }
