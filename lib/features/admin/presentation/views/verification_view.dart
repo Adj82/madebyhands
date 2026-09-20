@@ -3,6 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
+import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
+import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/admin/presentation/pages/details/creator_profile_review_page.dart';
+import 'package:madebyhands/features/admin/presentation/widgets/doc_item.dart';
 
 class VerificationView extends StatefulWidget {
   const VerificationView({super.key});
@@ -20,145 +24,101 @@ class _VerificationViewState extends State<VerificationView> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<CreatorBloc, CreatorState>(
-      buildWhen: (previous, current) {
-        // Only rebuild the main view if it is relevant to full lists or failure states
-        return current is CreatorAllProfilesLoaded || current is CreatorFailure || current is CreatorLoading;
-      },
+    return BlocBuilder<AdminBloc, AdminState>(
       builder: (context, state) {
-        if (state is CreatorLoading) {
-          return const Center(child: CircularProgressIndicator());
-        }
+        final applications = state.creatorApplications;
 
-        if (state is CreatorAllProfilesLoaded) {
-          final pendingProfiles = state.profiles
-              .where((p) => p.verificationStatus == 'In-Process')
-              .toList();
-
-          if (pendingProfiles.isEmpty) {
-            return RefreshIndicator(
-              onRefresh: () async {
-                context.read<CreatorBloc>().add(CreatorFetchAllProfiles());
-              },
-              child: const SingleChildScrollView(
-                physics: AlwaysScrollableScrollPhysics(),
-                child: SizedBox(
-                  height: 400,
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: Text(
-                        'No pending creator verifications found.',
-                        style: TextStyle(color: AppColors.mutedText, fontSize: 16),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }
-
-          return RefreshIndicator(
-            onRefresh: () async {
-              context.read<CreatorBloc>().add(CreatorFetchAllProfiles());
-            },
-            child: ListView.separated(
-              padding: const EdgeInsets.all(15),
-              itemCount: pendingProfiles.length,
-              physics: const AlwaysScrollableScrollPhysics(),
-              separatorBuilder: (context, index) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final profile = pendingProfiles[index];
-                return Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(15),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 25,
-                              backgroundColor: AppColors.primary,
-                              backgroundImage: profile.profileImage.isNotEmpty
-                                  ? NetworkImage(profile.profileImage)
-                                  : null,
-                              child: profile.profileImage.isEmpty
-                                  ? const Icon(Icons.person, color: Colors.white)
-                                  : null,
-                            ),
-                            const SizedBox(width: 15),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    profile.businessName.isNotEmpty
-                                        ? profile.businessName
-                                        : profile.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold, fontSize: 16),
-                                  ),
-                                  Text(
-                                    profile.category,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(color: AppColors.mutedText),
-                                  ),
-                                ],
+        return Material(
+          color: Colors.transparent,
+          child: Column(
+            children: [
+              if (state.isLoading) const LinearProgressIndicator(),
+              Expanded(
+                child: applications.isEmpty
+                    ? const Center(child: Text('No pending verifications'))
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(15),
+                        itemCount: applications.length,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        separatorBuilder: (context, index) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final app = applications[index];
+                          return Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(15),
+                              onTap: () => Navigator.push(
+                                  context, MaterialPageRoute(builder: (_) => CreatorProfileReviewPage(index: index))),
+                              child: Padding(
+                                padding: const EdgeInsets.all(15),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const CircleAvatar(
+                                          radius: 25,
+                                          backgroundColor: AppColors.primary,
+                                          child: Icon(Icons.person, color: Colors.white),
+                                        ),
+                                        const SizedBox(width: 15),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(app.name,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                              Text(app.category,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(color: AppColors.mutedText)),
+                                            ],
+                                          ),
+                                        ),
+                                        const Chip(
+                                          label: Text('Pending', style: TextStyle(fontSize: 10)),
+                                          backgroundColor: Color(0xFFFFF3E0),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 15),
+                                    Text(app.bio, maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    const SizedBox(height: 15),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        TextButton(
+                                          onPressed: () => _showDocumentReview(context, index),
+                                          child: const Text('Review Docs'),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        FilledButton(
+                                          onPressed: () {
+                                            context.read<AdminBloc>().add(AdminApproveCreatorRequested(app.id));
+                                          },
+                                          style: FilledButton.styleFrom(
+                                            backgroundColor: AppColors.primary,
+                                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                                          ),
+                                          child: const Text('Verify'),
+                                        ),
+                                      ],
+                                    )
+                                  ],
+                                ),
                               ),
                             ),
-                            const Chip(
-                              label: Text('In-Process',
-                                  style: TextStyle(fontSize: 10, color: Colors.orange)),
-                              backgroundColor: Color(0xFFFFF3E0),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 15),
-                        Text('Bio: "${profile.bio}"',
-                            maxLines: 2, overflow: TextOverflow.ellipsis),
-                        const SizedBox(height: 15),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton(
-                              onPressed: () => _showDocumentReview(context, profile),
-                              child: const Text('Review Docs & Take Action'),
-                            ),
-                          ],
-                        )
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          );
-        }
-
-        if (state is CreatorFailure) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('Error: ${state.message}'),
-                const SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: () => context.read<CreatorBloc>().add(CreatorFetchAllProfiles()),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return const Center(child: CircularProgressIndicator());
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
       },
     );
   }

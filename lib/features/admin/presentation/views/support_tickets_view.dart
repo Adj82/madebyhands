@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:madebyhands/features/admin/presentation/pages/details/support_ticket_detail_page.dart';
 
 class SupportTicketsView extends StatelessWidget {
   const SupportTicketsView({super.key});
@@ -19,7 +20,10 @@ class SupportTicketsView extends StatelessWidget {
               label: Text(isOpen ? 'Open' : 'Resolved', style: const TextStyle(fontSize: 10)),
               backgroundColor: isOpen ? Colors.orange.withAlpha(50) : Colors.green.withAlpha(50),
             ),
-            onTap: () {},
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => SupportTicketDetailPage(index: index)),
+            ),
           ),
         );
       },
