@@ -96,6 +96,46 @@ final class CreatorAddProduct extends CreatorEvent {
   });
 }
 
+final class CreatorUpdateProduct extends CreatorEvent {
+  final String productId;
+  final String name;
+  final String description;
+  final List<File> newImageFiles;
+  final List<String> existingImageUrls;
+  final String category;
+  final double price;
+  final int stock;
+  final String materials;
+  final String dimensions;
+  final String weight;
+  final String shippingInfo;
+  final String creatorUid;
+  final String creatorName;
+  final bool isCustomizable;
+  final List<CustomizationInput> customizations;
+  final bool hasChanges;
+
+  CreatorUpdateProduct({
+    required this.productId,
+    required this.name,
+    required this.description,
+    required this.newImageFiles,
+    required this.existingImageUrls,
+    required this.category,
+    required this.price,
+    required this.stock,
+    required this.materials,
+    required this.dimensions,
+    required this.weight,
+    required this.shippingInfo,
+    required this.creatorUid,
+    required this.creatorName,
+    required this.isCustomizable,
+    required this.customizations,
+    required this.hasChanges,
+  });
+}
+
 final class CreatorFetchPendingProducts extends CreatorEvent {}
 
 final class CreatorFetchAdminAllProducts extends CreatorEvent {}

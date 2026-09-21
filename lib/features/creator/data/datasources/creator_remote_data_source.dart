@@ -39,6 +39,9 @@ abstract interface class CreatorRemoteDataSource {
   /// Adds a new product document to the Firestore 'products' collection.
   Future<void> addProduct(CreatorProductModel product);
 
+  /// Updates an existing product document.
+  Future<void> updateProduct(CreatorProductModel product);
+
   /// Uploads multiple product images to Firebase Storage.
   Future<List<String>> uploadProductImages({
     required List<File> images,
@@ -251,6 +254,18 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
   Future<void> addProduct(CreatorProductModel product) async {
     try {
       await firestore.collection('products').add(product.toJson());
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<void> updateProduct(CreatorProductModel product) async {
+    try {
+      await firestore
+          .collection('products')
+          .doc(product.id)
+          .update(product.toJson());
     } catch (e) {
       throw Exception(e.toString());
     }

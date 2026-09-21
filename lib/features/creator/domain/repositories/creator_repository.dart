@@ -53,6 +53,26 @@ abstract interface class CreatorRepository {
     List<CustomizationInput> customizations = const [],
   });
 
+  Future<Either<Failure, void>> updateProduct({
+    required String productId,
+    required String name,
+    required String description,
+    required List<File> newImageFiles,
+    required List<String> existingImageUrls,
+    required String category,
+    required double price,
+    required int stock,
+    required String materials,
+    required String dimensions,
+    required String weight,
+    required String shippingInfo,
+    required String creatorUid,
+    required String creatorName,
+    required bool isCustomizable,
+    required List<CustomizationInput> customizations,
+    required bool hasChanges,
+  });
+
   Future<Either<Failure, List<CreatorProduct>>> getPendingProducts();
   Future<Either<Failure, List<CreatorProduct>>> getAdminAllProducts();
   Future<Either<Failure, List<CreatorProduct>>> getCreatorProducts(String uid);
@@ -65,11 +85,15 @@ class CustomizationInput {
   final String description;
   final double additionalPrice;
   final List<File> imageFiles;
+  final bool isMultipleSelection;
+  final List<String> options;
 
   CustomizationInput({
     required this.name,
     required this.description,
     required this.additionalPrice,
+    required this.isMultipleSelection,
     this.imageFiles = const [],
+    this.options = const [],
   });
 }
