@@ -107,7 +107,7 @@ class ProductReviewPage extends StatelessWidget {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: c.images.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                separatorBuilder: (context, index) => const SizedBox(width: 8),
                 itemBuilder: (context, i) => ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(c.images[i], width: 60, height: 60, fit: BoxFit.cover)),
               ),
             ),

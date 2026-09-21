@@ -343,7 +343,7 @@ class _AddProductPageState extends State<AddProductPage> {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: _customizationList.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 15),
+          separatorBuilder: (context, index) => const SizedBox(height: 15),
           itemBuilder: (context, index) {
             return _CustomizationBlock(
               controllers: _customizationList[index],

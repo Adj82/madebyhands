@@ -187,7 +187,7 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
           builder: (context, state) {
             final categories = state.categories;
             return DropdownButtonFormField<String>(
-              value: categories.contains(_categoryController.text) ? _categoryController.text : null,
+              initialValue: categories.contains(_categoryController.text) ? _categoryController.text : null,
               decoration: const InputDecoration(
                   labelText: 'Primary Craft Category *',
                   prefixIcon: Icon(Icons.category_outlined)),

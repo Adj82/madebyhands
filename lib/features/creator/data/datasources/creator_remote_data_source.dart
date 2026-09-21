@@ -229,7 +229,7 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
           .update({'isVerified': isVerified});
 
       // 3. Update products visibility (Business/Data Layer enforcement)
-      final creatorProducts = await firestore
+      final productsQuery = await firestore
           .collection('products')
           .where('creatorUid', isEqualTo: uid)
           .get();
