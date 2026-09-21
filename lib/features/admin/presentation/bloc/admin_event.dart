@@ -9,6 +9,12 @@ sealed class AdminEvent extends Equatable {
 
 final class AdminLoadDataRequested extends AdminEvent {}
 
+final class AdminFetchBuyersRequested extends AdminEvent {}
+
+final class AdminFetchCreatorsRequested extends AdminEvent {}
+
+final class AdminFetchAdminsRequested extends AdminEvent {}
+
 final class AdminApproveCreatorRequested extends AdminEvent {
   final String applicationId;
   const AdminApproveCreatorRequested(this.applicationId);

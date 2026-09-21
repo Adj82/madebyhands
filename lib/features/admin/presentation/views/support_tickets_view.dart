@@ -8,33 +8,40 @@ class SupportTicketsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: () async {
-        context.read<AdminBloc>().add(AdminLoadDataRequested());
+    return BlocBuilder<AdminBloc, AdminState>(
+      builder: (context, state) {
+        final tickets = state.supportTickets;
+        return RefreshIndicator(
+          onRefresh: () async {
+            context.read<AdminBloc>().add(AdminLoadDataRequested());
+          },
+          child: tickets.isEmpty
+              ? const Center(child: Text('No support tickets found.'))
+              : ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(15),
+                  itemCount: tickets.length,
+                  itemBuilder: (context, index) {
+                    final ticket = tickets[index];
+                    return Card(
+                      child: ListTile(
+                        leading: Icon(Icons.help_center, color: ticket.isOpen ? Colors.orange : Colors.green),
+                        title: Text(ticket.subject),
+                        subtitle: Text(ticket.lastMessage, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        trailing: Chip(
+                          label: Text(ticket.isOpen ? 'Open' : 'Resolved', style: const TextStyle(fontSize: 10)),
+                          backgroundColor: ticket.isOpen ? Colors.orange.withAlpha(50) : Colors.green.withAlpha(50),
+                        ),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => SupportTicketDetailPage(ticket: ticket)),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        );
       },
-      child: ListView.builder(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(15),
-        itemCount: 6,
-        itemBuilder: (context, index) {
-          final isOpen = index < 3;
-          return Card(
-            child: ListTile(
-              leading: Icon(Icons.help_center, color: isOpen ? Colors.orange : Colors.green),
-              title: Text('Support Ticket #78$index'),
-              subtitle: Text('Issue: ${index % 2 == 0 ? 'Payment failed' : 'Product damaged'}'),
-              trailing: Chip(
-                label: Text(isOpen ? 'Open' : 'Resolved', style: const TextStyle(fontSize: 10)),
-                backgroundColor: isOpen ? Colors.orange.withAlpha(50) : Colors.green.withAlpha(50),
-              ),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => SupportTicketDetailPage(index: index)),
-              ),
-            ),
-          );
-        },
-      ),
     );
   }
 }

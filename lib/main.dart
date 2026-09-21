@@ -33,7 +33,7 @@ void main() async {
           create: (_) => AdminCubit(),
         ),
         BlocProvider(
-          create: (_) => AdminBloc()..add(AdminLoadDataRequested()),
+          create: (_) => serviceLocator<AdminBloc>()..add(AdminLoadDataRequested()),
         ),
       ],
       child: const MyApp(),
