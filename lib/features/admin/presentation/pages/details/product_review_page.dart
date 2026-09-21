@@ -1,30 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
+import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 
 class ProductReviewPage extends StatelessWidget {
-  final int index;
-  const ProductReviewPage({super.key, required this.index});
+  final CreatorProduct product;
+  const ProductReviewPage({super.key, required this.product});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Product Review'),
-        actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.flag_outlined, color: Colors.red)),
-        ],
+        title: const Text('Product Review', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Product Images Gallery Placeholder
-            Container(
-              height: 300,
-              width: double.infinity,
-              color: AppColors.outline,
-              child: const Icon(Icons.image, size: 100, color: Colors.grey),
-            ),
+            _buildImageGallery(),
             Padding(
               padding: const EdgeInsets.all(20.0),
               child: Column(
@@ -32,36 +26,32 @@ class ProductReviewPage extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const Expanded(
-                        child: Text(
-                          'Handmade Ceramic Vase',
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      Text(
-                        '₹1,200',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.primary,
-                        ),
-                      ),
+                      Expanded(child: Text(product.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold))),
+                      Text('₹${product.price}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.primary)),
                     ],
                   ),
                   const SizedBox(height: 10),
-                  const Chip(label: Text('Pottery'), backgroundColor: AppColors.background),
+                  Chip(label: Text(product.category), backgroundColor: AppColors.background),
                   const SizedBox(height: 20),
-                  const _InfoSection(title: 'Creator', value: 'Artisan #12 (Verified)'),
-                  const _InfoSection(title: 'Stock', value: '15 Units'),
-                  const _InfoSection(title: 'Dimensions', value: '12 x 8 x 8 inches'),
-                  const _InfoSection(title: 'Materials', value: 'Organic Clay, Natural Glaze'),
+                  _InfoSection(title: 'Creator', value: product.creatorName),
+                  _InfoSection(title: 'Stock', value: '${product.stock} Units'),
+                  _InfoSection(title: 'Dimensions', value: product.dimensions),
+                  _InfoSection(title: 'Materials', value: product.materials),
+                  
                   const SizedBox(height: 20),
                   const Text('Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 8),
-                  const Text(
-                    'This beautiful vase is handcrafted using traditional techniques. Each piece is unique with its own natural variations in glaze and texture. Perfect for dry flowers or as a standalone art piece.',
-                    style: TextStyle(color: AppColors.mutedText, height: 1.5),
-                  ),
+                  Text(product.description, style: const TextStyle(color: AppColors.mutedText, height: 1.5)),
+
+                  if (product.isCustomizable) ...[
+                    const SizedBox(height: 30),
+                    const Divider(),
+                    const SizedBox(height: 10),
+                    const Text('Customizations', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                    const SizedBox(height: 15),
+                    ...product.customizations.map((c) => _buildCustomizationCard(c)),
+                  ],
+
                   const SizedBox(height: 40),
                   const Divider(),
                   const Text('Admin Quality Check', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
@@ -76,35 +66,85 @@ class ProductReviewPage extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(15.0),
-          child: Row(
+      bottomNavigationBar: _buildActionButtons(context),
+    );
+  }
+
+  Widget _buildImageGallery() {
+    return Container(
+      height: 300,
+      width: double.infinity,
+      color: AppColors.outline,
+      child: product.images.isNotEmpty
+          ? PageView.builder(
+              itemCount: product.images.length,
+              itemBuilder: (context, i) => Image.network(product.images[i], fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.broken_image)),
+            )
+          : const Icon(Icons.image, size: 100, color: Colors.grey),
+    );
+  }
+
+  Widget _buildCustomizationCard(ProductCustomization c) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(15), border: Border.all(color: AppColors.outline)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    foregroundColor: Colors.redAccent,
-                    side: const BorderSide(color: Colors.redAccent),
-                  ),
-                  child: const Text('REJECT PRODUCT'),
-                ),
-              ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    backgroundColor: AppColors.primary,
-                  ),
-                  child: const Text('APPROVE & PUBLISH'),
-                ),
-              ),
+              Expanded(child: Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+              Text('+ ₹${c.additionalPrice}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
             ],
           ),
+          const SizedBox(height: 5),
+          Text(c.description, style: const TextStyle(fontSize: 13, color: AppColors.mutedText)),
+          if (c.images.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 60,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: c.images.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, i) => ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(c.images[i], width: 60, height: 60, fit: BoxFit.cover)),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(15.0),
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () {
+                  context.read<CreatorBloc>().add(CreatorUpdateProductStatus(productId: product.id, status: 'Rejected'));
+                  Navigator.pop(context);
+                },
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 15), foregroundColor: Colors.redAccent, side: const BorderSide(color: Colors.redAccent)),
+                child: const Text('REJECT PRODUCT'),
+              ),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: FilledButton(
+                onPressed: () {
+                  context.read<CreatorBloc>().add(CreatorUpdateProductStatus(productId: product.id, status: 'Approved'));
+                  Navigator.pop(context);
+                },
+                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 15), backgroundColor: AppColors.primary),
+                child: const Text('APPROVE & PUBLISH'),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -122,11 +162,8 @@ class _InfoSection extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12.0),
       child: Row(
         children: [
-          SizedBox(
-            width: 100,
-            child: Text(title, style: const TextStyle(color: AppColors.mutedText, fontWeight: FontWeight.w600)),
-          ),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          SizedBox(width: 100, child: Text(title, style: const TextStyle(color: AppColors.mutedText, fontWeight: FontWeight.w600))),
+          Expanded(child: Text(value.isNotEmpty ? value : 'N/A', style: const TextStyle(fontWeight: FontWeight.bold))),
         ],
       ),
     );

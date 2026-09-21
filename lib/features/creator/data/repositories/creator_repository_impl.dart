@@ -168,6 +168,8 @@ class CreatorRepositoryImpl implements CreatorRepository {
     required String shippingInfo,
     required String creatorUid,
     required String creatorName,
+    bool isCustomizable = false,
+    List<CustomizationInput> customizations = const [],
   }) async {
     try {
       final profile = await remoteDataSource.getCreatorProfile(creatorUid);
@@ -181,8 +183,26 @@ class CreatorRepositoryImpl implements CreatorRepository {
         productName: name,
       );
 
+      List<ProductCustomization> customizationEntities = [];
+      if (isCustomizable) {
+        for (final input in customizations) {
+          final custImageUrls = await remoteDataSource.uploadCustomizationImages(
+            images: input.imageFiles,
+            uid: creatorUid,
+            productName: name,
+            customizationName: input.name,
+          );
+          customizationEntities.add(ProductCustomization(
+            name: input.name,
+            description: input.description,
+            additionalPrice: input.additionalPrice,
+            images: custImageUrls,
+          ));
+        }
+      }
+
       final newProduct = CreatorProductModel(
-        id: '', 
+        id: '',
         name: name,
         description: description,
         images: imageUrls,
@@ -197,6 +217,8 @@ class CreatorRepositoryImpl implements CreatorRepository {
         creatorName: creatorName,
         status: 'Pending Approval',
         isActive: false,
+        isCustomizable: isCustomizable,
+        customizations: customizationEntities,
         createdAt: DateTime.now(),
       );
 

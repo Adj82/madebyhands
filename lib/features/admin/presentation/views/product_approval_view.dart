@@ -56,7 +56,7 @@ class _ProductApprovalViewState extends State<ProductApprovalView> {
                             child: InkWell(
                               onTap: () => Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => ProductReviewPage(index: index)),
+                                MaterialPageRoute(builder: (_) => ProductReviewPage(product: product)),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,

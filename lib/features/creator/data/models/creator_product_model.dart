@@ -19,6 +19,8 @@ class CreatorProductModel extends CreatorProduct {
     required super.status,
     required super.isActive,
     required super.createdAt,
+    super.isCustomizable,
+    super.customizations,
   });
 
   Map<String, dynamic> toJson() {
@@ -37,11 +39,26 @@ class CreatorProductModel extends CreatorProduct {
       'creatorName': creatorName,
       'status': status,
       'isActive': isActive,
+      'isCustomizable': isCustomizable,
+      'customizations': customizations.map((c) => {
+        'name': c.name,
+        'description': c.description,
+        'additionalPrice': c.additionalPrice,
+        'images': c.images,
+      }).toList(),
       'createdAt': FieldValue.serverTimestamp(),
     };
   }
 
   factory CreatorProductModel.fromJson(Map<String, dynamic> json, String id) {
+    final customizationsRaw = json['customizations'] as List<dynamic>? ?? [];
+    final customizations = customizationsRaw.map((c) => ProductCustomization(
+      name: c['name'] ?? '',
+      description: c['description'] ?? '',
+      additionalPrice: (c['additionalPrice'] as num?)?.toDouble() ?? 0.0,
+      images: List<String>.from(c['images'] ?? []),
+    )).toList();
+
     return CreatorProductModel(
       id: id,
       name: json['name'] ?? '',
@@ -58,28 +75,9 @@ class CreatorProductModel extends CreatorProduct {
       creatorName: json['creatorName'] ?? '',
       status: json['status'] ?? 'Pending Approval',
       isActive: json['isActive'] ?? false,
+      isCustomizable: json['isCustomizable'] ?? false,
+      customizations: customizations,
       createdAt: (json['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-    );
-  }
-
-  factory CreatorProductModel.fromEntity(CreatorProduct entity) {
-    return CreatorProductModel(
-      id: entity.id,
-      name: entity.name,
-      description: entity.description,
-      images: entity.images,
-      category: entity.category,
-      price: entity.price,
-      stock: entity.stock,
-      materials: entity.materials,
-      dimensions: entity.dimensions,
-      weight: entity.weight,
-      shippingInfo: entity.shippingInfo,
-      creatorUid: entity.creatorUid,
-      creatorName: entity.creatorName,
-      status: entity.status,
-      isActive: entity.isActive,
-      createdAt: entity.createdAt,
     );
   }
 }

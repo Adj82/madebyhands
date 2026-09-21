@@ -6,6 +6,7 @@ import 'package:madebyhands/features/creator/domain/entities/creator_profile.dar
 
 abstract interface class CreatorRepository {
   Future<Either<Failure, CreatorProfile?>> getCreatorProfile(String uid);
+  
   Future<Either<Failure, void>> saveCreatorProfile({
     required String uid,
     required String name,
@@ -19,6 +20,7 @@ abstract interface class CreatorRepository {
     String? existingProfileImageUrl,
     List<String>? existingPortfolioUrls,
   });
+
   Future<Either<Failure, void>> submitVerification({
     required String uid,
     required String creatorName,
@@ -29,7 +31,9 @@ abstract interface class CreatorRepository {
     required String existingLatestPhotoUrl,
     required String existingIdCardUrl,
   });
+
   Future<Either<Failure, List<CreatorProfile>>> getAllCreatorProfiles();
+
   Future<Either<Failure, void>> updateVerificationStatus(String uid, String status);
 
   Future<Either<Failure, void>> addProduct({
@@ -45,9 +49,27 @@ abstract interface class CreatorRepository {
     required String shippingInfo,
     required String creatorUid,
     required String creatorName,
+    bool isCustomizable = false,
+    List<CustomizationInput> customizations = const [],
   });
 
   Future<Either<Failure, List<CreatorProduct>>> getPendingProducts();
+
   Future<Either<Failure, List<CreatorProduct>>> getCreatorProducts(String uid);
+
   Future<Either<Failure, void>> updateProductStatus(String productId, String status);
+}
+
+class CustomizationInput {
+  final String name;
+  final String description;
+  final double additionalPrice;
+  final List<File> imageFiles;
+
+  CustomizationInput({
+    required this.name,
+    required this.description,
+    required this.additionalPrice,
+    this.imageFiles = const [],
+  });
 }
