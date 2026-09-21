@@ -127,7 +127,6 @@ class CreatorRepositoryImpl implements CreatorRepository {
       );
 
       await remoteDataSource.saveCreatorProfile(updatedProfile);
-      await remoteDataSource.updateVerificationStatus(uid, 'In-Process');
       return right(null);
     } catch (e) {
       return left(Failure(e.toString()));

@@ -49,6 +49,8 @@ class UserManagementView extends StatelessWidget {
               itemBuilder: (context, index) {
                 final user = users[index];
                 final isCreator = user.role == 'creator';
+                final isVerified = user.isVerified;
+
                 return Card(
                   margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
                   child: ListTile(
@@ -57,8 +59,17 @@ class UserManagementView extends StatelessWidget {
                       child: Icon(isCreator ? Icons.palette : Icons.person,
                           size: 20, color: isCreator ? AppColors.primary : AppColors.mutedText),
                     ),
-                    title: Text(user.name.isEmpty ? 'Anonymous User' : user.name, 
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    title: Row(
+                      children: [
+                        Text(user.name.isEmpty ? 'Anonymous User' : user.name, 
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                        if (isVerified)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 6),
+                            child: Icon(Icons.verified, size: 14, color: AppColors.primary),
+                          ),
+                      ],
+                    ),
                     subtitle: Text('${user.email} • ${user.role.toUpperCase()}'),
                     trailing: PopupMenuButton(
                       itemBuilder: (context) => [

@@ -206,13 +206,21 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
   @override
   Future<void> updateVerificationStatus(String uid, String status) async {
     try {
+      final isVerified = status == 'Verified';
+      
+      // 1. Update creator_profiles collection
       await firestore
           .collection('creator_profiles')
           .doc(uid)
           .update({'verificationStatus': status});
 
-      // Business/Data Layer enforcement: Hide products if creator is not Verified
-      final isVerified = status == 'Verified';
+      // 2. Update users collection (Single source of truth for Role & Verification)
+      await firestore
+          .collection('users')
+          .doc(uid)
+          .update({'isVerified': isVerified});
+
+      // 3. Update products visibility (Business/Data Layer enforcement)
       final creatorProducts = await firestore
           .collection('products')
           .where('creatorUid', isEqualTo: uid)

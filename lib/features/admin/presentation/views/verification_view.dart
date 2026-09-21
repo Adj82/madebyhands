@@ -52,7 +52,7 @@ class _VerificationViewState extends State<VerificationView> {
               for (var p in state.profiles) {
                 if (p.verificationStatus == 'Verified') {
                   approved.add(p);
-                } else if (p.verificationStatus == 'Rejected') {
+                } else if (p.verificationStatus == 'Rejected' || p.verificationStatus == 'Unverified') {
                   rejected.add(p);
                 } else {
                   pending.add(p);
@@ -62,9 +62,9 @@ class _VerificationViewState extends State<VerificationView> {
 
             return TabBarView(
               children: [
-                _buildProfileList(pending, isLoading, 'No pending verifications'),
+                _buildProfileList(pending, isLoading, 'No pending verifications (In-Process)'),
                 _buildProfileList(approved, isLoading, 'No approved creators'),
-                _buildProfileList(rejected, isLoading, 'No rejected creators'),
+                _buildProfileList(rejected, isLoading, 'No rejected or unverified creators'),
               ],
             );
           },
