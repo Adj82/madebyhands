@@ -25,6 +25,8 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     on<AdminRejectProductRequested>(_onRejectProductRequested);
     on<AdminAddCategoryRequested>(_onAddCategoryRequested);
     on<AdminDeleteCategoryRequested>(_onDeleteCategoryRequested);
+    on<AdminSuspendUserRequested>(_onSuspendUserRequested);
+    on<AdminChangeUserRoleRequested>(_onChangeUserRoleRequested);
     on<AdminSendMessageRequested>(_onSendMessageRequested);
     on<AdminUpdateSettingsRequested>(_onUpdateSettingsRequested);
   }
@@ -53,6 +55,12 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
       (l) => null,
       (r) => emit(state.copyWith(creatorProfiles: r)),
     );
+
+    final categoriesRes = await _adminRepository.getCategories();
+    categoriesRes.fold(
+      (l) => null,
+      (r) => emit(state.copyWith(categories: r)),
+    );
     
     // Initial mock data for other tabs until those specific repositories are ready
     emit(state.copyWith(
@@ -65,7 +73,6 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
               creatorName: 'Creator $i',
               price: 1200,
               category: 'Pottery')),
-      categories: ['Pottery', 'Jewellery', 'Home Decor', 'Textiles', 'Gifts'],
     ));
     
     // Trigger real data fetches
@@ -137,14 +144,24 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     emit(state.copyWith(productApprovals: newList));
   }
 
-  void _onAddCategoryRequested(AdminAddCategoryRequested event, Emitter<AdminState> emit) {
-    final newList = List<String>.from(state.categories)..add(event.name);
-    emit(state.copyWith(categories: newList));
+  void _onAddCategoryRequested(AdminAddCategoryRequested event, Emitter<AdminState> emit) async {
+    await _adminRepository.addCategory(event.name);
+    add(AdminLoadDataRequested());
   }
 
-  void _onDeleteCategoryRequested(AdminDeleteCategoryRequested event, Emitter<AdminState> emit) {
-    final newList = state.categories.where((c) => c != event.name).toList();
-    emit(state.copyWith(categories: newList));
+  void _onDeleteCategoryRequested(AdminDeleteCategoryRequested event, Emitter<AdminState> emit) async {
+    await _adminRepository.deleteCategory(event.name);
+    add(AdminLoadDataRequested());
+  }
+
+  void _onSuspendUserRequested(AdminSuspendUserRequested event, Emitter<AdminState> emit) async {
+    await _adminRepository.suspendUser(event.uid, event.isSuspended);
+    add(AdminLoadDataRequested());
+  }
+
+  void _onChangeUserRoleRequested(AdminChangeUserRoleRequested event, Emitter<AdminState> emit) async {
+    await _adminRepository.updateUserRole(event.uid, event.newRole);
+    add(AdminLoadDataRequested());
   }
 
   void _onSendMessageRequested(AdminSendMessageRequested event, Emitter<AdminState> emit) {

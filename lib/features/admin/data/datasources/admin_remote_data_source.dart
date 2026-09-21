@@ -12,6 +12,10 @@ abstract interface class AdminRemoteDataSource {
   Future<List<CreatorProfileModel>> getPendingVerifications();
   Future<void> approveCreator(String uid);
   Future<void> rejectCreator(String uid);
+  Future<List<String>> getCategories();
+  Future<void> addCategory(String name);
+  Future<void> deleteCategory(String name);
+  Future<void> suspendUser(String uid, bool isSuspended);
 }
 
 class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
@@ -122,6 +126,51 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
     try {
       await firestore.collection('creator_profiles').doc(uid).update({'verificationStatus': 'Rejected'});
       await firestore.collection('users').doc(uid).update({'isVerified': false});
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<List<String>> getCategories() async {
+    try {
+      final snapshot = await firestore.collection('categories').get();
+      if (snapshot.docs.isEmpty) {
+        // Seed initial categories if none exist
+        final defaultCategories = ['Pottery', 'Jewellery', 'Home Decor', 'Textiles', 'Gifts'];
+        for (var cat in defaultCategories) {
+          await addCategory(cat);
+        }
+        return defaultCategories;
+      }
+      return snapshot.docs.map((doc) => doc.id).toList();
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<void> addCategory(String name) async {
+    try {
+      await firestore.collection('categories').doc(name).set({'name': name});
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<void> deleteCategory(String name) async {
+    try {
+      await firestore.collection('categories').doc(name).delete();
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<void> suspendUser(String uid, bool isSuspended) async {
+    try {
+      await firestore.collection('users').doc(uid).update({'isSuspended': isSuspended});
     } catch (e) {
       throw Exception(e.toString());
     }

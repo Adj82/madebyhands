@@ -15,6 +15,18 @@ final class AdminFetchCreatorsRequested extends AdminEvent {}
 
 final class AdminFetchAdminsRequested extends AdminEvent {}
 
+final class AdminSuspendUserRequested extends AdminEvent {
+  final String uid;
+  final bool isSuspended;
+  const AdminSuspendUserRequested(this.uid, this.isSuspended);
+}
+
+final class AdminChangeUserRoleRequested extends AdminEvent {
+  final String uid;
+  final String newRole;
+  const AdminChangeUserRoleRequested(this.uid, this.newRole);
+}
+
 final class AdminApproveCreatorRequested extends AdminEvent {
   final String applicationId;
   const AdminApproveCreatorRequested(this.applicationId);

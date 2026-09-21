@@ -7,6 +7,7 @@ class UserModel extends UserEntity {
     required super.name,
     required super.role,
     super.isVerified,
+    super.isSuspended,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -16,6 +17,7 @@ class UserModel extends UserEntity {
       name: json['name'] ?? '',
       role: json['role'] ?? 'buyer',
       isVerified: json['isVerified'] ?? false,
+      isSuspended: json['isSuspended'] ?? false,
     );
   }
 
@@ -26,6 +28,7 @@ class UserModel extends UserEntity {
       'name': name,
       'role': role,
       'isVerified': isVerified,
+      'isSuspended': isSuspended,
     };
   }
 
@@ -35,6 +38,7 @@ class UserModel extends UserEntity {
     String? name,
     String? role,
     bool? isVerified,
+    bool? isSuspended,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -42,6 +46,7 @@ class UserModel extends UserEntity {
       name: name ?? this.name,
       role: role ?? this.role,
       isVerified: isVerified ?? this.isVerified,
+      isSuspended: isSuspended ?? this.isSuspended,
     );
   }
 }

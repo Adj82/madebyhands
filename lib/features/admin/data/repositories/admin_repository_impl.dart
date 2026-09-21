@@ -109,4 +109,44 @@ class AdminRepositoryImpl implements AdminRepository {
       return left(Failure(e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, List<String>>> getCategories() async {
+    try {
+      final categories = await remoteDataSource.getCategories();
+      return right(categories);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> addCategory(String name) async {
+    try {
+      await remoteDataSource.addCategory(name);
+      return right(null);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteCategory(String name) async {
+    try {
+      await remoteDataSource.deleteCategory(name);
+      return right(null);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> suspendUser(String uid, bool isSuspended) async {
+    try {
+      await remoteDataSource.suspendUser(uid, isSuspended);
+      return right(null);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
 }

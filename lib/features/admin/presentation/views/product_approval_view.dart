@@ -83,9 +83,19 @@ class _ProductApprovalViewState extends State<ProductApprovalView> {
           if (isLoading) const LinearProgressIndicator(),
           Expanded(
             child: products.isEmpty && !isLoading
-                ? Center(child: Text(emptyMessage))
+                ? Center(
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Container(
+                        height: 400,
+                        alignment: Alignment.center,
+                        child: Text(emptyMessage),
+                      ),
+                    ),
+                  )
                 : GridView.builder(
                     padding: const EdgeInsets.all(15),
+                    physics: const AlwaysScrollableScrollPhysics(),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       crossAxisSpacing: 15,

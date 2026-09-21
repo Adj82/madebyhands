@@ -63,7 +63,16 @@ class VerificationView extends StatelessWidget {
           if (isLoading) const LinearProgressIndicator(),
           Expanded(
             child: profiles.isEmpty && !isLoading
-                ? Center(child: Text(emptyMessage))
+                ? Center(
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Container(
+                        height: 400,
+                        alignment: Alignment.center,
+                        child: Text(emptyMessage),
+                      ),
+                    ),
+                  )
                 : ListView.separated(
                     padding: const EdgeInsets.all(15),
                     itemCount: profiles.length,

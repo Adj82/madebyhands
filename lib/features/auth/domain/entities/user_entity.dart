@@ -4,6 +4,7 @@ class UserEntity {
   final String name;
   final String role; // 'buyer', 'creator', 'admin'
   final bool isVerified;
+  final bool isSuspended;
 
   UserEntity({
     required this.uid,
@@ -11,5 +12,6 @@ class UserEntity {
     required this.name,
     required this.role,
     this.isVerified = false,
+    this.isSuspended = false,
   });
 }

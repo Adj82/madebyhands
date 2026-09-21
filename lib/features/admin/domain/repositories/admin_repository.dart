@@ -14,4 +14,8 @@ abstract interface class AdminRepository {
   Future<Either<Failure, List<CreatorProfile>>> getPendingVerifications();
   Future<Either<Failure, void>> approveCreator(String uid);
   Future<Either<Failure, void>> rejectCreator(String uid);
+  Future<Either<Failure, List<String>>> getCategories();
+  Future<Either<Failure, void>> addCategory(String name);
+  Future<Either<Failure, void>> deleteCategory(String name);
+  Future<Either<Failure, void>> suspendUser(String uid, bool isSuspended);
 }

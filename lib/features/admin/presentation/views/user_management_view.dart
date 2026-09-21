@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
+import 'package:madebyhands/features/creator/presentation/pages/creator_dashboard_page.dart';
+import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 
 class UserManagementView extends StatelessWidget {
   const UserManagementView({super.key});
@@ -50,9 +52,11 @@ class UserManagementView extends StatelessWidget {
                 final user = users[index];
                 final isCreator = user.role == 'creator';
                 final isVerified = user.isVerified;
+                final isSuspended = user.isSuspended;
 
                 return Card(
                   margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                  color: isSuspended ? Colors.red.shade50 : null,
                   child: ListTile(
                     leading: CircleAvatar(
                       backgroundColor: isCreator ? AppColors.primary.withAlpha(50) : AppColors.outline,
@@ -61,12 +65,20 @@ class UserManagementView extends StatelessWidget {
                     ),
                     title: Row(
                       children: [
-                        Text(user.name.isEmpty ? 'Anonymous User' : user.name, 
-                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Expanded(
+                          child: Text(user.name.isEmpty ? 'Anonymous User' : user.name, 
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis),
+                        ),
                         if (isVerified)
                           const Padding(
                             padding: EdgeInsets.only(left: 6),
                             child: Icon(Icons.verified, size: 14, color: AppColors.primary),
+                          ),
+                        if (isSuspended)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 6),
+                            child: Icon(Icons.block, size: 14, color: Colors.red),
                           ),
                       ],
                     ),
@@ -74,20 +86,78 @@ class UserManagementView extends StatelessWidget {
                     trailing: PopupMenuButton(
                       itemBuilder: (context) => [
                         const PopupMenuItem(value: 'view', child: Text('View Profile')),
-                        const PopupMenuItem(
-                            value: 'suspend', child: Text('Suspend User', style: TextStyle(color: Colors.redAccent))),
+                        PopupMenuItem(
+                            value: 'suspend', 
+                            child: Text(isSuspended ? 'Unsuspend User' : 'Suspend User', 
+                                style: TextStyle(color: isSuspended ? Colors.green : Colors.redAccent))),
                         const PopupMenuItem(value: 'role', child: Text('Change Role')),
                       ],
                       onSelected: (val) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Action "$val" will be implemented with Firebase Functions.')),
-                        );
+                        if (val == 'view') {
+                          _viewProfile(context, user);
+                        } else if (val == 'suspend') {
+                          context.read<AdminBloc>().add(AdminSuspendUserRequested(user.uid, !isSuspended));
+                        } else if (val == 'role') {
+                          _showChangeRoleDialog(context, user);
+                        }
                       },
                     ),
                   ),
                 );
               },
             ),
+    );
+  }
+
+  void _viewProfile(BuildContext context, UserEntity user) {
+    if (user.role == 'creator') {
+       context.read<CreatorBloc>().add(CreatorCheckProfileExists(user.uid));
+       // This will navigate through the CreatorFlowWrapper if we were in that flow, 
+       // but here we are in Admin flow. Let's just show a snackbar or a dialog for now 
+       // as full cross-feature navigation might need more setup.
+       ScaffoldMessenger.of(context).showSnackBar(
+         const SnackBar(content: Text('Viewing profiles will be improved in next update.')),
+       );
+    } else {
+       ScaffoldMessenger.of(context).showSnackBar(
+         const SnackBar(content: Text('Buyer profile view is coming soon.')),
+       );
+    }
+  }
+
+  void _showChangeRoleDialog(BuildContext context, UserEntity user) {
+    final adminBloc = context.read<AdminBloc>();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Change User Role'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Buyer'),
+              onTap: () {
+                adminBloc.add(AdminChangeUserRoleRequested(user.uid, 'buyer'));
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              title: const Text('Creator'),
+              onTap: () {
+                adminBloc.add(AdminChangeUserRoleRequested(user.uid, 'creator'));
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              title: const Text('Admin'),
+              onTap: () {
+                adminBloc.add(AdminChangeUserRoleRequested(user.uid, 'admin'));
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
