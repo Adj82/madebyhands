@@ -2,26 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
-import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
+import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/admin/presentation/pages/details/creator_profile_review_page.dart';
 
-class VerificationView extends StatefulWidget {
+class VerificationView extends StatelessWidget {
   const VerificationView({super.key});
-
-  @override
-  State<VerificationView> createState() => _VerificationViewState();
-}
-
-class _VerificationViewState extends State<VerificationView> {
-  @override
-  void initState() {
-    super.initState();
-    _fetchData();
-  }
-
-  void _fetchData() {
-    context.read<CreatorBloc>().add(CreatorFetchAllProfiles());
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,32 +24,27 @@ class _VerificationViewState extends State<VerificationView> {
           unselectedLabelColor: AppColors.mutedText,
           indicatorColor: AppColors.primary,
         ),
-        body: BlocBuilder<CreatorBloc, CreatorState>(
+        body: BlocBuilder<AdminBloc, AdminState>(
           builder: (context, state) {
             List<CreatorProfile> pending = [];
             List<CreatorProfile> approved = [];
             List<CreatorProfile> rejected = [];
-            bool isLoading = false;
 
-            if (state is CreatorLoading) {
-              isLoading = true;
-            } else if (state is CreatorAllProfilesLoaded) {
-              for (var p in state.profiles) {
-                if (p.verificationStatus == 'Verified') {
-                  approved.add(p);
-                } else if (p.verificationStatus == 'Rejected' || p.verificationStatus == 'Unverified') {
-                  rejected.add(p);
-                } else {
-                  pending.add(p);
-                }
+            for (var p in state.creatorProfiles) {
+              if (p.verificationStatus == 'Verified') {
+                approved.add(p);
+              } else if (p.verificationStatus == 'Rejected' || p.verificationStatus == 'Unverified') {
+                rejected.add(p);
+              } else {
+                pending.add(p);
               }
             }
 
             return TabBarView(
               children: [
-                _buildProfileList(pending, isLoading, 'No pending verifications (In-Process)'),
-                _buildProfileList(approved, isLoading, 'No approved creators'),
-                _buildProfileList(rejected, isLoading, 'No rejected or unverified creators'),
+                _buildProfileList(context, pending, state.isLoading, 'No pending verifications (In-Process)'),
+                _buildProfileList(context, approved, state.isLoading, 'No approved creators'),
+                _buildProfileList(context, rejected, state.isLoading, 'No rejected or unverified creators'),
               ],
             );
           },
@@ -73,10 +53,10 @@ class _VerificationViewState extends State<VerificationView> {
     );
   }
 
-  Widget _buildProfileList(List<CreatorProfile> profiles, bool isLoading, String emptyMessage) {
+  Widget _buildProfileList(BuildContext context, List<CreatorProfile> profiles, bool isLoading, String emptyMessage) {
     return RefreshIndicator(
       onRefresh: () async {
-        _fetchData();
+        context.read<AdminBloc>().add(AdminLoadDataRequested());
       },
       child: Column(
         children: [
@@ -152,8 +132,8 @@ class _VerificationViewState extends State<VerificationView> {
                                     if (profile.verificationStatus != 'Verified')
                                       FilledButton(
                                         onPressed: () {
-                                          context.read<CreatorBloc>().add(
-                                              CreatorUpdateVerificationStatus(uid: profile.uid, status: 'Verified'));
+                                          context.read<AdminBloc>().add(
+                                              AdminApproveCreatorRequested(profile.uid));
                                         },
                                         style: FilledButton.styleFrom(
                                           backgroundColor: AppColors.primary,
@@ -236,8 +216,8 @@ class _VerificationViewState extends State<VerificationView> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () {
-                      context.read<CreatorBloc>().add(
-                            CreatorUpdateVerificationStatus(uid: profile.uid, status: 'Rejected'),
+                      context.read<AdminBloc>().add(
+                            AdminRejectCreatorRequested(profile.uid),
                           );
                       Navigator.pop(sheetContext);
                     },
@@ -249,8 +229,8 @@ class _VerificationViewState extends State<VerificationView> {
                 Expanded(
                   child: FilledButton(
                     onPressed: () {
-                      context.read<CreatorBloc>().add(
-                            CreatorUpdateVerificationStatus(uid: profile.uid, status: 'Verified'),
+                      context.read<AdminBloc>().add(
+                            AdminApproveCreatorRequested(profile.uid),
                           );
                       Navigator.pop(sheetContext);
                     },

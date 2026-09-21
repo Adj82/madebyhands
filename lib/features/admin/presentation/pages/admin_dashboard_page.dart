@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_cubit.dart';
 import 'package:madebyhands/features/admin/presentation/views/admin_settings_view.dart';
 import 'package:madebyhands/features/admin/presentation/views/category_management_view.dart';
@@ -42,6 +43,14 @@ class AdminDashboardPage extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
             actions: [
+              IconButton(
+                onPressed: () {
+                  context.read<AdminBloc>().add(AdminLoadDataRequested());
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Refreshing data...')));
+                },
+                icon: const Icon(Icons.refresh),
+              ),
               IconButton(
                 onPressed: () {
                   context.read<AuthBloc>().add(AuthLogoutRequested());

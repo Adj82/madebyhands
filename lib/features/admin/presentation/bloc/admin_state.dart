@@ -6,6 +6,7 @@ class AdminState extends Equatable {
   final List<String> categories;
   final List<AdminSupportTicket> supportTickets;
   
+  final List<CreatorProfile> creatorProfiles;
   final List<UserEntity> buyers;
   final List<UserEntity> creators;
   final List<UserEntity> admins;
@@ -25,6 +26,7 @@ class AdminState extends Equatable {
     this.productApprovals = const [],
     this.categories = const [],
     this.supportTickets = const [],
+    this.creatorProfiles = const [],
     this.buyers = const [],
     this.creators = const [],
     this.admins = const [],
@@ -43,6 +45,7 @@ class AdminState extends Equatable {
     List<AdminProductApproval>? productApprovals,
     List<String>? categories,
     List<AdminSupportTicket>? supportTickets,
+    List<CreatorProfile>? creatorProfiles,
     List<UserEntity>? buyers,
     List<UserEntity>? creators,
     List<UserEntity>? admins,
@@ -60,6 +63,7 @@ class AdminState extends Equatable {
       productApprovals: productApprovals ?? this.productApprovals,
       categories: categories ?? this.categories,
       supportTickets: supportTickets ?? this.supportTickets,
+      creatorProfiles: creatorProfiles ?? this.creatorProfiles,
       buyers: buyers ?? this.buyers,
       creators: creators ?? this.creators,
       admins: admins ?? this.admins,
@@ -80,6 +84,7 @@ class AdminState extends Equatable {
         productApprovals,
         categories,
         supportTickets,
+        creatorProfiles,
         buyers,
         creators,
         admins,

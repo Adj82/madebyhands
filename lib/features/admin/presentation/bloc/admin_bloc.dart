@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 import 'package:madebyhands/features/admin/domain/entities/admin_data.dart';
 import 'package:madebyhands/features/admin/domain/repositories/admin_repository.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 
 part 'admin_event.dart';
 part 'admin_state.dart';
@@ -36,22 +37,26 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     settingsRes.fold(
       (l) => emit(state.copyWith(isLoading: false, errorMessage: l.message)),
       (r) => emit(state.copyWith(
-        isLoading: false,
         flatFee: r['flatFee']!,
         percentFee: r['percentFee']!,
       )),
     );
 
+    final ticketsRes = await _adminRepository.getSupportTickets();
+    ticketsRes.fold(
+      (l) => null,
+      (r) => emit(state.copyWith(supportTickets: r)),
+    );
+
+    final verificationRes = await _adminRepository.getPendingVerifications();
+    verificationRes.fold(
+      (l) => null,
+      (r) => emit(state.copyWith(creatorProfiles: r)),
+    );
+    
     // Initial mock data for other tabs until those specific repositories are ready
     emit(state.copyWith(
-      creatorApplications: List.generate(
-          8,
-          (i) => AdminCreatorApplication(
-              id: 'app-$i',
-              name: 'Artisan $i',
-              category: 'Pottery',
-              bio: 'A creator from Jaipur.',
-              appliedAt: DateTime.now())),
+      isLoading: false,
       productApprovals: List.generate(
           10,
           (i) => AdminProductApproval(
@@ -62,12 +67,6 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
               category: 'Pottery')),
       categories: ['Pottery', 'Jewellery', 'Home Decor', 'Textiles', 'Gifts'],
     ));
-
-    final ticketsRes = await _adminRepository.getSupportTickets();
-    ticketsRes.fold(
-      (l) => null,
-      (r) => emit(state.copyWith(supportTickets: r)),
-    );
     
     // Trigger real data fetches
     add(AdminFetchBuyersRequested());
@@ -85,14 +84,13 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     emit(state.copyWith(
       totalUsersCount: (buyers.getOrElse((l) => []).length) + (creators.getOrElse((l) => []).length),
       activeCreatorsCount: creators.getOrElse((l) => []).length,
-      // We can also count pending products if needed
     ));
   }
 
   void _onFetchBuyersRequested(AdminFetchBuyersRequested event, Emitter<AdminState> emit) async {
     final res = await _adminRepository.getUsers('buyer');
     res.fold(
-      (l) => null, // Handle error if needed
+      (l) => null,
       (r) => emit(state.copyWith(buyers: r)),
     );
   }
@@ -113,14 +111,20 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     );
   }
 
-  void _onApproveCreatorRequested(AdminApproveCreatorRequested event, Emitter<AdminState> emit) {
-    final newList = state.creatorApplications.where((a) => a.id != event.applicationId).toList();
-    emit(state.copyWith(creatorApplications: newList));
+  void _onApproveCreatorRequested(AdminApproveCreatorRequested event, Emitter<AdminState> emit) async {
+    final res = await _adminRepository.approveCreator(event.applicationId);
+    res.fold(
+      (l) => emit(state.copyWith(errorMessage: l.message)),
+      (r) => add(AdminLoadDataRequested()),
+    );
   }
 
-  void _onRejectCreatorRequested(AdminRejectCreatorRequested event, Emitter<AdminState> emit) {
-    final newList = state.creatorApplications.where((a) => a.id != event.applicationId).toList();
-    emit(state.copyWith(creatorApplications: newList));
+  void _onRejectCreatorRequested(AdminRejectCreatorRequested event, Emitter<AdminState> emit) async {
+    final res = await _adminRepository.rejectCreator(event.applicationId);
+    res.fold(
+      (l) => emit(state.copyWith(errorMessage: l.message)),
+      (r) => add(AdminLoadDataRequested()),
+    );
   }
 
   void _onApproveProductRequested(AdminApproveProductRequested event, Emitter<AdminState> emit) {

@@ -4,6 +4,7 @@ import 'package:madebyhands/features/admin/data/datasources/admin_remote_data_so
 import 'package:madebyhands/features/admin/domain/entities/admin_data.dart';
 import 'package:madebyhands/features/admin/domain/repositories/admin_repository.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 
 class AdminRepositoryImpl implements AdminRepository {
   final AdminRemoteDataSource remoteDataSource;
@@ -74,6 +75,36 @@ class AdminRepositoryImpl implements AdminRepository {
         isOpen: data['status'] == 'open',
       )).toList();
       return right(tickets);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<CreatorProfile>>> getPendingVerifications() async {
+    try {
+      final profiles = await remoteDataSource.getPendingVerifications();
+      return right(profiles);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> approveCreator(String uid) async {
+    try {
+      await remoteDataSource.approveCreator(uid);
+      return right(null);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> rejectCreator(String uid) async {
+    try {
+      await remoteDataSource.rejectCreator(uid);
+      return right(null);
     } catch (e) {
       return left(Failure(e.toString()));
     }

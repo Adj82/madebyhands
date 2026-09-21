@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:madebyhands/features/auth/data/models/user_model.dart';
+import 'package:madebyhands/features/creator/data/models/creator_profile_model.dart';
 
 abstract interface class AdminRemoteDataSource {
   Future<List<UserModel>> getUsers(String role);
@@ -8,6 +9,9 @@ abstract interface class AdminRemoteDataSource {
   Future<Map<String, dynamic>> getPlatformSettings();
   Future<void> updatePlatformSettings(double flatFee, double percentFee);
   Future<List<Map<String, dynamic>>> getSupportTickets();
+  Future<List<CreatorProfileModel>> getPendingVerifications();
+  Future<void> approveCreator(String uid);
+  Future<void> rejectCreator(String uid);
 }
 
 class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
@@ -77,6 +81,47 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
     try {
       final snapshot = await firestore.collection('support_tickets').get();
       return snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList();
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<List<CreatorProfileModel>> getPendingVerifications() async {
+    try {
+      final snapshot = await firestore.collection('creator_profiles').get();
+      return snapshot.docs
+          .map((doc) => CreatorProfileModel.fromJson(doc.data()))
+          .toList();
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<void> approveCreator(String uid) async {
+    try {
+      final batch = firestore.batch();
+      batch.update(firestore.collection('creator_profiles').doc(uid), {'verificationStatus': 'Verified'});
+      batch.update(firestore.collection('users').doc(uid), {'isVerified': true});
+      
+      // Also activate products
+      final products = await firestore.collection('products').where('creatorUid', isEqualTo: uid).get();
+      for (var doc in products.docs) {
+        batch.update(doc.reference, {'isActive': true});
+      }
+      
+      await batch.commit();
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<void> rejectCreator(String uid) async {
+    try {
+      await firestore.collection('creator_profiles').doc(uid).update({'verificationStatus': 'Rejected'});
+      await firestore.collection('users').doc(uid).update({'isVerified': false});
     } catch (e) {
       throw Exception(e.toString());
     }

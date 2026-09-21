@@ -34,7 +34,7 @@ class OverviewView extends StatelessWidget {
                   children: [
                     AdminStatCard(title: 'Total Users', value: '${state.totalUsersCount}', icon: Icons.people, color: Colors.blue),
                     AdminStatCard(title: 'Active Creators', value: '${state.activeCreatorsCount}', icon: Icons.palette, color: AppColors.primary),
-                    AdminStatCard(title: 'Pending Approvals', value: '${state.creatorApplications.length}', icon: Icons.hourglass_empty, color: AppColors.accent),
+                    AdminStatCard(title: 'Pending Approvals', value: '${state.creatorProfiles.where((p) => p.verificationStatus != 'Verified').length}', icon: Icons.hourglass_empty, color: AppColors.accent),
                     AdminStatCard(title: 'Total Revenue', value: '₹${state.totalRevenue.toStringAsFixed(0)}', icon: Icons.payments, color: Colors.green),
                   ],
                 ),
