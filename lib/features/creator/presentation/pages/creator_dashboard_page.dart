@@ -27,7 +27,7 @@ class _CreatorDashboardPageState extends State<CreatorDashboardPage> {
     _views = [
       CreatorHomeView(profile: widget.profile),
       CreatorProductsView(profile: widget.profile),
-      const CreatorOrdersView(),
+      CreatorOrdersView(profile: widget.profile),
       const CreatorEarningsView(),
       CreatorProfileView(profile: widget.profile),
     ];

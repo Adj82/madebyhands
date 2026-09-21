@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:fpdart/fpdart.dart';
 import 'package:madebyhands/core/error/failures.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 
@@ -78,6 +79,10 @@ abstract interface class CreatorRepository {
   Future<Either<Failure, List<CreatorProduct>>> getCreatorProducts(String uid);
 
   Future<Either<Failure, void>> updateProductStatus(String productId, String status);
+
+  Future<Either<Failure, List<CreatorOrder>>> getCreatorOrders(String uid);
+
+  Future<Either<Failure, void>> updateOrderStatus(String orderId, String status, {String? rejectionReason, String? consignmentNumber});
 }
 
 class CustomizationInput {

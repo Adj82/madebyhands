@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:madebyhands/features/creator/data/models/creator_order_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_product_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_profile_model.dart';
 
@@ -68,6 +69,12 @@ abstract interface class CreatorRemoteDataSource {
 
   /// Updates the approval status and active state of a product.
   Future<void> updateProductStatus(String productId, String status);
+
+  /// Fetches all orders belonging to a specific creator.
+  Future<List<CreatorOrderModel>> getCreatorOrders(String creatorUid);
+
+  /// Updates the status of an order.
+  Future<void> updateOrderStatus(String orderId, String status, {String? rejectionReason, String? consignmentNumber});
 }
 
 class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
@@ -388,6 +395,37 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
         'status': status,
         'isActive': status == 'Approved',
       });
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<List<CreatorOrderModel>> getCreatorOrders(String creatorUid) async {
+    try {
+      final snapshot = await firestore
+          .collection('orders')
+          .where('creatorId', isEqualTo: creatorUid)
+          .get();
+      return snapshot.docs
+          .map((doc) => CreatorOrderModel.fromJson(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<void> updateOrderStatus(String orderId, String status, {String? rejectionReason, String? consignmentNumber}) async {
+    try {
+      final updateData = <String, dynamic>{'status': status};
+      if (rejectionReason != null) {
+        updateData['rejectionReason'] = rejectionReason;
+      }
+      if (consignmentNumber != null) {
+        updateData['consignmentNumber'] = consignmentNumber;
+      }
+      await firestore.collection('orders').doc(orderId).update(updateData);
     } catch (e) {
       throw Exception(e.toString());
     }

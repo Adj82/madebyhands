@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
@@ -26,6 +27,8 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
     on<CreatorFetchAdminAllProducts>(_onFetchAdminAllProducts);
     on<CreatorFetchCreatorProducts>(_onFetchCreatorProducts);
     on<CreatorUpdateProductStatus>(_onUpdateProductStatus);
+    on<CreatorFetchOrders>(_onFetchOrders);
+    on<CreatorUpdateOrderStatus>(_onUpdateOrderStatus);
   }
 
   void _onCheckProfileExists(
@@ -268,6 +271,36 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
           add(CreatorFetchPendingProducts());
         }
       },
+    );
+  }
+
+  void _onFetchOrders(
+    CreatorFetchOrders event,
+    Emitter<CreatorState> emit,
+  ) async {
+    if (state is! CreatorOrdersLoaded) {
+      emit(CreatorLoading());
+    }
+    final res = await _creatorRepository.getCreatorOrders(event.uid);
+    res.fold(
+      (l) => emit(CreatorFailure(l.message)),
+      (r) => emit(CreatorOrdersLoaded(r)),
+    );
+  }
+
+  void _onUpdateOrderStatus(
+    CreatorUpdateOrderStatus event,
+    Emitter<CreatorState> emit,
+  ) async {
+    final res = await _creatorRepository.updateOrderStatus(
+      event.orderId,
+      event.status,
+      rejectionReason: event.rejectionReason,
+      consignmentNumber: event.consignmentNumber,
+    );
+    res.fold(
+      (l) => emit(CreatorFailure(l.message)),
+      (r) => add(CreatorFetchOrders(event.uid)),
     );
   }
 }

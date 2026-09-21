@@ -150,3 +150,17 @@ final class CreatorUpdateProductStatus extends CreatorEvent {
   final String status;
   CreatorUpdateProductStatus({required this.productId, required this.status});
 }
+
+final class CreatorFetchOrders extends CreatorEvent {
+  final String uid;
+  CreatorFetchOrders(this.uid);
+}
+
+final class CreatorUpdateOrderStatus extends CreatorEvent {
+  final String orderId;
+  final String status;
+  final String? rejectionReason;
+  final String? consignmentNumber;
+  final String uid; // to re-fetch
+  CreatorUpdateOrderStatus({required this.orderId, required this.status, this.rejectionReason, this.consignmentNumber, required this.uid});
+}

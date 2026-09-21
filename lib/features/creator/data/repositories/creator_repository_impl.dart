@@ -4,6 +4,7 @@ import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/features/creator/data/datasources/creator_remote_data_source.dart';
 import 'package:madebyhands/features/creator/data/models/creator_product_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_profile_model.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
@@ -365,6 +366,26 @@ class CreatorRepositoryImpl implements CreatorRepository {
   Future<Either<Failure, void>> updateProductStatus(String productId, String status) async {
     try {
       await remoteDataSource.updateProductStatus(productId, status);
+      return right(null);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<CreatorOrder>>> getCreatorOrders(String uid) async {
+    try {
+      final orders = await remoteDataSource.getCreatorOrders(uid);
+      return right(orders);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> updateOrderStatus(String orderId, String status, {String? rejectionReason, String? consignmentNumber}) async {
+    try {
+      await remoteDataSource.updateOrderStatus(orderId, status, rejectionReason: rejectionReason, consignmentNumber: consignmentNumber);
       return right(null);
     } catch (e) {
       return left(Failure(e.toString()));
