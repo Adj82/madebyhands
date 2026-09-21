@@ -7,6 +7,8 @@ import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 
+import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
+
 class CreatorOnboardingPage extends StatefulWidget {
   final UserEntity user;
   const CreatorOnboardingPage({super.key, required this.user});
@@ -181,10 +183,23 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
           validator: (v) => v == null || v.isEmpty ? 'Required' : null,
         ),
         const SizedBox(height: 20),
-        TextFormField(
-          controller: _categoryController,
-          decoration: const InputDecoration(labelText: 'Primary Craft Category *', hintText: 'e.g. Pottery', prefixIcon: Icon(Icons.category_outlined)),
-          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+        BlocBuilder<AdminBloc, AdminState>(
+          builder: (context, state) {
+            final categories = state.categories;
+            return DropdownButtonFormField<String>(
+              value: categories.contains(_categoryController.text) ? _categoryController.text : null,
+              decoration: const InputDecoration(
+                  labelText: 'Primary Craft Category *',
+                  prefixIcon: Icon(Icons.category_outlined)),
+              items: categories
+                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                  .toList(),
+              onChanged: (val) {
+                if (val != null) setState(() => _categoryController.text = val);
+              },
+              validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+            );
+          },
         ),
         const SizedBox(height: 20),
         TextFormField(

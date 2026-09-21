@@ -57,6 +57,9 @@ abstract interface class CreatorRemoteDataSource {
   /// Fetches products that are awaiting admin approval.
   Future<List<CreatorProductModel>> getPendingProducts();
 
+  /// Fetches all products for admin review (Pending, Approved, Rejected).
+  Future<List<CreatorProductModel>> getAdminAllProducts();
+
   /// Fetches all products belonging to a specific creator.
   Future<List<CreatorProductModel>> getCreatorProducts(String uid);
 
@@ -211,14 +214,22 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
   @override
   Future<void> updateVerificationStatus(String uid, String status) async {
     try {
+      final isVerified = status == 'Verified';
+      
+      // 1. Update creator_profiles collection
       await firestore
           .collection('creator_profiles')
           .doc(uid)
           .update({'verificationStatus': status});
 
-      // Business/Data Layer enforcement: Hide products if creator is not Verified
-      final isVerified = status == 'Verified';
-      final productsQuery = await firestore
+      // 2. Update users collection (Single source of truth for Role & Verification)
+      await firestore
+          .collection('users')
+          .doc(uid)
+          .update({'isVerified': isVerified});
+
+      // 3. Update products visibility (Business/Data Layer enforcement)
+      final creatorProducts = await firestore
           .collection('products')
           .where('creatorUid', isEqualTo: uid)
           .get();
@@ -320,6 +331,18 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
           .collection('products')
           .where('status', isEqualTo: 'Pending Approval')
           .get();
+      return snapshot.docs
+          .map((doc) => CreatorProductModel.fromJson(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<List<CreatorProductModel>> getAdminAllProducts() async {
+    try {
+      final snapshot = await firestore.collection('products').get();
       return snapshot.docs
           .map((doc) => CreatorProductModel.fromJson(doc.data(), doc.id))
           .toList();

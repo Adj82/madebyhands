@@ -127,7 +127,6 @@ class CreatorRepositoryImpl implements CreatorRepository {
       );
 
       await remoteDataSource.saveCreatorProfile(updatedProfile);
-      await remoteDataSource.updateVerificationStatus(uid, 'In-Process');
       return right(null);
     } catch (e) {
       return left(Failure(e.toString()));
@@ -233,6 +232,16 @@ class CreatorRepositoryImpl implements CreatorRepository {
   Future<Either<Failure, List<CreatorProduct>>> getPendingProducts() async {
     try {
       final products = await remoteDataSource.getPendingProducts();
+      return right(products);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<CreatorProduct>>> getAdminAllProducts() async {
+    try {
+      final products = await remoteDataSource.getAdminAllProducts();
       return right(products);
     } catch (e) {
       return left(Failure(e.toString()));

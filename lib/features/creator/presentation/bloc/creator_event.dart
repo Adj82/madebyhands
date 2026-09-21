@@ -98,6 +98,8 @@ final class CreatorAddProduct extends CreatorEvent {
 
 final class CreatorFetchPendingProducts extends CreatorEvent {}
 
+final class CreatorFetchAdminAllProducts extends CreatorEvent {}
+
 final class CreatorFetchCreatorProducts extends CreatorEvent {
   final String uid;
   CreatorFetchCreatorProducts(this.uid);

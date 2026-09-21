@@ -30,6 +30,11 @@ final class CreatorPendingProductsLoaded extends CreatorState {
   CreatorPendingProductsLoaded(this.products);
 }
 
+final class CreatorAdminAllProductsLoaded extends CreatorState {
+  final List<CreatorProduct> products;
+  CreatorAdminAllProductsLoaded(this.products);
+}
+
 final class CreatorMyProductsLoaded extends CreatorState {
   final List<CreatorProduct> products;
   CreatorMyProductsLoaded(this.products);

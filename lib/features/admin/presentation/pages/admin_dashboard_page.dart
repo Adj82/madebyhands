@@ -6,7 +6,6 @@ import 'package:madebyhands/features/admin/presentation/bloc/admin_cubit.dart';
 import 'package:madebyhands/features/admin/presentation/views/admin_settings_view.dart';
 import 'package:madebyhands/features/admin/presentation/views/category_management_view.dart';
 import 'package:madebyhands/features/admin/presentation/views/finance_view.dart';
-import 'package:madebyhands/features/admin/presentation/views/moderation_view.dart';
 import 'package:madebyhands/features/admin/presentation/views/order_management_view.dart';
 import 'package:madebyhands/features/admin/presentation/views/overview_view.dart';
 import 'package:madebyhands/features/admin/presentation/views/product_approval_view.dart';
@@ -14,7 +13,6 @@ import 'package:madebyhands/features/admin/presentation/views/support_tickets_vi
 import 'package:madebyhands/features/admin/presentation/views/verification_view.dart';
 import 'package:madebyhands/features/admin/presentation/views/user_management_view.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 
 class AdminDashboardPage extends StatelessWidget {
   const AdminDashboardPage({super.key});
@@ -27,7 +25,6 @@ class AdminDashboardPage extends StatelessWidget {
     'Orders',
     'User Management',
     'Support Tickets',
-    'Moderation',
     'Payouts & Finance',
     'Admin Settings',
   ];
@@ -44,19 +41,6 @@ class AdminDashboardPage extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
             actions: [
-              IconButton(
-                onPressed: () {
-                  context.read<AdminBloc>().add(AdminLoadDataRequested());
-                  if (selectedIndex == 1) {
-                    context.read<CreatorBloc>().add(CreatorFetchAllProfiles());
-                  } else if (selectedIndex == 2) {
-                    context.read<CreatorBloc>().add(CreatorFetchPendingProducts());
-                  }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Refreshing data...')));
-                },
-                icon: const Icon(Icons.refresh),
-              ),
               IconButton(
                 onPressed: () {
                   context.read<AuthBloc>().add(AuthLogoutRequested());
@@ -120,16 +104,14 @@ class AdminDashboardPage extends StatelessWidget {
                           Icons.support_agent,
                           'Support',
                           selectedIndex),
-                      _buildDrawerTile(context, 7, Icons.gavel_outlined,
-                          Icons.gavel, 'Moderation', selectedIndex),
                       _buildDrawerTile(
                           context,
-                          8,
+                          7,
                           Icons.account_balance_wallet_outlined,
                           Icons.account_balance_wallet,
                           'Payouts',
                           selectedIndex),
-                      _buildDrawerTile(context, 9, Icons.settings_outlined,
+                      _buildDrawerTile(context, 8, Icons.settings_outlined,
                           Icons.settings, 'Settings', selectedIndex),
                     ],
                   ),
@@ -155,7 +137,6 @@ class AdminDashboardPage extends StatelessWidget {
               OrderManagementView(),
               UserManagementView(),
               SupportTicketsView(),
-              ModerationView(),
               FinanceView(),
               AdminSettingsView(),
             ],

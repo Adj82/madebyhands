@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/admin/domain/entities/admin_data.dart';
 
 class SupportTicketDetailPage extends StatelessWidget {
-  final int index;
-  const SupportTicketDetailPage({super.key, required this.index});
+  final AdminSupportTicket ticket;
+  const SupportTicketDetailPage({super.key, required this.ticket});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Ticket #78$index'),
+        title: Text('Ticket #${ticket.id.substring(0, 5)}'),
         actions: [
           IconButton(onPressed: () {}, icon: const Icon(Icons.check_circle_outline, color: Colors.green)),
         ],
@@ -26,18 +27,18 @@ class SupportTicketDetailPage extends StatelessWidget {
                 const SizedBox(height: 10),
                 _buildBubble(
                   context,
-                  message: 'I made a payment for the ceramic pot but the order still shows as pending. Can you please check?',
+                  message: ticket.lastMessage.isEmpty ? 'No message content.' : ticket.lastMessage,
                   isUser: true,
-                  time: '10:30 AM',
+                  time: 'Recently',
                 ),
                 const SizedBox(height: 20),
                 const Text('Admin Response', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.mutedText)),
                 const SizedBox(height: 10),
                 _buildBubble(
                   context,
-                  message: 'Hello! I am looking into your transaction. It seems there is a delay from the payment gateway side.',
+                  message: 'Hello! Our team is looking into this.',
                   isUser: false,
-                  time: '11:15 AM',
+                  time: 'Just now',
                 ),
               ],
             ),
@@ -52,20 +53,21 @@ class SupportTicketDetailPage extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.orange.withAlpha(20),
+        color: ticket.isOpen ? Colors.orange.withAlpha(20) : Colors.green.withAlpha(20),
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.orange.withAlpha(50)),
+        border: Border.all(color: ticket.isOpen ? Colors.orange.withAlpha(50) : Colors.green.withAlpha(50)),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.info_outline, color: Colors.orange),
-          SizedBox(width: 15),
+          Icon(ticket.isOpen ? Icons.info_outline : Icons.check_circle_outline, color: ticket.isOpen ? Colors.orange : Colors.green),
+          const SizedBox(width: 15),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Status: Open', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
-                Text('Assigned to: Support Agent #4', style: TextStyle(fontSize: 12)),
+                Text('Status: ${ticket.isOpen ? 'Open' : 'Resolved'}', 
+                    style: TextStyle(fontWeight: FontWeight.bold, color: ticket.isOpen ? Colors.orange : Colors.green)),
+                const Text('Assigned to: Support Team', style: TextStyle(fontSize: 12)),
               ],
             ),
           ),
