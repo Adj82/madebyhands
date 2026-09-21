@@ -19,30 +19,36 @@ class CategoryManagementView extends StatelessWidget {
             icon: const Icon(Icons.add),
             label: const Text('New Category'),
           ),
-          body: ListView.builder(
-            padding: const EdgeInsets.all(15),
-            itemCount: categories.length,
-            itemBuilder: (context, index) {
-              return Card(
-                child: ListTile(
-                  leading: const CircleAvatar(backgroundColor: AppColors.outline, child: Icon(Icons.category, size: 20)),
-                  title: Text(categories[index]),
-                  subtitle: Text('${index * 12 + 5} products listed'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(onPressed: () {}, icon: const Icon(Icons.edit_outlined)),
-                      IconButton(
-                        onPressed: () {
-                          context.read<AdminBloc>().add(AdminDeleteCategoryRequested(categories[index]));
-                        }, 
-                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent)
-                      ),
-                    ],
-                  ),
-                ),
-              );
+          body: RefreshIndicator(
+            onRefresh: () async {
+              context.read<AdminBloc>().add(AdminLoadDataRequested());
             },
+            child: ListView.builder(
+              padding: const EdgeInsets.all(15),
+              physics: const AlwaysScrollableScrollPhysics(),
+              itemCount: categories.length,
+              itemBuilder: (context, index) {
+                return Card(
+                  child: ListTile(
+                    leading: const CircleAvatar(backgroundColor: AppColors.outline, child: Icon(Icons.category, size: 20)),
+                    title: Text(categories[index]),
+                    subtitle: Text('${index * 12 + 5} products listed'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(onPressed: () {}, icon: const Icon(Icons.edit_outlined)),
+                        IconButton(
+                          onPressed: () {
+                            context.read<AdminBloc>().add(AdminDeleteCategoryRequested(categories[index]));
+                          }, 
+                          icon: const Icon(Icons.delete_outline, color: Colors.redAccent)
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         );
       },

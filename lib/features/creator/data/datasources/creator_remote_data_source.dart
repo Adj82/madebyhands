@@ -49,6 +49,9 @@ abstract interface class CreatorRemoteDataSource {
   /// Fetches products that are awaiting admin approval.
   Future<List<CreatorProductModel>> getPendingProducts();
 
+  /// Fetches all products for admin review (Pending, Approved, Rejected).
+  Future<List<CreatorProductModel>> getAdminAllProducts();
+
   /// Fetches all products belonging to a specific creator.
   Future<List<CreatorProductModel>> getCreatorProducts(String uid);
 
@@ -282,6 +285,18 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
           .collection('products')
           .where('status', isEqualTo: 'Pending Approval')
           .get();
+      return snapshot.docs
+          .map((doc) => CreatorProductModel.fromJson(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<List<CreatorProductModel>> getAdminAllProducts() async {
+    try {
+      final snapshot = await firestore.collection('products').get();
       return snapshot.docs
           .map((doc) => CreatorProductModel.fromJson(doc.data(), doc.id))
           .toList();

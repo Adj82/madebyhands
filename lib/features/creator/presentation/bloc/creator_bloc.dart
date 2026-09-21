@@ -22,6 +22,7 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
     on<CreatorUpdateVerificationStatus>(_onUpdateVerificationStatus);
     on<CreatorAddProduct>(_onAddProduct);
     on<CreatorFetchPendingProducts>(_onFetchPendingProducts);
+    on<CreatorFetchAdminAllProducts>(_onFetchAdminAllProducts);
     on<CreatorFetchCreatorProducts>(_onFetchCreatorProducts);
     on<CreatorUpdateProductStatus>(_onUpdateProductStatus);
   }
@@ -182,6 +183,20 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
     res.fold(
       (l) => emit(CreatorFailure(l.message)),
       (r) => emit(CreatorPendingProductsLoaded(r)),
+    );
+  }
+
+  void _onFetchAdminAllProducts(
+    CreatorFetchAdminAllProducts event,
+    Emitter<CreatorState> emit,
+  ) async {
+    if (state is! CreatorAdminAllProductsLoaded) {
+      emit(CreatorLoading());
+    }
+    final res = await _creatorRepository.getAdminAllProducts();
+    res.fold(
+      (l) => emit(CreatorFailure(l.message)),
+      (r) => emit(CreatorAdminAllProductsLoaded(r)),
     );
   }
 

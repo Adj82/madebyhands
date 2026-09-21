@@ -218,6 +218,16 @@ class CreatorRepositoryImpl implements CreatorRepository {
   }
 
   @override
+  Future<Either<Failure, List<CreatorProduct>>> getAdminAllProducts() async {
+    try {
+      final products = await remoteDataSource.getAdminAllProducts();
+      return right(products);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<CreatorProduct>>> getCreatorProducts(String uid) async {
     try {
       final products = await remoteDataSource.getCreatorProducts(uid);

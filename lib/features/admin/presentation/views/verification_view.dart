@@ -16,118 +16,163 @@ class _VerificationViewState extends State<VerificationView> {
   @override
   void initState() {
     super.initState();
+    _fetchData();
+  }
+
+  void _fetchData() {
     context.read<CreatorBloc>().add(CreatorFetchAllProfiles());
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<CreatorBloc, CreatorState>(
-      builder: (context, state) {
-        List<CreatorProfile> profiles = [];
-        bool isLoading = false;
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: const TabBar(
+          tabs: [
+            Tab(text: 'Pending'),
+            Tab(text: 'Approved'),
+            Tab(text: 'Rejected'),
+          ],
+          labelColor: AppColors.primary,
+          unselectedLabelColor: AppColors.mutedText,
+          indicatorColor: AppColors.primary,
+        ),
+        body: BlocBuilder<CreatorBloc, CreatorState>(
+          builder: (context, state) {
+            List<CreatorProfile> pending = [];
+            List<CreatorProfile> approved = [];
+            List<CreatorProfile> rejected = [];
+            bool isLoading = false;
 
-        if (state is CreatorLoading) {
-          isLoading = true;
-        } else if (state is CreatorAllProfilesLoaded) {
-          profiles = state.profiles
-              .where((p) => p.verificationStatus != 'Verified')
-              .toList();
-        }
+            if (state is CreatorLoading) {
+              isLoading = true;
+            } else if (state is CreatorAllProfilesLoaded) {
+              for (var p in state.profiles) {
+                if (p.verificationStatus == 'Verified') {
+                  approved.add(p);
+                } else if (p.verificationStatus == 'Rejected') {
+                  rejected.add(p);
+                } else {
+                  pending.add(p);
+                }
+              }
+            }
 
-        return Material(
-          color: Colors.transparent,
-          child: Column(
-            children: [
-              if (isLoading) const LinearProgressIndicator(),
-              Expanded(
-                child: profiles.isEmpty && !isLoading
-                    ? const Center(child: Text('No pending verifications'))
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(15),
-                        itemCount: profiles.length,
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        separatorBuilder: (context, index) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final profile = profiles[index];
-                          return Card(
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(15),
-                              onTap: () => Navigator.push(
-                                  context, MaterialPageRoute(builder: (_) => CreatorProfileReviewPage(profile: profile))),
-                              child: Padding(
-                                padding: const EdgeInsets.all(15),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
+            return TabBarView(
+              children: [
+                _buildProfileList(pending, isLoading, 'No pending verifications'),
+                _buildProfileList(approved, isLoading, 'No approved creators'),
+                _buildProfileList(rejected, isLoading, 'No rejected creators'),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileList(List<CreatorProfile> profiles, bool isLoading, String emptyMessage) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        _fetchData();
+      },
+      child: Column(
+        children: [
+          if (isLoading) const LinearProgressIndicator(),
+          Expanded(
+            child: profiles.isEmpty && !isLoading
+                ? Center(child: Text(emptyMessage))
+                : ListView.separated(
+                    padding: const EdgeInsets.all(15),
+                    itemCount: profiles.length,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    separatorBuilder: (context, index) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final profile = profiles[index];
+                      return Card(
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(15),
+                          onTap: () => Navigator.push(
+                              context, MaterialPageRoute(builder: (_) => CreatorProfileReviewPage(profile: profile))),
+                          child: Padding(
+                            padding: const EdgeInsets.all(15),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
                                   children: [
-                                    Row(
-                                      children: [
-                                        CircleAvatar(
-                                          radius: 25,
-                                          backgroundColor: AppColors.primary,
-                                          backgroundImage: profile.profileImage.isNotEmpty ? NetworkImage(profile.profileImage) : null,
-                                          child: profile.profileImage.isEmpty ? const Icon(Icons.person, color: Colors.white) : null,
-                                        ),
-                                        const SizedBox(width: 15),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(profile.name,
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                              Text(profile.category,
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: const TextStyle(color: AppColors.mutedText)),
-                                            ],
-                                          ),
-                                        ),
-                                        Chip(
-                                          label: Text(profile.verificationStatus, style: const TextStyle(fontSize: 10)),
-                                          backgroundColor: const Color(0xFFFFF3E0),
-                                        ),
-                                      ],
+                                    CircleAvatar(
+                                      radius: 25,
+                                      backgroundColor: AppColors.primary,
+                                      backgroundImage: profile.profileImage.isNotEmpty ? NetworkImage(profile.profileImage) : null,
+                                      child: profile.profileImage.isEmpty ? const Icon(Icons.person, color: Colors.white) : null,
                                     ),
-                                    const SizedBox(height: 15),
-                                    Text(profile.bio, maxLines: 2, overflow: TextOverflow.ellipsis),
-                                    const SizedBox(height: 15),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        TextButton(
-                                          onPressed: () => _showDocumentReview(context, profile),
-                                          child: const Text('Review Docs'),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        FilledButton(
-                                          onPressed: () {
-                                            context.read<CreatorBloc>().add(
-                                                CreatorUpdateVerificationStatus(uid: profile.uid, status: 'Verified'));
-                                          },
-                                          style: FilledButton.styleFrom(
-                                            backgroundColor: AppColors.primary,
-                                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                                          ),
-                                          child: const Text('Verify'),
-                                        ),
-                                      ],
-                                    )
+                                    const SizedBox(width: 15),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(profile.name,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                          Text(profile.category,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(color: AppColors.mutedText)),
+                                        ],
+                                      ),
+                                    ),
+                                    Chip(
+                                      label: Text(profile.verificationStatus, style: const TextStyle(fontSize: 10)),
+                                      backgroundColor: profile.verificationStatus == 'Verified' 
+                                          ? AppColors.primary.withAlpha(50) 
+                                          : profile.verificationStatus == 'Rejected'
+                                              ? Colors.red.withAlpha(50)
+                                              : const Color(0xFFFFF3E0),
+                                    ),
                                   ],
                                 ),
-                              ),
+                                const SizedBox(height: 15),
+                                Text(profile.bio, maxLines: 2, overflow: TextOverflow.ellipsis),
+                                const SizedBox(height: 15),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    TextButton(
+                                      onPressed: () => _showDocumentReview(context, profile),
+                                      child: const Text('Review Docs'),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    if (profile.verificationStatus != 'Verified')
+                                      FilledButton(
+                                        onPressed: () {
+                                          context.read<CreatorBloc>().add(
+                                              CreatorUpdateVerificationStatus(uid: profile.uid, status: 'Verified'));
+                                        },
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: AppColors.primary,
+                                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                                        ),
+                                        child: const Text('Verify'),
+                                      ),
+                                  ],
+                                )
+                              ],
                             ),
-                          );
-                        },
-                      ),
-              ),
-            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -192,7 +237,7 @@ class _VerificationViewState extends State<VerificationView> {
                   child: OutlinedButton(
                     onPressed: () {
                       context.read<CreatorBloc>().add(
-                            CreatorUpdateVerificationStatus(uid: profile.uid, status: 'Unverified'),
+                            CreatorUpdateVerificationStatus(uid: profile.uid, status: 'Rejected'),
                           );
                       Navigator.pop(sheetContext);
                     },
