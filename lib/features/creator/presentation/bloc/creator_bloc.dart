@@ -164,6 +164,8 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
       shippingInfo: event.shippingInfo,
       creatorUid: event.creatorUid,
       creatorName: event.creatorName,
+      isCustomizable: event.isCustomizable,
+      customizations: event.customizations,
     );
 
     res.fold(

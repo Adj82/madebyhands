@@ -46,6 +46,14 @@ abstract interface class CreatorRemoteDataSource {
     required String productName,
   });
 
+  /// Uploads images for a specific product customization.
+  Future<List<String>> uploadCustomizationImages({
+    required List<File> images,
+    required String uid,
+    required String productName,
+    required String customizationName,
+  });
+
   /// Fetches products that are awaiting admin approval.
   Future<List<CreatorProductModel>> getPendingProducts();
 
@@ -225,17 +233,13 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
           .collection('products')
           .where('creatorUid', isEqualTo: uid)
           .get();
-      final sellerProducts = await firestore
-          .collection('products')
-          .where('sellerId', isEqualTo: uid)
-          .get();
 
       final batch = firestore.batch();
-      for (final doc in creatorProducts.docs) {
-        batch.update(doc.reference, {'isActive': isVerified});
-      }
-      for (final doc in sellerProducts.docs) {
-        batch.update(doc.reference, {'isActive': isVerified});
+      for (final doc in productsQuery.docs) {
+        final data = doc.data();
+        final isApproved = data['status'] == 'Approved';
+        // Only mark active if Creator is Verified AND Product is Approved
+        batch.update(doc.reference, {'isActive': isVerified && isApproved});
       }
       await batch.commit();
     } catch (e) {
@@ -283,6 +287,40 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
       return urls;
     } catch (e) {
       throw Exception('Error uploading product images: $e');
+    }
+  }
+
+  @override
+  Future<List<String>> uploadCustomizationImages({
+    required List<File> images,
+    required String uid,
+    required String productName,
+    required String customizationName,
+  }) async {
+    try {
+      List<String> urls = [];
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      for (var i = 0; i < images.length; i++) {
+        if (!await images[i].exists()) continue;
+
+        final ref = firebaseStorage.ref().child(
+            'products/$uid/$productName/customizations/$customizationName/image_${timestamp}_$i.jpg');
+
+        final uploadTask = ref.putFile(
+          images[i],
+          _imageMetadata,
+        );
+
+        final snapshot = await uploadTask;
+
+        if (snapshot.state == TaskState.success) {
+          final url = await snapshot.ref.getDownloadURL();
+          urls.add(url);
+        }
+      }
+      return urls;
+    } catch (e) {
+      throw Exception('Error uploading customization images: $e');
     }
   }
 

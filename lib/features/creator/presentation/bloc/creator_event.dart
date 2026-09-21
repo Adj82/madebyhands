@@ -75,6 +75,8 @@ final class CreatorAddProduct extends CreatorEvent {
   final String shippingInfo;
   final String creatorUid;
   final String creatorName;
+  final bool isCustomizable;
+  final List<CustomizationInput> customizations;
 
   CreatorAddProduct({
     required this.name,
@@ -89,6 +91,8 @@ final class CreatorAddProduct extends CreatorEvent {
     required this.shippingInfo,
     required this.creatorUid,
     required this.creatorName,
+    this.isCustomizable = false,
+    this.customizations = const [],
   });
 }
 

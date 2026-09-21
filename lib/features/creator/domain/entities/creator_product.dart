@@ -15,6 +15,8 @@ class CreatorProduct {
   final String status; // 'Pending Approval', 'Approved', 'Rejected'
   final bool isActive;
   final DateTime createdAt;
+  final bool isCustomizable;
+  final List<ProductCustomization> customizations;
 
   CreatorProduct({
     required this.id,
@@ -33,5 +35,21 @@ class CreatorProduct {
     required this.status,
     required this.isActive,
     required this.createdAt,
+    this.isCustomizable = false,
+    this.customizations = const [],
+  });
+}
+
+class ProductCustomization {
+  final String name;
+  final String description;
+  final double additionalPrice;
+  final List<String> images;
+
+  ProductCustomization({
+    required this.name,
+    required this.description,
+    required this.additionalPrice,
+    this.images = const [],
   });
 }
