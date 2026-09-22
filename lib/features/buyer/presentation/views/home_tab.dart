@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
@@ -22,7 +24,7 @@ class HomeTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final firstName = userName.trim().isEmpty
-        ? 'there'
+        ? 'Artisan'
         : userName.trim().split(' ').first;
 
     return BlocBuilder<BuyerBloc, BuyerState>(
@@ -33,133 +35,86 @@ class HomeTab extends StatelessWidget {
         return CustomScrollView(
           key: const PageStorageKey('buyer-home'),
           slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-              sliver: SliverList.list(
-                children: [
-                  Row(
+            SliverAppBar(
+              floating: true,
+              pinned: false,
+              expandedHeight: 120.0,
+              backgroundColor: AppColors.background,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 50, 20, 0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Expanded(
                         child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               'MADEBYHANDS',
-                              style: TextStyle(
+                              style: GoogleFonts.montserrat(
                                 color: AppColors.primary,
                                 fontWeight: FontWeight.w900,
-                                letterSpacing: 1.1,
+                                letterSpacing: 2,
+                                fontSize: 12,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Hello, $firstName',
-                              style: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(fontWeight: FontWeight.w800),
+                              style: GoogleFonts.playfairDisplay(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.text,
+                              ),
                             ),
                           ],
                         ),
                       ),
                       IconButton.filledTonal(
                         onPressed: () {},
-                        tooltip: 'Notifications',
-                        icon: const Icon(Icons.notifications_none),
+                        icon: const Icon(Icons.notifications_none_rounded),
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppColors.surface,
+                          foregroundColor: AppColors.primary,
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 22),
-                  Container(
-                    padding: const EdgeInsets.all(22),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryDark,
-                      borderRadius: BorderRadius.circular(26),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Stories shaped by hand',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w800,
-                                  height: 1.1,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                'Discover thoughtful pieces made by independent Indian artisans.',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.78),
-                                  height: 1.4,
-                                ),
-                              ),
-                              const SizedBox(height: 18),
-                              FilledButton.tonal(
-                                onPressed: onBrowseAll,
-                                child: const Text('Explore collection'),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        const Icon(
-                          Icons.auto_awesome,
-                          size: 64,
-                          color: Color(0xFFE7C889),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 26),
+                ),
+              ),
+            ),
+            
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverList.list(
+                children: [
+                  const SizedBox(height: 10),
+                  _buildExperienceBanner(),
+                  const SizedBox(height: 30),
                   const _SectionTitle(title: 'Shop by craft'),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 90,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: const [
-                        _CategoryCard(icon: Icons.home_outlined, label: 'Decor'),
-                        _CategoryCard(
-                          icon: Icons.local_florist_outlined,
-                          label: 'Pottery',
-                        ),
-                        _CategoryCard(
-                          icon: Icons.diamond_outlined,
-                          label: 'Jewellery',
-                        ),
-                        _CategoryCard(
-                          icon: Icons.checkroom_outlined,
-                          label: 'Textiles',
-                        ),
-                        _CategoryCard(
-                          icon: Icons.card_giftcard_outlined,
-                          label: 'Gifts',
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 26),
+                  const SizedBox(height: 16),
+                  _buildCategoryScroll(),
+                  const SizedBox(height: 30),
                   _SectionTitle(
                     title: 'Handpicked for you',
                     actionLabel: 'See all',
                     onAction: onBrowseAll,
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
+
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
               sliver: SliverGrid(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 0.67,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 20,
+                  childAspectRatio: 0.65,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   childCount: products.length < 4 ? products.length : 4,
@@ -175,7 +130,7 @@ class HomeTab extends StatelessWidget {
                               product: product,
                             ),
                           ),
-                    );
+                    ).animate().fadeIn(delay: (index * 100).ms).slideY(begin: 0.1);
                   },
                 ),
               ),
@@ -183,6 +138,81 @@ class HomeTab extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildExperienceBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.primaryDark,
+        borderRadius: BorderRadius.circular(28),
+        image: const DecorationImage(
+          image: NetworkImage('https://images.unsplash.com/photo-1590424753858-394a12e6e4a2?q=80&w=600&auto=format&fit=crop'),
+          fit: BoxFit.cover,
+          opacity: 0.25,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.auto_awesome, color: AppColors.gold, size: 32),
+          const SizedBox(height: 16),
+          Text(
+            'Stories shaped\nby hand',
+            style: GoogleFonts.playfairDisplay(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              height: 1.1,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Discover thoughtful pieces made by independent artisans.',
+            style: GoogleFonts.montserrat(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontSize: 14,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: onBrowseAll,
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.primaryDark,
+              minimumSize: const Size(160, 48),
+            ),
+            child: const Text('Explore collection'),
+          ),
+        ],
+      ),
+    ).animate().fadeIn().scale(begin: const Offset(0.95, 0.95));
+  }
+
+  Widget _buildCategoryScroll() {
+    final categories = [
+      (Icons.home_outlined, 'Decor'),
+      (Icons.local_florist_outlined, 'Pottery'),
+      (Icons.diamond_outlined, 'Jewellery'),
+      (Icons.checkroom_outlined, 'Textiles'),
+      (Icons.card_giftcard_outlined, 'Gifts'),
+    ];
+
+    return SizedBox(
+      height: 100,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: categories.length,
+        itemBuilder: (context, i) {
+          return _CategoryCard(icon: categories[i].$1, label: categories[i].$2)
+              .animate()
+              .fadeIn(delay: (i * 50).ms)
+              .slideX(begin: 0.2);
+        },
+      ),
     );
   }
 }
@@ -200,11 +230,24 @@ class _SectionTitle extends StatelessWidget {
       Expanded(
         child: Text(
           title,
-          style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+          style: GoogleFonts.playfairDisplay(
+            fontSize: 20, 
+            fontWeight: FontWeight.bold,
+            color: AppColors.text,
+          ),
         ),
       ),
       if (actionLabel != null)
-        TextButton(onPressed: onAction, child: Text(actionLabel!)),
+        TextButton(
+          onPressed: onAction, 
+          child: Text(
+            actionLabel!,
+            style: GoogleFonts.montserrat(
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+            ),
+          ),
+        ),
     ],
   );
 }
@@ -217,24 +260,34 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    width: 82,
-    margin: const EdgeInsets.only(right: 10),
+    margin: const EdgeInsets.only(right: 16),
     child: Column(
       children: [
         Container(
-          width: 58,
-          height: 58,
-          decoration: const BoxDecoration(
-            color: Color(0xFFE8ECD9),
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
             shape: BoxShape.circle,
+            border: Border.all(color: AppColors.outline),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          child: Icon(icon, color: AppColors.primaryDark),
+          child: Icon(icon, color: AppColors.primary, size: 28),
         ),
-        const SizedBox(height: 7),
+        const SizedBox(height: 10),
         Text(
           label,
-          maxLines: 1,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          style: GoogleFonts.montserrat(
+            fontSize: 12, 
+            fontWeight: FontWeight.w600,
+            color: AppColors.mutedText,
+          ),
         ),
       ],
     ),
