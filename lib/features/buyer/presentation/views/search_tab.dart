@@ -9,11 +9,13 @@ import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dar
 class SearchTab extends StatefulWidget {
   final String userId;
   final ValueChanged<Product> onProductTap;
+  final String initialCategory;
 
   const SearchTab({
     super.key,
     required this.userId,
     required this.onProductTap,
+    this.initialCategory = 'All',
   });
 
   @override
@@ -23,6 +25,30 @@ class SearchTab extends StatefulWidget {
 class _SearchTabState extends State<SearchTab> {
   String _query = '';
   String _category = 'All';
+
+  @override
+  void initState() {
+    super.initState();
+    _category = widget.initialCategory;
+  }
+
+  @override
+  void didUpdateWidget(covariant SearchTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialCategory != widget.initialCategory) {
+      _category = widget.initialCategory;
+    }
+  }
+
+  bool _matchesCategory(Product product) {
+    if (_category == 'All') return true;
+    final productCategory = product.category.trim().toLowerCase();
+    final selectedCategory = _category.trim().toLowerCase();
+    if (selectedCategory == 'home decor') {
+      return productCategory == 'home decor' || productCategory == 'decor';
+    }
+    return productCategory == selectedCategory;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,8 +66,7 @@ class _SearchTabState extends State<SearchTab> {
       builder: (context, state) {
         final products = state.products.where((product) {
           final normalizedQuery = _query.trim().toLowerCase();
-          final matchesCategory =
-              _category == 'All' || product.category == _category;
+          final matchesCategory = _matchesCategory(product);
           final matchesQuery =
               normalizedQuery.isEmpty ||
               product.name.toLowerCase().contains(normalizedQuery) ||

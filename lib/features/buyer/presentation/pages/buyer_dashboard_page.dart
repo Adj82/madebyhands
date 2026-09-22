@@ -37,6 +37,7 @@ class BuyerDashboardPage extends StatefulWidget {
 
 class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
   late final BuyerCubit _navigationCubit;
+  String _shopCategory = 'All';
   SavedAddress? _selectedAddress;
   StreamSubscription<List<SavedAddress>>? _addressSubscription;
 
@@ -98,6 +99,11 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
         ),
       ),
     );
+  }
+
+  void _openShopCategory(String category) {
+    setState(() => _shopCategory = category);
+    _navigationCubit.changePage(1);
   }
 
   void _openCheckout() {
@@ -163,9 +169,14 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                     ),
                   ),
                   onProductTap: _openProduct,
-                  onBrowseAll: () => _navigationCubit.changePage(1),
+                  onBrowseAll: () => _openShopCategory('All'),
+                  onCategoryTap: _openShopCategory,
                 ),
-                SearchTab(userId: widget.user.uid, onProductTap: _openProduct),
+                SearchTab(
+                  userId: widget.user.uid,
+                  onProductTap: _openProduct,
+                  initialCategory: _shopCategory,
+                ),
                 SavedTab(
                   userId: widget.user.uid,
                   onProductTap: _openProduct,
