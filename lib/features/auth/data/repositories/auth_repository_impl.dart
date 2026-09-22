@@ -27,6 +27,7 @@ class AuthRepositoryImpl implements AuthRepository {
     required String uid,
     required String email,
     required String name,
+    required String phone,
     required String role,
   }) async {
     try {
@@ -34,6 +35,7 @@ class AuthRepositoryImpl implements AuthRepository {
         uid: uid,
         email: email,
         name: name,
+        phone: phone,
         role: role,
       );
       return right(user);

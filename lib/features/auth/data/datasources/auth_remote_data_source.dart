@@ -10,6 +10,7 @@ abstract interface class AuthRemoteDataSource {
     required String uid,
     required String email,
     required String name,
+    required String phone,
     required String role,
   });
   Future<UserModel?> getCurrentUserData();
@@ -40,9 +41,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       debugPrint("Google Sign-In: Fetching authentication details...");
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
-      
+
       if (googleAuth.idToken == null && googleAuth.accessToken == null) {
-        throw Exception('Both idToken and accessToken are null. Check your Google Cloud Console configuration.');
+        throw Exception(
+          'Both idToken and accessToken are null. Check your Google Cloud Console configuration.',
+        );
       }
 
       final AuthCredential credential = GoogleAuthProvider.credential(
@@ -51,8 +54,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
 
       debugPrint("Firebase: Signing in with Google credentials...");
-      final UserCredential userCredential =
-          await firebaseAuth.signInWithCredential(credential);
+      final UserCredential userCredential = await firebaseAuth
+          .signInWithCredential(credential);
       final User? user = userCredential.user;
 
       if (user == null) return null;
@@ -70,7 +73,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       // Check if user exists in Firestore
       final userDoc = await firestore.collection('users').doc(user.uid).get();
       final userData = userDoc.data();
-      
+
       if (userDoc.exists && userData != null) {
         return UserModel.fromJson(userData);
       } else if (adminEmails.contains(userEmail)) {
@@ -79,6 +82,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           uid: user.uid,
           email: userEmail,
           name: user.displayName ?? 'Admin',
+          phone: '',
           role: 'admin',
         );
       } else {
@@ -104,20 +108,35 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String uid,
     required String email,
     required String name,
+    required String phone,
     required String role,
   }) async {
     try {
+      final reference = firestore.collection('users').doc(uid);
+      final existing = await reference.get();
+      if (existing.exists && existing.data() != null) {
+        await reference.update({'name': name, 'email': email, 'phone': phone});
+        return UserModel.fromJson({
+          ...existing.data()!,
+          'name': name,
+          'email': email,
+          'phone': phone,
+        });
+      }
       final userModel = UserModel(
         uid: uid,
         email: email,
         name: name,
+        phone: phone,
         role: role,
         isVerified: false,
       );
-      await firestore.collection('users').doc(uid).set(userModel.toJson());
+      await reference.set(userModel.toJson());
       return userModel;
     } on FirebaseException catch (e) {
-      throw Exception(e.message ?? 'A Firestore error occurred while creating user.');
+      throw Exception(
+        e.message ?? 'A Firestore error occurred while creating user.',
+      );
     } catch (e) {
       throw Exception('An unexpected error occurred during role assignment.');
     }
@@ -134,8 +153,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       if (userDoc.exists && userData != null) {
         return UserModel.fromJson(userData);
       }
-      
-      // If user is authenticated in Firebase but no profile in Firestore, 
+
+      // If user is authenticated in Firebase but no profile in Firestore,
       // trigger role selection by returning a UserModel with empty role.
       return UserModel(
         uid: user.uid,

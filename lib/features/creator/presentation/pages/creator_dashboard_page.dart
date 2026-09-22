@@ -6,6 +6,9 @@ import 'package:madebyhands/features/creator/presentation/views/creator_home_vie
 import 'package:madebyhands/features/creator/presentation/views/creator_orders_view.dart';
 import 'package:madebyhands/features/creator/presentation/views/creator_products_view.dart';
 import 'package:madebyhands/features/creator/presentation/views/creator_profile_view.dart';
+import 'package:madebyhands/init_dependencies.dart';
+import 'package:madebyhands/features/support/presentation/pages/support_center_page.dart';
+import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 
 class CreatorDashboardPage extends StatefulWidget {
   final CreatorProfile profile;
@@ -28,7 +31,10 @@ class _CreatorDashboardPageState extends State<CreatorDashboardPage> {
       CreatorHomeView(profile: widget.profile),
       CreatorProductsView(profile: widget.profile),
       CreatorOrdersView(profile: widget.profile),
-      const CreatorEarningsView(),
+      CreatorEarningsView(
+        creatorId: widget.profile.uid,
+        repository: serviceLocator(),
+      ),
       CreatorProfileView(profile: widget.profile),
     ];
   }
@@ -52,15 +58,24 @@ class _CreatorDashboardPageState extends State<CreatorDashboardPage> {
         centerTitle: true,
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => SupportCenterPage(
+                  user: UserEntity(
+                    uid: widget.profile.uid,
+                    email: '',
+                    name: widget.profile.name,
+                    role: 'creator',
+                  ),
+                  repository: serviceLocator(),
+                ),
+              ),
+            ),
             icon: const Icon(Icons.help_outline),
           ),
         ],
       ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _views,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: _views),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -78,7 +93,10 @@ class _CreatorDashboardPageState extends State<CreatorDashboardPage> {
           backgroundColor: Colors.white,
           selectedItemColor: AppColors.primary,
           unselectedItemColor: AppColors.mutedText,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+          selectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
           unselectedLabelStyle: const TextStyle(fontSize: 12),
           items: const [
             BottomNavigationBarItem(

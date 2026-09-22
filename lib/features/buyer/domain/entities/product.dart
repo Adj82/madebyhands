@@ -10,6 +10,8 @@ class Product {
   final double rating;
   final Color color;
   final IconData icon;
+  final String creatorUid;
+  final List<String> images;
 
   const Product({
     required this.id,
@@ -21,5 +23,7 @@ class Product {
     required this.rating,
     required this.color,
     required this.icon,
+    this.creatorUid = '',
+    this.images = const [],
   });
 }

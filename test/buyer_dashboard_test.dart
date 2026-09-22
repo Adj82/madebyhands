@@ -41,6 +41,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Hello, Suhani'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Handpicked for you'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Handpicked for you'), findsOneWidget);
 
     await tester.tap(find.text('Shop').last);

@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/presentation/pages/welcome_screen.dart';
 import 'package:madebyhands/features/auth/presentation/pages/role_selection_page.dart';
+import 'package:madebyhands/features/auth/presentation/pages/phone_completion_page.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_cubit.dart';
 import 'package:madebyhands/features/admin/presentation/pages/admin_dashboard_page.dart';
@@ -23,17 +24,12 @@ void main() async {
         BlocProvider(
           create: (_) => serviceLocator<AuthBloc>()..add(AuthIsUserLoggedIn()),
         ),
+        BlocProvider(create: (_) => serviceLocator<CreatorBloc>()),
+        BlocProvider(create: (_) => serviceLocator<BuyerBloc>()),
+        BlocProvider(create: (_) => AdminCubit()),
         BlocProvider(
-          create: (_) => serviceLocator<CreatorBloc>(),
-        ),
-        BlocProvider(
-          create: (_) => serviceLocator<BuyerBloc>(),
-        ),
-        BlocProvider(
-          create: (_) => AdminCubit(),
-        ),
-        BlocProvider(
-          create: (_) => serviceLocator<AdminBloc>()..add(AdminLoadDataRequested()),
+          create: (_) =>
+              serviceLocator<AdminBloc>()..add(AdminLoadDataRequested()),
         ),
       ],
       child: const MyApp(),
@@ -65,6 +61,9 @@ class MyApp extends StatelessWidget {
               if (state is AuthSuccess) {
                 // Intelligent Routing based on User Role
                 final role = state.user.role.toLowerCase();
+                if (role != 'admin' && state.user.phone.trim().isEmpty) {
+                  return PhoneCompletionPage(user: state.user);
+                }
                 if (role == 'admin') {
                   return const AdminDashboardPage();
                 } else if (role == 'creator' || role == 'seller') {
@@ -88,8 +87,10 @@ class MyApp extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Error: ${state.message}',
-                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text(
+                          'Error: ${state.message}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         const SizedBox(height: 16),
                         FilledButton(
                           onPressed: () {

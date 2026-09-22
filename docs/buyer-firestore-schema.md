@@ -1,5 +1,7 @@
 # Buyer Firestore contract
 
+> The canonical cross-panel order, finance, user, and support contract is now documented in `docs/firestore-schema.md`. This file retains buyer-specific catalogue and address notes.
+
 The buyer feature reads and writes the following collections. Field names should stay aligned with the seller/admin implementations.
 
 ## `products/{productId}`

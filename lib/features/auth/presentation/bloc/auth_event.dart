@@ -13,12 +13,14 @@ final class AuthSignUpWithRoleRequested extends AuthEvent {
   final String uid;
   final String email;
   final String name;
+  final String phone;
   final String role;
 
   const AuthSignUpWithRoleRequested({
     required this.uid,
     required this.email,
     required this.name,
+    required this.phone,
     required this.role,
   });
 }

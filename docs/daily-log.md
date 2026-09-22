@@ -46,3 +46,22 @@ Use one dated section per workday so the three role-based branches can be merged
 - Cart and checkout remain local and unchanged.
 - The seller/admin teams should write products and orders using the documented buyer contract.
 - Firestore security rules must enforce user ownership for favourites, addresses, and orders.
+
+## 22 September 2026 — Cross-panel order synchronization
+
+### Added
+
+- Required buyer/creator phone collection plus completion for existing accounts.
+- Payment-skipped checkout that groups cart items by creator and places real Firestore orders.
+- Shared fee snapshots with platform fee, commission, and creator net payout.
+- Real admin order management, platform balance, pending payouts, and payout release.
+- Real creator earnings sourced from the same order documents.
+- Buyer and creator ticket creation/conversations plus admin reply and resolution.
+- Debug-only, idempotent sample-order generation for registered creators.
+- Shared Firestore schema documentation and local security-rules proposal.
+
+### Safety notes
+
+- No Firebase rules were deployed and no live sample records were created.
+- Sample seeding requires an explicit admin confirmation and is available only in debug builds.
+- Production payment processing should move financial calculation to a trusted backend.

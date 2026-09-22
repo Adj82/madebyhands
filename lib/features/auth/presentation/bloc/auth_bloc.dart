@@ -9,10 +9,9 @@ part 'auth_state.dart';
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository _authRepository;
 
-  AuthBloc({
-    required AuthRepository authRepository,
-  })  : _authRepository = authRepository,
-        super(AuthInitial()) {
+  AuthBloc({required AuthRepository authRepository})
+    : _authRepository = authRepository,
+      super(AuthInitial()) {
     on<AuthGoogleSignInRequested>(_onGoogleSignInRequested);
     on<AuthSignUpWithRoleRequested>(_onSignUpWithRoleRequested);
     on<AuthIsUserLoggedIn>(_onIsUserLoggedIn);
@@ -26,16 +25,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     final res = await _authRepository.signInWithGoogle();
 
-    res.fold(
-      (l) => emit(AuthFailure(l.message)),
-      (r) {
-        if (r.role.isEmpty) {
-          emit(AuthNeedsRoleSelection(r));
-        } else {
-          emit(AuthSuccess(r));
-        }
-      },
-    );
+    res.fold((l) => emit(AuthFailure(l.message)), (r) {
+      if (r.role.isEmpty) {
+        emit(AuthNeedsRoleSelection(r));
+      } else {
+        emit(AuthSuccess(r));
+      }
+    });
   }
 
   void _onSignUpWithRoleRequested(
@@ -47,13 +43,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       uid: event.uid,
       email: event.email,
       name: event.name,
+      phone: event.phone,
       role: event.role,
     );
 
-    res.fold(
-      (l) => emit(AuthFailure(l.message)),
-      (r) => emit(AuthSuccess(r)),
-    );
+    res.fold((l) => emit(AuthFailure(l.message)), (r) => emit(AuthSuccess(r)));
   }
 
   void _onIsUserLoggedIn(
@@ -62,16 +56,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     final res = await _authRepository.getCurrentUser();
 
-    res.fold(
-      (l) => emit(AuthInitial()),
-      (r) {
-        if (r.role.isEmpty) {
-          emit(AuthNeedsRoleSelection(r));
-        } else {
-          emit(AuthSuccess(r));
-        }
-      },
-    );
+    res.fold((l) => emit(AuthInitial()), (r) {
+      if (r.role.isEmpty) {
+        emit(AuthNeedsRoleSelection(r));
+      } else {
+        emit(AuthSuccess(r));
+      }
+    });
   }
 
   void _onLogoutRequested(
@@ -81,9 +72,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     final res = await _authRepository.signOut();
 
-    res.fold(
-      (l) => emit(AuthFailure(l.message)),
-      (r) => emit(AuthInitial()),
-    );
+    res.fold((l) => emit(AuthFailure(l.message)), (r) => emit(AuthInitial()));
   }
 }

@@ -6,11 +6,9 @@ import 'package:madebyhands/features/buyer/presentation/widgets/buyer_empty_stat
 
 class CartTab extends StatelessWidget {
   final VoidCallback onBrowse;
+  final VoidCallback onCheckout;
 
-  const CartTab({
-    super.key,
-    required this.onBrowse,
-  });
+  const CartTab({super.key, required this.onBrowse, required this.onCheckout});
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +20,8 @@ class CartTab extends StatelessWidget {
 
         final subtotal = productsInCart.fold<int>(
           0,
-          (total, product) => total + product.price * state.cartQuantities[product.id]!,
+          (total, product) =>
+              total + product.price * state.cartQuantities[product.id]!,
         );
 
         return Column(
@@ -32,7 +31,9 @@ class CartTab extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
               child: Text(
                 'Your cart',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
             Expanded(
@@ -71,18 +72,23 @@ class CartTab extends StatelessWidget {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         product.name,
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontWeight: FontWeight.w700),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
                                       const SizedBox(height: 5),
                                       Text(
                                         '₹${product.price}',
-                                        style: const TextStyle(fontWeight: FontWeight.w800),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -91,20 +97,34 @@ class CartTab extends StatelessWidget {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     IconButton(
-                                      onPressed: () => context.read<BuyerBloc>().add(
-                                            BuyerUpdateCartQuantity(product, quantity - 1),
+                                      onPressed: () =>
+                                          context.read<BuyerBloc>().add(
+                                            BuyerUpdateCartQuantity(
+                                              product,
+                                              quantity - 1,
+                                            ),
                                           ),
-                                      icon: const Icon(Icons.remove_circle_outline),
+                                      icon: const Icon(
+                                        Icons.remove_circle_outline,
+                                      ),
                                     ),
                                     Text(
                                       '$quantity',
-                                      style: const TextStyle(fontWeight: FontWeight.w800),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
                                     IconButton(
-                                      onPressed: () => context.read<BuyerBloc>().add(
-                                            BuyerUpdateCartQuantity(product, quantity + 1),
+                                      onPressed: () =>
+                                          context.read<BuyerBloc>().add(
+                                            BuyerUpdateCartQuantity(
+                                              product,
+                                              quantity + 1,
+                                            ),
                                           ),
-                                      icon: const Icon(Icons.add_circle_outline),
+                                      icon: const Icon(
+                                        Icons.add_circle_outline,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -131,23 +151,25 @@ class CartTab extends StatelessWidget {
                           const Expanded(
                             child: Text(
                               'Subtotal',
-                              style: TextStyle(fontSize: 16, color: AppColors.mutedText),
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: AppColors.mutedText,
+                              ),
                             ),
                           ),
                           Text(
                             '₹$subtotal',
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 14),
                       FilledButton(
-                        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Payment integration will be added with the team.'),
-                          ),
-                        ),
-                        child: const Text('Proceed to checkout'),
+                        onPressed: onCheckout,
+                        child: const Text('Review and place order'),
                       ),
                     ],
                   ),

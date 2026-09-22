@@ -34,12 +34,31 @@ class CreatorOrderModel extends CreatorOrder {
       buyerName: json['buyerName'] ?? 'Valued Customer',
       createdAt: (json['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       status: json['status'] ?? 'Placed',
-      totalAmount: (json['totalAmount'] as num?)?.toInt() ?? 0,
+      totalAmount:
+          (json['subtotal'] as num?)?.toInt() ??
+          (json['totalAmount'] as num?)?.toInt() ??
+          (json['total'] as num?)?.toInt() ??
+          0,
       items: items,
-      deliveryAddress: json['deliveryAddress'] ?? 'Address unavailable',
+      deliveryAddress: _addressText(
+        json['shippingAddress'] ?? json['deliveryAddress'],
+      ),
       rejectionReason: json['rejectionReason'],
       consignmentNumber: json['consignmentNumber'],
     );
+  }
+
+  static String _addressText(Object? address) {
+    if (address is String) return address;
+    if (address is Map) {
+      return [
+        address['addressLine'],
+        address['city'],
+        address['state'],
+        address['postalCode'],
+      ].whereType<String>().where((value) => value.isNotEmpty).join(', ');
+    }
+    return 'Address unavailable';
   }
 
   Map<String, dynamic> toJson() {
@@ -48,12 +67,16 @@ class CreatorOrderModel extends CreatorOrder {
       'buyerName': buyerName,
       'status': status,
       'totalAmount': totalAmount,
-      'items': items.map((item) => {
-        'productId': item.productId,
-        'name': item.name,
-        'quantity': item.quantity,
-        'unitPrice': item.unitPrice,
-      }).toList(),
+      'items': items
+          .map(
+            (item) => {
+              'productId': item.productId,
+              'name': item.name,
+              'quantity': item.quantity,
+              'unitPrice': item.unitPrice,
+            },
+          )
+          .toList(),
       'deliveryAddress': deliveryAddress,
       'rejectionReason': rejectionReason,
       'consignmentNumber': consignmentNumber,

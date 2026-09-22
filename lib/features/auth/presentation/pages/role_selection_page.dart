@@ -6,9 +6,36 @@ import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 
-class RoleSelectionPage extends StatelessWidget {
+class RoleSelectionPage extends StatefulWidget {
   final UserEntity tempUser;
   const RoleSelectionPage({super.key, required this.tempUser});
+
+  @override
+  State<RoleSelectionPage> createState() => _RoleSelectionPageState();
+}
+
+class _RoleSelectionPageState extends State<RoleSelectionPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _phone = TextEditingController();
+
+  @override
+  void dispose() {
+    _phone.dispose();
+    super.dispose();
+  }
+
+  void _submit(String role) {
+    if (!_formKey.currentState!.validate()) return;
+    context.read<AuthBloc>().add(
+      AuthSignUpWithRoleRequested(
+        uid: widget.tempUser.uid,
+        email: widget.tempUser.email,
+        name: widget.tempUser.name,
+        phone: _phone.text.trim(),
+        role: role,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +49,8 @@ class RoleSelectionPage extends StatelessWidget {
         centerTitle: true,
         actions: [
           IconButton(
-            onPressed: () => context.read<AuthBloc>().add(AuthLogoutRequested()),
+            onPressed: () =>
+                context.read<AuthBloc>().add(AuthLogoutRequested()),
             icon: const Icon(Icons.logout_rounded, color: AppColors.primary),
           ),
         ],
@@ -30,14 +58,16 @@ class RoleSelectionPage extends StatelessWidget {
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthFailure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message)),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.message)));
           }
         },
         builder: (context, state) {
           if (state is AuthLoading) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+            return const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            );
           }
 
           return SingleChildScrollView(
@@ -47,7 +77,7 @@ class RoleSelectionPage extends StatelessWidget {
               children: [
                 const SizedBox(height: 10),
                 Text(
-                  'Welcome, ${tempUser.name.split(' ').first}',
+                  'Welcome, ${widget.tempUser.name.split(' ').first}',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: AppColors.primary,
@@ -62,47 +92,51 @@ class RoleSelectionPage extends StatelessWidget {
                     height: 1.4,
                   ),
                 ).animate().fadeIn(delay: 200.ms),
-                
-                const SizedBox(height: 40),
-                
+
+                const SizedBox(height: 28),
+                Form(
+                  key: _formKey,
+                  child: TextFormField(
+                    controller: _phone,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Phone number',
+                      hintText: '10-digit mobile number',
+                      prefixText: '+91 ',
+                      prefixIcon: Icon(Icons.phone_outlined),
+                    ),
+                    validator: (value) {
+                      final digits = value?.replaceAll(RegExp(r'\D'), '') ?? '';
+                      return digits.length == 10
+                          ? null
+                          : 'Enter a valid 10-digit phone number';
+                    },
+                  ),
+                ),
+                const SizedBox(height: 28),
+
                 _RoleCard(
                   title: 'I am a Buyer',
                   subtitle: 'Explore authentic handmade treasures',
-                  description: 'Discover unique pieces directly from artisans and support local craftsmanship.',
+                  description:
+                      'Discover unique pieces directly from artisans and support local craftsmanship.',
                   icon: Icons.shopping_bag_outlined,
-                  onPressed: () {
-                    context.read<AuthBloc>().add(
-                          AuthSignUpWithRoleRequested(
-                            uid: tempUser.uid,
-                            email: tempUser.email,
-                            name: tempUser.name,
-                            role: 'buyer',
-                          ),
-                        );
-                  },
+                  onPressed: () => _submit('buyer'),
                 ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1),
-                
+
                 const SizedBox(height: 20),
-                
+
                 _RoleCard(
                   title: 'I am a Creator',
                   subtitle: 'Share your craft with the world',
-                  description: 'Set up your studio, showcase your portfolio, and sell your handmade products.',
+                  description:
+                      'Set up your studio, showcase your portfolio, and sell your handmade products.',
                   icon: Icons.palette_outlined,
-                  onPressed: () {
-                    context.read<AuthBloc>().add(
-                          AuthSignUpWithRoleRequested(
-                            uid: tempUser.uid,
-                            email: tempUser.email,
-                            name: tempUser.name,
-                            role: 'creator',
-                          ),
-                        );
-                  },
+                  onPressed: () => _submit('creator'),
                 ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.1),
-                
+
                 const SizedBox(height: 40),
-                
+
                 Center(
                   child: Text(
                     'You can change your role later in settings.',

@@ -5,6 +5,7 @@ import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_cubit.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/order_history_page.dart';
+import 'package:madebyhands/features/buyer/presentation/pages/checkout_page.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/product_details_page.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/saved_addresses_page.dart';
 import 'package:madebyhands/features/buyer/presentation/views/cart_tab.dart';
@@ -14,6 +15,7 @@ import 'package:madebyhands/features/buyer/presentation/views/saved_tab.dart';
 import 'package:madebyhands/features/buyer/presentation/views/search_tab.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_empty_state.dart';
 import 'package:madebyhands/init_dependencies.dart';
+import 'package:madebyhands/features/support/presentation/pages/support_center_page.dart';
 
 class BuyerDashboardPage extends StatefulWidget {
   final UserEntity user;
@@ -58,10 +60,12 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
               return ProductDetailsPage(
                 product: product,
                 isSaved: state.favoriteIds.contains(product.id),
-                onSave: () => buyerBloc.add(BuyerToggleFavorite(
-                  userId: widget.user.uid,
-                  product: product,
-                )),
+                onSave: () => buyerBloc.add(
+                  BuyerToggleFavorite(
+                    userId: widget.user.uid,
+                    product: product,
+                  ),
+                ),
                 onAddToCart: () {
                   final current = state.cartQuantities[product.id] ?? 0;
                   buyerBloc.add(BuyerUpdateCartQuantity(product, current + 1));
@@ -69,6 +73,30 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
               );
             },
           ),
+        ),
+      ),
+    );
+  }
+
+  void _openCheckout() {
+    final buyerBloc = context.read<BuyerBloc>();
+    final state = buyerBloc.state;
+    final products = state.products
+        .where((product) => state.cartQuantities.containsKey(product.id))
+        .toList();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CheckoutPage(
+          user: widget.user,
+          products: products,
+          quantities: Map<String, int>.from(state.cartQuantities),
+          buyerRepository: serviceLocator(),
+          orderRepository: serviceLocator(),
+          onOrderPlaced: () {
+            for (final product in products) {
+              buyerBloc.add(BuyerUpdateCartQuantity(product, 0));
+            }
+          },
         ),
       ),
     );
@@ -88,7 +116,8 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                 );
               }
 
-              if (buyerState.errorMessage != null && buyerState.products.isEmpty) {
+              if (buyerState.errorMessage != null &&
+                  buyerState.products.isEmpty) {
                 return Scaffold(
                   body: BuyerEmptyState(
                     icon: Icons.cloud_off_outlined,
@@ -105,10 +134,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                   onProductTap: _openProduct,
                   onBrowseAll: () => _navigationCubit.changePage(1),
                 ),
-                SearchTab(
-                  userId: widget.user.uid,
-                  onProductTap: _openProduct,
-                ),
+                SearchTab(userId: widget.user.uid, onProductTap: _openProduct),
                 SavedTab(
                   userId: widget.user.uid,
                   onProductTap: _openProduct,
@@ -116,6 +142,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                 ),
                 CartTab(
                   onBrowse: () => _navigationCubit.changePage(1),
+                  onCheckout: _openCheckout,
                 ),
                 ProfileTab(
                   user: widget.user,
@@ -135,12 +162,22 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                       ),
                     ),
                   ),
+                  onSupport: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SupportCenterPage(
+                        user: widget.user,
+                        repository: serviceLocator(),
+                      ),
+                    ),
+                  ),
                   onLogout: widget.onLogout,
                 ),
               ];
 
-              final cartCount = buyerState.cartQuantities.values
-                  .fold(0, (total, quantity) => total + quantity);
+              final cartCount = buyerState.cartQuantities.values.fold(
+                0,
+                (total, quantity) => total + quantity,
+              );
 
               return Scaffold(
                 body: SafeArea(
