@@ -17,6 +17,7 @@ class CreatorProduct {
   final DateTime createdAt;
   final bool isCustomizable;
   final List<ProductCustomization> customizations;
+  final Map<String, dynamic>? editHistory; // Stores previous values for comparison
 
   CreatorProduct({
     required this.id,
@@ -37,6 +38,7 @@ class CreatorProduct {
     required this.createdAt,
     this.isCustomizable = false,
     this.customizations = const [],
+    this.editHistory,
   });
 }
 
@@ -45,11 +47,26 @@ class ProductCustomization {
   final String description;
   final double additionalPrice;
   final List<String> images;
+  final bool isMultipleSelection;
+  final List<String> options;
 
   ProductCustomization({
     required this.name,
     required this.description,
     required this.additionalPrice,
+    required this.isMultipleSelection,
     this.images = const [],
+    this.options = const [],
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'description': description,
+      'additionalPrice': additionalPrice,
+      'images': images,
+      'isMultipleSelection': isMultipleSelection,
+      'options': options,
+    };
+  }
 }

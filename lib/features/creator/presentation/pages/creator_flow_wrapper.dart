@@ -35,8 +35,7 @@ class _CreatorFlowWrapperState extends State<CreatorFlowWrapper> {
           _cachedProfile = state.profile;
         }
         if (state is CreatorOnboardingSuccess || 
-            state is CreatorVerificationSuccess || 
-            state is CreatorAddProductSuccess) {
+            state is CreatorVerificationSuccess) {
           _checkProfile();
         }
       },

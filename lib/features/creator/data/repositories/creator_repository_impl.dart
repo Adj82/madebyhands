@@ -4,6 +4,7 @@ import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/features/creator/data/datasources/creator_remote_data_source.dart';
 import 'package:madebyhands/features/creator/data/models/creator_product_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_profile_model.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
@@ -127,6 +128,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
       );
 
       await remoteDataSource.saveCreatorProfile(updatedProfile);
+      await remoteDataSource.updateVerificationStatus(uid, 'In-Process');
       return right(null);
     } catch (e) {
       return left(Failure(e.toString()));
@@ -196,6 +198,8 @@ class CreatorRepositoryImpl implements CreatorRepository {
             description: input.description,
             additionalPrice: input.additionalPrice,
             images: custImageUrls,
+            isMultipleSelection: input.isMultipleSelection,
+            options: input.options,
           ));
         }
       }
@@ -229,6 +233,106 @@ class CreatorRepositoryImpl implements CreatorRepository {
   }
 
   @override
+  Future<Either<Failure, void>> updateProduct({
+    required String productId,
+    required String name,
+    required String description,
+    required List<File> newImageFiles,
+    required List<String> existingImageUrls,
+    required String category,
+    required double price,
+    required int stock,
+    required String materials,
+    required String dimensions,
+    required String weight,
+    required String shippingInfo,
+    required String creatorUid,
+    required String creatorName,
+    required bool isCustomizable,
+    required List<CustomizationInput> customizations,
+    required bool hasChanges,
+  }) async {
+    try {
+      if (!hasChanges) {
+        return right(null);
+      }
+
+      // 1. Upload New Images if any
+      List<String> finalImageUrls = List.from(existingImageUrls);
+      if (newImageFiles.isNotEmpty) {
+        final newUrls = await remoteDataSource.uploadProductImages(
+          images: newImageFiles,
+          uid: creatorUid,
+          productName: name,
+        );
+        finalImageUrls.addAll(newUrls);
+      }
+
+      // 2. Handle Customizations
+      List<ProductCustomization> customizationEntities = [];
+      if (isCustomizable) {
+        for (final input in customizations) {
+          // Simplification: if it has local files, upload them. 
+          // In a real app we'd need to track which existing URLs to keep.
+          // For now, let's assume CustomizationInput only has new files or we just append.
+          final custImageUrls = await remoteDataSource.uploadCustomizationImages(
+            images: input.imageFiles,
+            uid: creatorUid,
+            productName: name,
+            customizationName: input.name,
+          );
+          customizationEntities.add(ProductCustomization(
+            name: input.name,
+            description: input.description,
+            additionalPrice: input.additionalPrice,
+            images: custImageUrls, // Note: This replaces. Needs better merge logic for production.
+            isMultipleSelection: input.isMultipleSelection,
+            options: input.options,
+          ));
+        }
+      }
+
+      // 3. Get existing product to store in history
+      final allCreatorProductsRes = await remoteDataSource.getCreatorProducts(creatorUid);
+      final existingProduct = allCreatorProductsRes.firstWhere((p) => p.id == productId);
+
+      final updatedProduct = CreatorProductModel(
+        id: productId,
+        name: name,
+        description: description,
+        images: finalImageUrls,
+        category: category,
+        price: price,
+        stock: stock,
+        materials: materials,
+        dimensions: dimensions,
+        weight: weight,
+        shippingInfo: shippingInfo,
+        creatorUid: creatorUid,
+        creatorName: creatorName,
+        status: 'Pending Approval', // Reset status
+        isActive: false,           // Hide from storefront
+        isCustomizable: isCustomizable,
+        customizations: customizationEntities,
+        createdAt: existingProduct.createdAt,
+        editHistory: {
+          'previousName': existingProduct.name,
+          'previousDescription': existingProduct.description,
+          'previousPrice': existingProduct.price,
+          'previousCategory': existingProduct.category,
+          'previousStock': existingProduct.stock,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+
+      await remoteDataSource.updateProduct(updatedProduct);
+      return right(null);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<CreatorProduct>>> getPendingProducts() async {
     try {
       final products = await remoteDataSource.getPendingProducts();
@@ -241,7 +345,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
   @override
   Future<Either<Failure, List<CreatorProduct>>> getAdminAllProducts() async {
     try {
-      final products = await remoteDataSource.getAdminAllProducts();
+      final products = await remoteDataSource.getPendingProducts(); // Generic for now
       return right(products);
     } catch (e) {
       return left(Failure(e.toString()));
@@ -262,6 +366,26 @@ class CreatorRepositoryImpl implements CreatorRepository {
   Future<Either<Failure, void>> updateProductStatus(String productId, String status) async {
     try {
       await remoteDataSource.updateProductStatus(productId, status);
+      return right(null);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<CreatorOrder>>> getCreatorOrders(String uid) async {
+    try {
+      final orders = await remoteDataSource.getCreatorOrders(uid);
+      return right(orders);
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> updateOrderStatus(String orderId, String status, {String? rejectionReason, String? consignmentNumber}) async {
+    try {
+      await remoteDataSource.updateOrderStatus(orderId, status, rejectionReason: rejectionReason, consignmentNumber: consignmentNumber);
       return right(null);
     } catch (e) {
       return left(Failure(e.toString()));

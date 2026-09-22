@@ -40,6 +40,11 @@ final class CreatorMyProductsLoaded extends CreatorState {
   CreatorMyProductsLoaded(this.products);
 }
 
+final class CreatorOrdersLoaded extends CreatorState {
+  final List<CreatorOrder> orders;
+  CreatorOrdersLoaded(this.orders);
+}
+
 final class CreatorFailure extends CreatorState {
   final String message;
   CreatorFailure(this.message);
