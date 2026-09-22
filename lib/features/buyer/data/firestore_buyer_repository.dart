@@ -130,6 +130,8 @@ class FirestoreBuyerRepository implements BuyerRepository {
         (data['iconCodePoint'] as num?)?.toInt() ?? visual.$2,
         fontFamily: 'MaterialIcons',
       ),
+      creatorUid: data['creatorUid'] as String? ?? '',
+      images: List<String>.from(data['images'] as List? ?? const []),
     );
   }
 
@@ -155,6 +157,8 @@ class FirestoreBuyerRepository implements BuyerRepository {
           DateTime.fromMillisecondsSinceEpoch(0),
       status: data['status'] as String? ?? 'Placed',
       total:
+          (data['subtotal'] as num?)?.round() ??
+          (data['totalAmount'] as num?)?.round() ??
           (data['total'] as num?)?.round() ??
           items.fold(0, (total, item) => total + item.total),
       items: items,

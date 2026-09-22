@@ -23,6 +23,10 @@ import 'package:madebyhands/features/creator/data/datasources/creator_remote_dat
 import 'package:madebyhands/features/creator/data/repositories/creator_repository_impl.dart';
 import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
+import 'package:madebyhands/features/orders/data/firestore_order_repository.dart';
+import 'package:madebyhands/features/orders/domain/repositories/order_repository.dart';
+import 'package:madebyhands/features/support/data/firestore_support_repository.dart';
+import 'package:madebyhands/features/support/domain/repositories/support_repository.dart';
 
 final serviceLocator = GetIt.instance;
 
@@ -40,9 +44,11 @@ Future<void> initDependencies() async {
   serviceLocator.registerLazySingleton(() => FirebaseAuth.instance);
   serviceLocator.registerLazySingleton(() => FirebaseFirestore.instance);
   serviceLocator.registerLazySingleton(() => FirebaseStorage.instance);
-  serviceLocator.registerLazySingleton(() => GoogleSignIn(
-        clientId: const String.fromEnvironment('GOOGLE_CLIENT_ID'),
-      ));
+  serviceLocator.registerLazySingleton(
+    () => GoogleSignIn(
+      clientId: const String.fromEnvironment('GOOGLE_CLIENT_ID'),
+    ),
+  );
 
   // Auth Feature
   _initAuth();
@@ -52,6 +58,16 @@ Future<void> initDependencies() async {
   _initBuyer();
   // Admin Feature
   _initAdmin();
+  _initSharedData();
+}
+
+void _initSharedData() {
+  serviceLocator.registerLazySingleton<OrderRepository>(
+    () => FirestoreOrderRepository(firestore: serviceLocator()),
+  );
+  serviceLocator.registerLazySingleton<SupportRepository>(
+    () => FirestoreSupportRepository(firestore: serviceLocator()),
+  );
 }
 
 void _initAuth() {
@@ -102,9 +118,7 @@ void _initBuyer() {
   );
 
   // Cubit/Bloc
-  serviceLocator.registerFactory(
-    () => BuyerCubit(),
-  );
+  serviceLocator.registerFactory(() => BuyerCubit());
 
   serviceLocator.registerLazySingleton(
     () => BuyerBloc(repository: serviceLocator()),
@@ -123,9 +137,7 @@ void _initAdmin() {
   );
 
   // Cubit/Bloc
-  serviceLocator.registerFactory(
-    () => AdminCubit(),
-  );
+  serviceLocator.registerFactory(() => AdminCubit());
 
   serviceLocator.registerLazySingleton(
     () => AdminBloc(adminRepository: serviceLocator()),

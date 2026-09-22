@@ -33,16 +33,13 @@ class BuyerPreviewApp extends StatelessWidget {
       home: MultiBlocProvider(
         providers: [
           BlocProvider(
-            create: (_) => AuthBloc(authRepository: FakeAuthRepository())
+            create: (_) => AuthBloc(authRepository: FakeAuthRepository()),
           ),
           BlocProvider(
             create: (_) => BuyerBloc(repository: MockBuyerRepository()),
           ),
         ],
-        child: BuyerDashboardPage(
-          user: buyer,
-          onLogout: () {},
-        ),
+        child: BuyerDashboardPage(user: buyer, onLogout: () {}),
       ),
     );
   }
@@ -50,11 +47,19 @@ class BuyerPreviewApp extends StatelessWidget {
 
 class FakeAuthRepository implements AuthRepository {
   @override
-  Future<Either<Failure, UserEntity>> getCurrentUser() async => throw UnimplementedError();
+  Future<Either<Failure, UserEntity>> getCurrentUser() async =>
+      throw UnimplementedError();
   @override
   Future<Either<Failure, void>> signOut() async => throw UnimplementedError();
   @override
-  Future<Either<Failure, UserEntity>> signInWithGoogle() async => throw UnimplementedError();
+  Future<Either<Failure, UserEntity>> signInWithGoogle() async =>
+      throw UnimplementedError();
   @override
-  Future<Either<Failure, UserEntity>> signUpWithRole({required String uid, required String email, required String name, required String role}) async => throw UnimplementedError();
+  Future<Either<Failure, UserEntity>> signUpWithRole({
+    required String uid,
+    required String email,
+    required String name,
+    required String phone,
+    required String role,
+  }) async => throw UnimplementedError();
 }

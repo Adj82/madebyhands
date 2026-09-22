@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
+import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
 
@@ -12,6 +13,8 @@ class HomeTab extends StatelessWidget {
   final String userId;
   final ValueChanged<Product> onProductTap;
   final VoidCallback onBrowseAll;
+  final SavedAddress? selectedAddress;
+  final VoidCallback? onAddressTap;
 
   const HomeTab({
     super.key,
@@ -19,6 +22,8 @@ class HomeTab extends StatelessWidget {
     required this.userId,
     required this.onProductTap,
     required this.onBrowseAll,
+    this.selectedAddress,
+    this.onAddressTap,
   });
 
   @override
@@ -85,7 +90,65 @@ class HomeTab extends StatelessWidget {
                 ),
               ),
             ),
-            
+
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              sliver: SliverToBoxAdapter(
+                child: InkWell(
+                  onTap: onAddressTap,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.outline),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'DELIVER TO',
+                                style: TextStyle(
+                                  color: AppColors.mutedText,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                selectedAddress == null
+                                    ? 'Add a delivery address'
+                                    : '${selectedAddress!.label} · ${selectedAddress!.formatted}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               sliver: SliverList.list(
@@ -121,16 +184,19 @@ class HomeTab extends StatelessWidget {
                   (context, index) {
                     final product = products[index];
                     return ProductCard(
-                      product: product,
-                      isSaved: savedProductIds.contains(product.id),
-                      onTap: () => onProductTap(product),
-                      onSave: () => context.read<BuyerBloc>().add(
+                          product: product,
+                          isSaved: savedProductIds.contains(product.id),
+                          onTap: () => onProductTap(product),
+                          onSave: () => context.read<BuyerBloc>().add(
                             BuyerToggleFavorite(
                               userId: userId,
                               product: product,
                             ),
                           ),
-                    ).animate().fadeIn(delay: (index * 100).ms).slideY(begin: 0.1);
+                        )
+                        .animate()
+                        .fadeIn(delay: (index * 100).ms)
+                        .slideY(begin: 0.1);
                   },
                 ),
               ),
@@ -148,10 +214,13 @@ class HomeTab extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.primaryDark,
         borderRadius: BorderRadius.circular(28),
-        image: const DecorationImage(
-          image: NetworkImage('https://images.unsplash.com/photo-1590424753858-394a12e6e4a2?q=80&w=600&auto=format&fit=crop'),
+        image: DecorationImage(
+          image: NetworkImage(
+            'https://images.unsplash.com/photo-1590424753858-394a12e6e4a2?q=80&w=600&auto=format&fit=crop',
+          ),
           fit: BoxFit.cover,
           opacity: 0.25,
+          onError: (_, _) {},
         ),
       ),
       child: Column(
@@ -207,10 +276,10 @@ class HomeTab extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         itemCount: categories.length,
         itemBuilder: (context, i) {
-          return _CategoryCard(icon: categories[i].$1, label: categories[i].$2)
-              .animate()
-              .fadeIn(delay: (i * 50).ms)
-              .slideX(begin: 0.2);
+          return _CategoryCard(
+            icon: categories[i].$1,
+            label: categories[i].$2,
+          ).animate().fadeIn(delay: (i * 50).ms).slideX(begin: 0.2);
         },
       ),
     );
@@ -231,7 +300,7 @@ class _SectionTitle extends StatelessWidget {
         child: Text(
           title,
           style: GoogleFonts.playfairDisplay(
-            fontSize: 20, 
+            fontSize: 20,
             fontWeight: FontWeight.bold,
             color: AppColors.text,
           ),
@@ -239,7 +308,7 @@ class _SectionTitle extends StatelessWidget {
       ),
       if (actionLabel != null)
         TextButton(
-          onPressed: onAction, 
+          onPressed: onAction,
           child: Text(
             actionLabel!,
             style: GoogleFonts.montserrat(
@@ -284,7 +353,7 @@ class _CategoryCard extends StatelessWidget {
         Text(
           label,
           style: GoogleFonts.montserrat(
-            fontSize: 12, 
+            fontSize: 12,
             fontWeight: FontWeight.w600,
             color: AppColors.mutedText,
           ),

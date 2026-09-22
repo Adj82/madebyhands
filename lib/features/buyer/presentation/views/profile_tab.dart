@@ -6,6 +6,7 @@ class ProfileTab extends StatelessWidget {
   final UserEntity user;
   final VoidCallback onOrders;
   final VoidCallback onAddresses;
+  final VoidCallback onSupport;
   final VoidCallback onLogout;
 
   const ProfileTab({
@@ -13,6 +14,7 @@ class ProfileTab extends StatelessWidget {
     required this.user,
     required this.onOrders,
     required this.onAddresses,
+    required this.onSupport,
     required this.onLogout,
   });
 
@@ -86,10 +88,11 @@ class ProfileTab extends StatelessWidget {
           subtitle: 'Manage delivery locations',
           onTap: onAddresses,
         ),
-        const _ProfileTile(
+        _ProfileTile(
           icon: Icons.support_agent_outlined,
           title: 'Help & support',
           subtitle: 'FAQs and contact options',
+          onTap: onSupport,
         ),
         const _ProfileTile(
           icon: Icons.info_outline,
