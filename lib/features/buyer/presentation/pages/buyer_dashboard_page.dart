@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
+import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
+import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_cubit.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/order_history_page.dart';
@@ -33,6 +37,8 @@ class BuyerDashboardPage extends StatefulWidget {
 
 class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
   late final BuyerCubit _navigationCubit;
+  SavedAddress? _selectedAddress;
+  StreamSubscription<List<SavedAddress>>? _addressSubscription;
 
   @override
   void initState() {
@@ -41,11 +47,27 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
     // Initialize data streaming
     context.read<BuyerBloc>().add(BuyerWatchProducts());
     context.read<BuyerBloc>().add(BuyerWatchFavorites(widget.user.uid));
+    _addressSubscription = context
+        .read<BuyerBloc>()
+        .repository
+        .watchAddresses(widget.user.uid)
+        .listen((addresses) {
+          if (!mounted) return;
+          final defaults = addresses.where((address) => address.isDefault);
+          setState(() {
+            _selectedAddress = defaults.isNotEmpty
+                ? defaults.first
+                : addresses.isNotEmpty
+                ? addresses.first
+                : null;
+          });
+        });
   }
 
   @override
   void dispose() {
     _navigationCubit.close();
+    _addressSubscription?.cancel();
     super.dispose();
   }
 
@@ -131,6 +153,15 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                 HomeTab(
                   userName: widget.user.name,
                   userId: widget.user.uid,
+                  selectedAddress: _selectedAddress,
+                  onAddressTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SavedAddressesPage(
+                        userId: widget.user.uid,
+                        repository: serviceLocator(),
+                      ),
+                    ),
+                  ),
                   onProductTap: _openProduct,
                   onBrowseAll: () => _navigationCubit.changePage(1),
                 ),

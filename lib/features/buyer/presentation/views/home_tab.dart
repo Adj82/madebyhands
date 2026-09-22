@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
+import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
 
@@ -12,6 +13,8 @@ class HomeTab extends StatelessWidget {
   final String userId;
   final ValueChanged<Product> onProductTap;
   final VoidCallback onBrowseAll;
+  final SavedAddress? selectedAddress;
+  final VoidCallback? onAddressTap;
 
   const HomeTab({
     super.key,
@@ -19,6 +22,8 @@ class HomeTab extends StatelessWidget {
     required this.userId,
     required this.onProductTap,
     required this.onBrowseAll,
+    this.selectedAddress,
+    this.onAddressTap,
   });
 
   @override
@@ -81,6 +86,64 @@ class HomeTab extends StatelessWidget {
                         ),
                       ),
                     ],
+                  ),
+                ),
+              ),
+            ),
+
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              sliver: SliverToBoxAdapter(
+                child: InkWell(
+                  onTap: onAddressTap,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.outline),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'DELIVER TO',
+                                style: TextStyle(
+                                  color: AppColors.mutedText,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                selectedAddress == null
+                                    ? 'Add a delivery address'
+                                    : '${selectedAddress!.label} · ${selectedAddress!.formatted}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right),
+                      ],
+                    ),
                   ),
                 ),
               ),

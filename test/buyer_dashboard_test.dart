@@ -41,6 +41,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Hello, Suhani'), findsOneWidget);
+    expect(find.textContaining('21 Craft Lane'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('Handpicked for you'),
       250,
