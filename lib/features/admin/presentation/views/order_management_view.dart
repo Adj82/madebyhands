@@ -18,7 +18,7 @@ class OrderManagementView extends StatelessWidget {
 
         List<Map<String, dynamic>> orders = [];
 
-        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty && !snapshot.hasError) {
           orders = snapshot.data!.docs.map((doc) {
             final data = doc.data();
             return {
@@ -33,7 +33,7 @@ class OrderManagementView extends StatelessWidget {
             return tB.compareTo(tA);
           });
         } else {
-          // Fallback mock orders matching the required structure if Firestore has no orders yet
+          // Fallback mock orders matching the required structure if Firestore has no orders yet or on network error
           orders = [
             {
               'id': '9I9HP7',
@@ -147,7 +147,7 @@ class _OrderTileCard extends StatelessWidget {
     final consignmentNumber = order['consignmentNumber'] as String? ?? '';
     final rejectionReason = order['rejectionReason'] as String? ?? '';
 
-    // Calculate platform fee and creator payout
+    // Calculate platform fee and creator payout safely
     final double platformFee = order['platformFee'] != null
         ? (order['platformFee'] as num).toDouble()
         : (total > 999 ? (50.0 + (total * 0.05)) : 50.0);
@@ -227,17 +227,23 @@ class _OrderTileCard extends StatelessWidget {
             const SizedBox(height: 12),
             const Divider(height: 1, color: AppColors.outline),
             const SizedBox(height: 12),
-            ...items.map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(
-                    '• ${item['name']} ${item['quantity']} × 1 — ₹${((item['unitPrice'] as double) * (item['quantity'] as int)).toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.text,
-                    ),
+            ...items.map((item) {
+              final name = item['name'] as String? ?? 'Item';
+              final quantity = (item['quantity'] as num?)?.toInt() ?? 1;
+              final unitPrice = (item['unitPrice'] as num?)?.toDouble() ?? 0.0;
+              final itemTotal = quantity * unitPrice;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  '• $name $quantity × 1 — ₹${itemTotal.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.text,
                   ),
-                )),
+                ),
+              );
+            }),
             const SizedBox(height: 12),
             const Divider(height: 1, color: AppColors.outline),
             const SizedBox(height: 12),
