@@ -148,7 +148,15 @@ final class CreatorFetchCreatorProducts extends CreatorEvent {
 final class CreatorUpdateProductStatus extends CreatorEvent {
   final String productId;
   final String status;
-  CreatorUpdateProductStatus({required this.productId, required this.status});
+  final String? approvedBy;
+  final String? approvedByEmail;
+
+  CreatorUpdateProductStatus({
+    required this.productId,
+    required this.status,
+    this.approvedBy,
+    this.approvedByEmail,
+  });
 }
 
 final class CreatorFetchOrders extends CreatorEvent {

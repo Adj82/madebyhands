@@ -272,9 +272,6 @@ class CreatorRepositoryImpl implements CreatorRepository {
       List<ProductCustomization> customizationEntities = [];
       if (isCustomizable) {
         for (final input in customizations) {
-          // Simplification: if it has local files, upload them. 
-          // In a real app we'd need to track which existing URLs to keep.
-          // For now, let's assume CustomizationInput only has new files or we just append.
           final custImageUrls = await remoteDataSource.uploadCustomizationImages(
             images: input.imageFiles,
             uid: creatorUid,
@@ -285,7 +282,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
             name: input.name,
             description: input.description,
             additionalPrice: input.additionalPrice,
-            images: custImageUrls, // Note: This replaces. Needs better merge logic for production.
+            images: custImageUrls,
             isMultipleSelection: input.isMultipleSelection,
             options: input.options,
           ));
@@ -345,7 +342,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
   @override
   Future<Either<Failure, List<CreatorProduct>>> getAdminAllProducts() async {
     try {
-      final products = await remoteDataSource.getPendingProducts(); // Generic for now
+      final products = await remoteDataSource.getAdminAllProducts();
       return right(products);
     } catch (e) {
       return left(Failure(e.toString()));
@@ -363,9 +360,19 @@ class CreatorRepositoryImpl implements CreatorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> updateProductStatus(String productId, String status) async {
+  Future<Either<Failure, void>> updateProductStatus(
+    String productId,
+    String status, {
+    String? approvedBy,
+    String? approvedByEmail,
+  }) async {
     try {
-      await remoteDataSource.updateProductStatus(productId, status);
+      await remoteDataSource.updateProductStatus(
+        productId,
+        status,
+        approvedBy: approvedBy,
+        approvedByEmail: approvedByEmail,
+      );
       return right(null);
     } catch (e) {
       return left(Failure(e.toString()));

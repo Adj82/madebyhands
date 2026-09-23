@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 
@@ -24,6 +25,29 @@ class ProductReviewPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (product.approvedBy.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.green.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Approved by ${product.approvedBy} (${product.approvedByEmail})',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   Row(
                     children: [
                       Expanded(
@@ -149,7 +173,7 @@ class ProductReviewPage extends StatelessWidget {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: c.images.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
                 itemBuilder: (context, i) => ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(c.images[i], width: 60, height: 60, fit: BoxFit.cover)),
               ),
             ),
@@ -160,6 +184,11 @@ class ProductReviewPage extends StatelessWidget {
   }
 
   Widget _buildActionButtons(BuildContext context) {
+    final authState = context.watch<AuthBloc>().state;
+    final currentUser = authState is AuthSuccess ? authState.user : null;
+    final adminName = currentUser?.name ?? 'Admin';
+    final adminEmail = currentUser?.email ?? '';
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(15.0),
@@ -168,7 +197,12 @@ class ProductReviewPage extends StatelessWidget {
             Expanded(
               child: OutlinedButton(
                 onPressed: () {
-                  context.read<CreatorBloc>().add(CreatorUpdateProductStatus(productId: product.id, status: 'Rejected'));
+                  context.read<CreatorBloc>().add(CreatorUpdateProductStatus(
+                        productId: product.id,
+                        status: 'Rejected',
+                        approvedBy: adminName,
+                        approvedByEmail: adminEmail,
+                      ));
                   Navigator.pop(context);
                 },
                 style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 15), foregroundColor: Colors.redAccent, side: const BorderSide(color: Colors.redAccent)),
@@ -179,7 +213,12 @@ class ProductReviewPage extends StatelessWidget {
             Expanded(
               child: FilledButton(
                 onPressed: () {
-                  context.read<CreatorBloc>().add(CreatorUpdateProductStatus(productId: product.id, status: 'Approved'));
+                  context.read<CreatorBloc>().add(CreatorUpdateProductStatus(
+                        productId: product.id,
+                        status: 'Approved',
+                        approvedBy: adminName,
+                        approvedByEmail: adminEmail,
+                      ));
                   Navigator.pop(context);
                 },
                 style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 15), backgroundColor: AppColors.primary),

@@ -18,6 +18,8 @@ class CreatorProduct {
   final bool isCustomizable;
   final List<ProductCustomization> customizations;
   final Map<String, dynamic>? editHistory; // Stores previous values for comparison
+  final String approvedBy;
+  final String approvedByEmail;
 
   CreatorProduct({
     required this.id,
@@ -39,6 +41,8 @@ class CreatorProduct {
     this.isCustomizable = false,
     this.customizations = const [],
     this.editHistory,
+    this.approvedBy = '',
+    this.approvedByEmail = '',
   });
 }
 

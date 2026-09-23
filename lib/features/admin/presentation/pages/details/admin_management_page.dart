@@ -32,39 +32,110 @@ class AdminManagementPage extends StatelessWidget {
             child: admins.isEmpty
                 ? const Center(child: Text('Fetching administrative accounts...'))
                 : ListView.builder(
-                    padding: const EdgeInsets.all(15),
+                    padding: const EdgeInsets.all(16),
                     physics: const AlwaysScrollableScrollPhysics(),
                     itemCount: admins.length,
                     itemBuilder: (context, index) {
                       final admin = admins[index];
                       final isRoot = UserEntity.presetSuperAdminEmails.contains(admin.email.toLowerCase());
 
-                      return Card(
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: isRoot ? AppColors.primary.withValues(alpha: 0.1) : AppColors.outline,
-                            child: Icon(
-                              isRoot ? Icons.verified_user : Icons.admin_panel_settings_outlined,
-                              color: isRoot ? AppColors.primary : AppColors.text,
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.outline),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.03),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
-                          ),
-                          title: Text(admin.name.isEmpty ? 'Admin Account' : admin.name),
-                          subtitle: Text('${admin.email} • ${admin.roleDisplay}'),
-                          trailing: isRoot
-                              ? const Chip(label: Text('Root Super Admin'), backgroundColor: AppColors.background)
-                              : IconButton(
-                                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                                  onPressed: () {
-                                    if (!isSuperAdmin) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Access Restricted: Only Super Admins can revoke admin access.')),
-                                      );
-                                    } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Super Admin privilege required to revoke credentials.')),
-                                      );
-                                    }
-                                  }),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                CircleAvatar(
+                                  radius: 20,
+                                  backgroundColor: isRoot
+                                      ? AppColors.primary.withValues(alpha: 0.1)
+                                      : AppColors.outline,
+                                  child: Icon(
+                                    isRoot ? Icons.verified_user : Icons.admin_panel_settings_outlined,
+                                    color: isRoot ? AppColors.primary : AppColors.text,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        admin.name.isEmpty ? 'Admin Account' : admin.name,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        admin.email,
+                                        style: const TextStyle(color: AppColors.mutedText, fontSize: 12),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (!isRoot)
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                                    onPressed: () {
+                                      if (!isSuperAdmin) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Access Restricted: Only Super Admins can revoke admin access.')),
+                                        );
+                                      } else {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Super Admin privilege required to revoke credentials.')),
+                                        );
+                                      }
+                                    },
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: isRoot
+                                        ? const Color(0xFFFFD700).withValues(alpha: 0.15)
+                                        : AppColors.primary.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isRoot ? const Color(0xFFDAA520) : AppColors.primary,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    isRoot ? 'ROOT SUPER ADMIN' : admin.roleDisplay.toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: isRoot ? const Color(0xFFB8860B) : AppColors.primary,
+                                      letterSpacing: 0.6,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       );
                     },

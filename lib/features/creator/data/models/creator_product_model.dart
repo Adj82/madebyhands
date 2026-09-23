@@ -22,6 +22,8 @@ class CreatorProductModel extends CreatorProduct {
     super.isCustomizable,
     super.customizations,
     super.editHistory,
+    super.approvedBy,
+    super.approvedByEmail,
   });
 
   Map<String, dynamic> toJson() {
@@ -44,6 +46,8 @@ class CreatorProductModel extends CreatorProduct {
       'customizations': customizations.map((c) => c.toMap()).toList(),
       'createdAt': createdAt,
       'editHistory': editHistory,
+      'approvedBy': approvedBy,
+      'approvedByEmail': approvedByEmail,
     };
   }
 
@@ -78,6 +82,8 @@ class CreatorProductModel extends CreatorProduct {
       customizations: customizations,
       createdAt: (json['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       editHistory: json['editHistory'] as Map<String, dynamic>?,
+      approvedBy: json['approvedBy'] ?? '',
+      approvedByEmail: json['approvedByEmail'] ?? '',
     );
   }
 }

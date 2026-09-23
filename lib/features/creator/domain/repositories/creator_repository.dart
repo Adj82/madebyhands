@@ -78,7 +78,12 @@ abstract interface class CreatorRepository {
   Future<Either<Failure, List<CreatorProduct>>> getAdminAllProducts();
   Future<Either<Failure, List<CreatorProduct>>> getCreatorProducts(String uid);
 
-  Future<Either<Failure, void>> updateProductStatus(String productId, String status);
+  Future<Either<Failure, void>> updateProductStatus(
+    String productId,
+    String status, {
+    String? approvedBy,
+    String? approvedByEmail,
+  });
 
   Future<Either<Failure, List<CreatorOrder>>> getCreatorOrders(String uid);
 

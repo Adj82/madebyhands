@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/admin/presentation/pages/details/product_review_page.dart';
+import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
-import 'package:madebyhands/features/admin/presentation/pages/details/product_review_page.dart';
 
 class ProductApprovalView extends StatefulWidget {
   const ProductApprovalView({super.key});
@@ -62,9 +63,9 @@ class _ProductApprovalViewState extends State<ProductApprovalView> {
 
             return TabBarView(
               children: [
-                _buildProductGrid(pending, isLoading, 'No pending product approvals'),
-                _buildProductGrid(approved, isLoading, 'No approved products'),
-                _buildProductGrid(rejected, isLoading, 'No rejected products'),
+                _buildProductGrid(context, pending, isLoading, 'No pending product approvals'),
+                _buildProductGrid(context, approved, isLoading, 'No approved products'),
+                _buildProductGrid(context, rejected, isLoading, 'No rejected products'),
               ],
             );
           },
@@ -73,7 +74,12 @@ class _ProductApprovalViewState extends State<ProductApprovalView> {
     );
   }
 
-  Widget _buildProductGrid(List<CreatorProduct> products, bool isLoading, String emptyMessage) {
+  Widget _buildProductGrid(BuildContext context, List<CreatorProduct> products, bool isLoading, String emptyMessage) {
+    final authState = context.watch<AuthBloc>().state;
+    final currentUser = authState is AuthSuccess ? authState.user : null;
+    final adminName = currentUser?.name ?? 'Admin';
+    final adminEmail = currentUser?.email ?? '';
+
     return RefreshIndicator(
       onRefresh: () async {
         _fetchData();
@@ -100,7 +106,7 @@ class _ProductApprovalViewState extends State<ProductApprovalView> {
                       crossAxisCount: 2,
                       crossAxisSpacing: 15,
                       mainAxisSpacing: 15,
-                      childAspectRatio: 0.7,
+                      childAspectRatio: 0.65,
                     ),
                     itemCount: products.length,
                     itemBuilder: (context, index) {
@@ -135,8 +141,17 @@ class _ProductApprovalViewState extends State<ProductApprovalView> {
                                         overflow: TextOverflow.ellipsis),
                                     Text('by ${product.creatorName}',
                                         style: const TextStyle(fontSize: 12, color: AppColors.mutedText)),
-                                    const SizedBox(height: 5),
+                                    const SizedBox(height: 4),
                                     Text('₹${product.price}', style: const TextStyle(fontWeight: FontWeight.w900)),
+                                    if (product.approvedBy.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Approved by: ${product.approvedBy}',
+                                        style: const TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.w600),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
                                     const SizedBox(height: 10),
                                     if (product.status == 'Pending Approval')
                                       Row(
@@ -144,7 +159,12 @@ class _ProductApprovalViewState extends State<ProductApprovalView> {
                                           Expanded(
                                               child: OutlinedButton(
                                                   onPressed: () {
-                                                    context.read<CreatorBloc>().add(CreatorUpdateProductStatus(productId: product.id, status: 'Rejected'));
+                                                    context.read<CreatorBloc>().add(CreatorUpdateProductStatus(
+                                                          productId: product.id,
+                                                          status: 'Rejected',
+                                                          approvedBy: adminName,
+                                                          approvedByEmail: adminEmail,
+                                                        ));
                                                   },
                                                   style: OutlinedButton.styleFrom(padding: EdgeInsets.zero, foregroundColor: Colors.red),
                                                   child: const Text('Reject'))),
@@ -152,10 +172,14 @@ class _ProductApprovalViewState extends State<ProductApprovalView> {
                                           Expanded(
                                               child: FilledButton(
                                                   onPressed: () {
-                                                    context.read<CreatorBloc>().add(CreatorUpdateProductStatus(productId: product.id, status: 'Approved'));
+                                                    context.read<CreatorBloc>().add(CreatorUpdateProductStatus(
+                                                          productId: product.id,
+                                                          status: 'Approved',
+                                                          approvedBy: adminName,
+                                                          approvedByEmail: adminEmail,
+                                                        ));
                                                   },
-                                                  style:
-                                                      FilledButton.styleFrom(padding: EdgeInsets.zero, backgroundColor: AppColors.primary),
+                                                  style: FilledButton.styleFrom(padding: EdgeInsets.zero, backgroundColor: AppColors.primary),
                                                   child: const Text('Approve'))),
                                         ],
                                       )
@@ -164,7 +188,7 @@ class _ProductApprovalViewState extends State<ProductApprovalView> {
                                         width: double.infinity,
                                         padding: const EdgeInsets.symmetric(vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: product.status == 'Approved' ? Colors.green.withAlpha(40) : Colors.red.withAlpha(40),
+                                          color: product.status == 'Approved' ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
                                           borderRadius: BorderRadius.circular(5),
                                         ),
                                         child: Text(

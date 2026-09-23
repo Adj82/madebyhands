@@ -114,8 +114,7 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
   ) async {
     final currentState = state;
     final List<CreatorProfile> previousProfiles = currentState is CreatorAllProfilesLoaded ? currentState.profiles : [];
-    
-    // Do not emit full CreatorLoading, as it puts screens into a spin loop
+
     final res = await _creatorRepository.updateVerificationStatus(event.uid, event.status);
     res.fold(
       (l) => emit(CreatorFailure(l.message)),
@@ -205,7 +204,7 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
 
     res.fold(
       (l) => emit(CreatorFailure(l.message)),
-      (r) => emit(CreatorAddProductSuccess()), // reuse success state
+      (r) => emit(CreatorAddProductSuccess()),
     );
   }
 
@@ -255,21 +254,16 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
     CreatorUpdateProductStatus event,
     Emitter<CreatorState> emit,
   ) async {
-    final currentState = state;
-    final List<CreatorProduct> previousProducts = currentState is CreatorPendingProductsLoaded ? currentState.products : [];
-
-    final res = await _creatorRepository.updateProductStatus(event.productId, event.status);
+    final res = await _creatorRepository.updateProductStatus(
+      event.productId,
+      event.status,
+      approvedBy: event.approvedBy,
+      approvedByEmail: event.approvedByEmail,
+    );
     res.fold(
       (l) => emit(CreatorFailure(l.message)),
       (r) {
-        if (previousProducts.isNotEmpty) {
-          final updatedProducts = previousProducts
-              .where((p) => p.id != event.productId)
-              .toList();
-          emit(CreatorPendingProductsLoaded(updatedProducts));
-        } else {
-          add(CreatorFetchPendingProducts());
-        }
+        add(CreatorFetchAdminAllProducts());
       },
     );
   }
