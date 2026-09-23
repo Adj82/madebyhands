@@ -4,6 +4,7 @@ import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/admin/presentation/pages/details/api_config_page.dart';
 import 'package:madebyhands/features/admin/presentation/pages/details/admin_management_page.dart';
+import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 
 class AdminSettingsView extends StatefulWidget {
   const AdminSettingsView({super.key});
@@ -18,6 +19,10 @@ class _AdminSettingsViewState extends State<AdminSettingsView> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = context.watch<AuthBloc>().state;
+    final currentUser = authState is AuthSuccess ? authState.user : null;
+    final isSuperAdmin = currentUser?.isSuperAdmin ?? true;
+
     return BlocBuilder<AdminBloc, AdminState>(
       builder: (context, state) {
         return ListView(
@@ -28,13 +33,19 @@ class _AdminSettingsViewState extends State<AdminSettingsView> {
               'Flat Platform Fee',
               'Currently ₹${state.flatFee} charged per sale',
               Icons.payments_outlined,
-              trailing: TextButton(onPressed: () => _showUpdateFeeDialog(context, true), child: const Text('Change')),
+              trailing: TextButton(
+                onPressed: () => _showUpdateFeeDialog(context, true, isSuperAdmin),
+                child: Text(isSuperAdmin ? 'Change' : 'Locked 🔒'),
+              ),
             ),
             _buildConfigTile(
               'Transaction Fee (%)',
               'Currently ${state.percentFee}% for orders > ₹999',
               Icons.percent,
-              trailing: TextButton(onPressed: () => _showUpdateFeeDialog(context, false), child: const Text('Change')),
+              trailing: TextButton(
+                onPressed: () => _showUpdateFeeDialog(context, false, isSuperAdmin),
+                child: Text(isSuperAdmin ? 'Change' : 'Locked 🔒'),
+              ),
             ),
             const SizedBox(height: 20),
             const _SettingsSection(title: 'System Control'),
@@ -43,7 +54,13 @@ class _AdminSettingsViewState extends State<AdminSettingsView> {
               subtitle: const Text('Block all user access while performing updates'),
               value: _maintenanceMode,
               activeTrackColor: AppColors.primary,
-              onChanged: (val) => setState(() => _maintenanceMode = val),
+              onChanged: isSuperAdmin
+                  ? (val) => setState(() => _maintenanceMode = val)
+                  : (val) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Only Super Admins can toggle maintenance mode.')),
+                      );
+                    },
             ),
             SwitchListTile(
               title: const Text('Admin Email Alerts', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -55,8 +72,8 @@ class _AdminSettingsViewState extends State<AdminSettingsView> {
             const SizedBox(height: 20),
             const _SettingsSection(title: 'Security'),
             _buildConfigTile(
-              'Authorized Admins',
-              '1 active admin account',
+              'Authorized Admins & Roles',
+              'Manage Super Admin & Manager access',
               Icons.admin_panel_settings_outlined,
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminManagementPage())),
               trailing: const Icon(Icons.chevron_right),
@@ -65,12 +82,26 @@ class _AdminSettingsViewState extends State<AdminSettingsView> {
               'API Configuration',
               'Manage Firebase & Google keys',
               Icons.key_outlined,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ApiConfigPage())),
-              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                if (!isSuperAdmin) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('API Configuration requires Super Admin access.')),
+                  );
+                } else {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ApiConfigPage()));
+                }
+              },
+              trailing: Icon(isSuperAdmin ? Icons.chevron_right : Icons.lock_outline, size: 20),
             ),
             const SizedBox(height: 40),
             FilledButton(
               onPressed: () {
+                if (!isSuperAdmin) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Access Restricted: Operational Managers cannot modify global settings.')),
+                  );
+                  return;
+                }
                 context.read<AdminBloc>().add(AdminUpdateSettingsRequested(
                   flatFee: state.flatFee,
                   percentFee: state.percentFee,
@@ -87,7 +118,32 @@ class _AdminSettingsViewState extends State<AdminSettingsView> {
     );
   }
 
-  void _showUpdateFeeDialog(BuildContext context, bool isFlat) {
+  void _showUpdateFeeDialog(BuildContext context, bool isFlat, bool isSuperAdmin) {
+    if (!isSuperAdmin) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.lock_outline, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Access Restricted'),
+            ],
+          ),
+          content: const Text(
+            'Operational Managers cannot update platform fee parameters.\n\nOnly Super Admins have permission to modify platform economics.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     final controller = TextEditingController();
     final adminBloc = context.read<AdminBloc>();
     showDialog(

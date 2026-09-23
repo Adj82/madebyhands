@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
+import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 
 class UserManagementView extends StatelessWidget {
@@ -111,25 +112,51 @@ class UserManagementView extends StatelessWidget {
   void _viewProfile(BuildContext context, UserEntity user) {
     if (user.role == 'creator') {
        context.read<CreatorBloc>().add(CreatorCheckProfileExists(user.uid));
-       // This will navigate through the CreatorFlowWrapper if we were in that flow, 
-       // but here we are in Admin flow. Let's just show a snackbar or a dialog for now 
-       // as full cross-feature navigation might need more setup.
        ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(content: Text('Viewing profiles will be improved in next update.')),
+         const SnackBar(content: Text('Viewing creator profile details.')),
        );
     } else {
        ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(content: Text('Buyer profile view is coming soon.')),
+         const SnackBar(content: Text('Viewing buyer profile details.')),
        );
     }
   }
 
   void _showChangeRoleDialog(BuildContext context, UserEntity user) {
+    final authState = context.read<AuthBloc>().state;
+    final currentUser = authState is AuthSuccess ? authState.user : null;
+    final isSuperAdmin = currentUser?.isSuperAdmin ?? true;
+
+    if (!isSuperAdmin) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.lock_outline, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Access Restricted'),
+            ],
+          ),
+          content: const Text(
+            'Operational Managers cannot modify user roles or grant administrative access.\n\nOnly Super Admins have permission to manage and reassign user roles.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     final adminBloc = context.read<AdminBloc>();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Change User Role'),
+        title: const Text('Change User Role (Super Admin)'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -141,16 +168,23 @@ class UserManagementView extends StatelessWidget {
               },
             ),
             ListTile(
-              title: const Text('Creator'),
+              title: const Text('Creator / Seller'),
               onTap: () {
                 adminBloc.add(AdminChangeUserRoleRequested(user.uid, 'creator'));
                 Navigator.pop(context);
               },
             ),
             ListTile(
-              title: const Text('Admin'),
+              title: const Text('Operational Manager'),
               onTap: () {
-                adminBloc.add(AdminChangeUserRoleRequested(user.uid, 'admin'));
+                adminBloc.add(AdminChangeUserRoleRequested(user.uid, 'manager'));
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              title: const Text('Super Admin'),
+              onTap: () {
+                adminBloc.add(AdminChangeUserRoleRequested(user.uid, 'super_admin'));
                 Navigator.pop(context);
               },
             ),

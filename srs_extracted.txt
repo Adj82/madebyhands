@@ -1,0 +1,200 @@
+MADEBYHANDS
+Software Requirements Specification
+Document Version
+1.0
+Project
+MADEBYHANDS
+Platform
+Android and WebApp
+Scope
+Phase 1
+Primary Users
+Creators and Buyers
+Purpose. This SRS defines the functional, non- functional and technical requirements for the first version of the MADEBYHANDSS mobile application. It is intended to serve as the working specification for the development team.
+1. Introduction
+1.1 Product Overview
+MADEBYHANDS is a creator- first marketplace for artists, handmade creators, student creators, pottery artists, digital illustrators, and small handmade businesses. The application will allow creators to establish an identity, showcase work, list products for sale, reach customers, and manage orders. Buyers will be able to discover creators and products, understand the story behind the work, and purchase unique handmade products.
+1.2 Product Philosophy
+The core product philosophy is: “Current platforms sell products. MADEBYHANDS builds creators.” The MVP therefore gives equal importance to creator identity and product commerce. MADEBYHANDS is committed to being a safe and trustworthy platform for both creators and buyers, with protections built into payments, orders, customization, and in-app communication.
+1.3 Problem Statement
+Creators often struggle with discoverability, reaching genuine buyers, building a personal brand, and receiving fair value. Existing workflows commonly depend on Instagram DMs, WhatsApp groups, and local exhibitions. MADEBYHANDS aims to provide a dedicated home for creator identity, discovery, and commerce.
+1.4 Target Users
+Creators: artists, painters, illustrators, pottery artists, craft makers, handmade businesses, student creators, and other independent makers.
+Buyers: consumers interested in authentic handmade products, art, independent creators, uniqueness, and creator stories.
+Administrators: platform operators responsible for verification, moderation, products, users, and orders.
+2. MVP Scope
+The MVP must prove the basic creator- to- buyer transaction loop. The first release should prioritize a complete, usable flow over a large number of features.
+2.1 In Scope
+Authentication and user roles
+Creator onboarding and profiles
+Creator portfolio
+Creator storefront
+Product listing and management
+Product discovery, categories, and search
+Product detail pages
+Shopping cart
+Checkout and one online payment provider
+Order management
+Basic creator analytics
+Basic notifications
+Creator verification
+Basic reviews and ratings
+Admin panel and moderation
+2.2 Out of Scope for MVP
+Live exhibitions
+Workshops
+Creator collaborations
+Custom commissions
+Creator community/social feed
+Messaging
+Following/likes/comments
+Advanced recommendation engine
+Advanced analytics
+Premium creator subscriptions
+Sponsored listings
+Complex AI- free authenticity verification
+These features may be considered for later releases after the core marketplace and transaction flow are validated.
+3. Functional Requirements
+FR- 01 - Registration
+Users shall be able to create an account.
+Registration shall collect name, email/phone, authentication credentials, and user type.
+User type shall be Buyer or Creator.
+FR- 02 - Authentication
+The system shall support login, logout, password recovery/reset, and session management.
+FR- 03 - Creator Onboarding
+Creators shall create a creator profile containing creator name, profile image, bio, category, location, social links, portfolio, and creator story.
+FR- 04 - Creator Profile
+Each creator shall have a public profile.
+The profile shall display identity, bio, portfolio, products/storefront, creator story, and social links.
+FR- 05 - Storefront
+Each creator shall have a dedicated storefront displaying available products, categories, prices, availability, and creator information.(Ex-YT Creators page etc.)
+FR- 06 - Product Listing
+Creators shall add products with name, description, price, images, category, quantity/stock, availability, dimensions/material where relevant, and shipping information where applicable.
+FR- 07 - Product Management
+Creators shall add, edit, delete, publish/unpublish, update stock, and update price for their own products.
+FR- 08 - Discovery
+Buyers shall discover products through the Home feed, categories, and creator profiles. The Home feed shall display popular products based on wishlist additions and orders. For buyers with previous wishlist activity, products from their frequently wishlisted categories shall be prioritized. New buyers shall see globally popular products..
+FR- 09 - Search
+Users shall search for products, creators, and categories.
+FR- 10 - Product Details
+Product pages shall show images, name, price, description, availability, creator, creator profile link, relevant product details, and purchase actions.
+FR- 11 - Cart
+Buyers shall add/remove products, change quantity, view subtotal/shipping/total, and proceed to checkout.
+FR- 12 - Checkout
+Checkout shall collect customer and shipping information and display the final payable amount.
+FR- 13 - Payment
+The application shall integrate one approved online payment provider.
+The system shall record payment status without storing raw card details.
+MadeByHands will charge buyers a ₹50 platform fee for each successful artwork sale. For orders with a value above ₹999, an additional 5% transaction fee will be deducted from the order value. Applicable fees will be automatically deducted before the creator payout is released. Orders of ₹999 or below will not incur the 5% transaction fee.
+MADEBYHANDS reassurance: all payments are processed securely, and no raw card details are stored on the platform, giving buyers and creators confidence in every transaction.
+FR- 14 - Orders
+Buyers shall view order history, order details, and order status.
+Creators shall view incoming orders, update fulfillment status, and submit the shipment consignment/reference number after dispatch.
+The buyer shall be able to view the submitted shipment reference number and an appropriate tracking link where available
+MADEBYHANDS reassurance: buyers can track every order from confirmation to delivery, and platform support is available if an order does not arrive as expected.
+FR- 15 - Order Status
+Supported initial states: Pending, Confirmed, Processing, In-transit, Shipped, Out for Delivery, Delivered.
+FR- 16 - Reviews
+Verified purchasers may submit a rating and written review, with optional image if supported.
+FR- 17 - Creator Verification
+Admins shall be able to verify creators and display a Verified Creator status. Creator verification shall be separate from individual product approval.
+Creators shall submit the verification information/documents required by the platform.
+The verification identified identity/PAN documentation and a current photo and current address as possible requirements.
+Verification actions shall be handled by authorized admin/manager personnel.
+FR- 18 - Notifications
+Buyers shall receive order- related in-app notifications.
+Creators shall receive new- order and important platform in-app notifications.
+Buyers shall receive an in-app notification when a creator publishes a new product in a category the buyer has previously wishlisted or purchased from.
+FR- 19 - Basic Analytics
+Creators shall see basic profile views, product views, orders, total sales, and best- selling product metrics where technically available.
+FR- 20 - Admin Panel
+Admins shall manage users, creators, verification, individual product approval, products, categories, orders, moderation, support tickets, and reports according to their role.
+The platform shall support role-based administration.
+A Super Admin shall have full access, including financial/payout controls.
+A Manager/Admin shall have operational access such as verification, product approval, moderation, support tickets, orders, and shipping operations, without unrestricted financial controls unless explicitly granted.
+FR- 21 - In-App Communication Policy & Safety Controls
+The platform shall prohibit intentional exchange of external contact details for moving transactions or communication off MADEBYHANDS.
+The system should detect and flag obvious attempts to share phone numbers, email addresses, external payment details, social handles, or other contact information, subject to the final moderation approach.
+Flagged messages may be blocked, hidden, or sent for admin review according to platform policy.
+The application shall display clear guidance that customization and transaction-related communication should remain within MADEBYHANDS.
+Admins shall be able to review reported conversations and take moderation action.
+The controls are intended to protect user privacy, reduce platform bypassing, and keep transaction-related communication within the platform.
+FR- 22 - In-App Direct Messaging (1-on-1 DM System)
+Users shall be able to exchange text messages and, where enabled, relevant images/files needed to clarify customization requirements.
+Conversations shall be associated with the relevant buyer, creator, product, or order where applicable.
+Users shall not need to reveal personal phone numbers or email addresses to communicate through the platform.
+The system should support timestamps and basic unread/read indicators.
+Users should be able to report or block inappropriate conversations.
+FR- 23 - Custom File Upload Capability
+Buyers shall be able to upload their own custom design, artwork, photograph, or other permitted file directly from the customization screen.
+The system shall validate supported file types and file size limits.
+The application should provide clear upload guidance and recommended dimensions/resolution where applicable.
+Uploaded files shall be securely stored and associated with the relevant customization/order.
+Unauthorized users shall not be able to access another buyer's uploaded customization files.
+FR- 24 - Customization Screen & Workflow
+The application shall provide a product customization interface for eligible base products.
+Where supported, buyers shall select a creator-provided design/template or upload their own artwork.
+Buyers shall be able to preview the customized product before adding it to the cart.
+The customization UI should provide appropriate positioning, cropping, scaling, and fitting controls.
+The final customization specification shall be associated with the order so the creator can fulfill it correctly.
+FR- 25 - Request customization
+Sellers shall define the available customization options and the final price for each customizable product in advance, before the product is listed for sale.
+Buyers shall only be able to select from the customization options and pricing predefined by the seller; only products with seller-defined customization options and pricing can be added to cart.
+MADEBYHANDS reassurance: because pricing and customization options are fixed by the seller upfront, buyers see exact, final pricing before adding a customized product to cart, with no surprise charges.
+FR- 26 - Account Management
+Users shall view/update permitted profile information, manage addresses where applicable, and request account deletion.
+4. User Journeys
+4.1 Buyer Journey
+Open application
+Register/login
+Browse or search
+Open product
+Explore creator
+Add to cart
+Checkout
+Pay
+Receive confirmation
+Track order
+Review after purchase
+4.2 Creator Journey
+Register/login
+Select Creator
+Complete onboarding
+Create profile
+Upload portfolio
+Create storefront
+Add products
+Submit for approval
+Products go live
+Receive orders
+Process/ship orders
+View basic sales metrics
+5. Non- Functional Requirements
+5.1 Performance
+Primary screens should load quickly under normal network conditions.
+Images should be compressed/resized appropriately.
+Product and order lists should use pagination or equivalent lazy loading.
+The app should avoid unnecessary API/database calls.
+5.2 Security
+Authentication and authorization must be enforced.
+Creator users must only modify their own profiles/products/orders where applicable.
+Admin functions must be restricted to authorized admin accounts.
+Sensitive credentials and secrets must not be committed to source control.
+Payment card data must not be stored by MADEBYHANDS unless explicitly required and securely supported by the payment provider.
+5.3 Reliability
+Order and payment state changes must be handled safely.
+The application should avoid duplicate order creation on repeated payment callbacks or user actions.
+Errors should be logged sufficiently for debugging without exposing sensitive data.
+5.4 Usability
+The UI should be mobile- first, visual, simple, and creator- focused.
+Creators without technical expertise should be able to list products without assistance.
+Important actions and errors should provide clear feedback.
+5.5 Scalability
+The architecture should allow future growth in creators, products, users, transactions, categories, and cities without requiring a complete rewrite.
+ Approval
+Founder / Product Owner
+Co-Founder
+Developer
+Payal Majumdar
+Reshob Roychoudhury
+Adhiraj Jain

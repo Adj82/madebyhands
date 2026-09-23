@@ -11,10 +11,13 @@ import 'package:madebyhands/features/admin/presentation/views/product_approval_v
 import 'package:madebyhands/features/admin/presentation/views/support_tickets_view.dart';
 import 'package:madebyhands/features/admin/presentation/views/verification_view.dart';
 import 'package:madebyhands/features/admin/presentation/views/user_management_view.dart';
+import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 
 class AdminDashboardPage extends StatelessWidget {
-  const AdminDashboardPage({super.key});
+  final UserEntity? currentUser;
+
+  const AdminDashboardPage({super.key, this.currentUser});
 
   static const List<String> _titles = [
     'Overview',
@@ -30,6 +33,10 @@ class AdminDashboardPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authState = context.watch<AuthBloc>().state;
+    final user = currentUser ?? (authState is AuthSuccess ? authState.user : null);
+    final isSuperAdmin = user?.isSuperAdmin ?? true;
+
     return BlocBuilder<AdminCubit, int>(
       builder: (context, selectedIndex) {
         return Scaffold(
@@ -52,20 +59,42 @@ class AdminDashboardPage extends StatelessWidget {
             backgroundColor: AppColors.background,
             child: Column(
               children: [
-                const DrawerHeader(
-                  decoration: BoxDecoration(color: AppColors.primary),
+                DrawerHeader(
+                  decoration: const BoxDecoration(color: AppColors.primary),
                   child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.admin_panel_settings,
-                            size: 50, color: Colors.white),
-                        SizedBox(height: 10),
-                        Text('MADEBYHANDS ADMIN',
+                        const Icon(Icons.admin_panel_settings,
+                            size: 44, color: Colors.white),
+                        const SizedBox(height: 8),
+                        const Text('MADEBYHANDS ADMIN',
                             style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 1.2)),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isSuperAdmin
+                                ? const Color(0xFFFFD700).withValues(alpha: 0.25)
+                                : Colors.teal.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSuperAdmin ? const Color(0xFFFFD700) : Colors.tealAccent,
+                            ),
+                          ),
+                          child: Text(
+                            isSuperAdmin ? 'SUPER ADMIN' : 'MANAGER (OPERATIONAL)',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: isSuperAdmin ? const Color(0xFFFFD700) : Colors.white,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -106,21 +135,24 @@ class AdminDashboardPage extends StatelessWidget {
                       _buildDrawerTile(
                           context,
                           7,
-                          Icons.account_balance_wallet_outlined,
-                          Icons.account_balance_wallet,
-                          'Payouts',
-                          selectedIndex),
+                          isSuperAdmin ? Icons.account_balance_wallet_outlined : Icons.lock_outlined,
+                          isSuperAdmin ? Icons.account_balance_wallet : Icons.lock,
+                          isSuperAdmin ? 'Payouts & Finance' : 'Payouts (Super Admin)',
+                          selectedIndex,
+                          isRestricted: !isSuperAdmin),
                       _buildDrawerTile(context, 8, Icons.settings_outlined,
                           Icons.settings, 'Settings', selectedIndex),
                     ],
                   ),
                 ),
                 const Divider(),
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text('Version 1.0.0',
-                      style:
-                          TextStyle(color: AppColors.mutedText, fontSize: 12)),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    'Logged in as: ${user?.name ?? "Admin"} (${user?.roleDisplay ?? "Admin"})',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.mutedText, fontSize: 11),
+                  ),
                 ),
                 const SizedBox(height: 10),
               ],
@@ -145,17 +177,41 @@ class AdminDashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _buildDrawerTile(BuildContext context, int index, IconData icon,
-      IconData selectedIcon, String title, int selectedIndex) {
+  Widget _buildDrawerTile(
+    BuildContext context,
+    int index,
+    IconData icon,
+    IconData selectedIcon,
+    String title,
+    int selectedIndex, {
+    bool isRestricted = false,
+  }) {
     final isSelected = selectedIndex == index;
     return ListTile(
-      leading: Icon(isSelected ? selectedIcon : icon,
-          color: isSelected ? AppColors.primary : AppColors.mutedText),
-      title: Text(title,
-          style: TextStyle(
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected ? AppColors.primary : AppColors.text,
-          )),
+      leading: Icon(
+        isSelected ? selectedIcon : icon,
+        color: isRestricted
+            ? Colors.orange.shade700
+            : (isSelected ? AppColors.primary : AppColors.mutedText),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          color: isSelected ? AppColors.primary : AppColors.text,
+        ),
+      ),
+      trailing: isRestricted
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: const Text('RESTRICTED', style: TextStyle(fontSize: 8, color: Colors.orange, fontWeight: FontWeight.bold)),
+            )
+          : null,
       selected: isSelected,
       onTap: () {
         context.read<AdminCubit>().changePage(index);
