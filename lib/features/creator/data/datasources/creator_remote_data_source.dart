@@ -65,7 +65,12 @@ abstract interface class CreatorRemoteDataSource {
   Future<List<CreatorProductModel>> getCreatorProducts(String uid);
 
   /// Updates the approval status and active state of a product.
-  Future<void> updateProductStatus(String productId, String status);
+  Future<void> updateProductStatus(
+    String productId,
+    String status, {
+    String? approvedBy,
+    String? approvedByEmail,
+  });
 
   /// Fetches all orders belonging to a specific creator.
   Future<List<CreatorOrderModel>> getCreatorOrders(String creatorUid);
@@ -384,12 +389,28 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
   }
 
   @override
-  Future<void> updateProductStatus(String productId, String status) async {
+  Future<void> updateProductStatus(
+    String productId,
+    String status, {
+    String? approvedBy,
+    String? approvedByEmail,
+  }) async {
     try {
-      await firestore.collection('products').doc(productId).update({
+      final updateData = <String, dynamic>{
         'status': status,
         'isActive': status == 'Approved',
-      });
+      };
+      if (approvedBy != null && approvedBy.isNotEmpty) {
+        updateData['approvedBy'] = approvedBy;
+      }
+      if (approvedByEmail != null && approvedByEmail.isNotEmpty) {
+        updateData['approvedByEmail'] = approvedByEmail;
+      }
+      if (status == 'Approved') {
+        updateData['approvedAt'] = FieldValue.serverTimestamp();
+      }
+
+      await firestore.collection('products').doc(productId).update(updateData);
     } catch (e) {
       throw Exception(e.toString());
     }
