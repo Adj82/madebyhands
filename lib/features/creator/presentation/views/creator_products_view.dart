@@ -61,7 +61,7 @@ class _CreatorProductsViewState extends State<CreatorProductsView> {
     final isSelected = _currentCriteria == criteria;
 
     return ListTile(
-      tileColor: isSelected ? AppColors.primary.withOpacity(0.1) : null,
+      tileColor: isSelected ? AppColors.primary.withValues(alpha: 0.1) : null,
       title: Text(
         title,
         style: TextStyle(
