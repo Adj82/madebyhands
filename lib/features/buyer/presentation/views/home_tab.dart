@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
+import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
 
@@ -12,6 +13,9 @@ class HomeTab extends StatelessWidget {
   final String userId;
   final ValueChanged<Product> onProductTap;
   final VoidCallback onBrowseAll;
+  final ValueChanged<String>? onCategoryTap;
+  final SavedAddress? selectedAddress;
+  final VoidCallback? onAddressTap;
 
   const HomeTab({
     super.key,
@@ -19,6 +23,9 @@ class HomeTab extends StatelessWidget {
     required this.userId,
     required this.onProductTap,
     required this.onBrowseAll,
+    this.onCategoryTap,
+    this.selectedAddress,
+    this.onAddressTap,
   });
 
   @override
@@ -85,7 +92,65 @@ class HomeTab extends StatelessWidget {
                 ),
               ),
             ),
-            
+
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              sliver: SliverToBoxAdapter(
+                child: InkWell(
+                  onTap: onAddressTap,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.outline),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'DELIVER TO',
+                                style: TextStyle(
+                                  color: AppColors.mutedText,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                selectedAddress == null
+                                    ? 'Add a delivery address'
+                                    : '${selectedAddress!.label} · ${selectedAddress!.formatted}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               sliver: SliverList.list(
@@ -95,7 +160,7 @@ class HomeTab extends StatelessWidget {
                   const SizedBox(height: 30),
                   const _SectionTitle(title: 'Shop by craft'),
                   const SizedBox(height: 16),
-                  _buildCategoryScroll(),
+                  _buildCategoryScroll(onCategoryTap),
                   const SizedBox(height: 30),
                   _SectionTitle(
                     title: 'Handpicked for you',
@@ -121,16 +186,19 @@ class HomeTab extends StatelessWidget {
                   (context, index) {
                     final product = products[index];
                     return ProductCard(
-                      product: product,
-                      isSaved: savedProductIds.contains(product.id),
-                      onTap: () => onProductTap(product),
-                      onSave: () => context.read<BuyerBloc>().add(
+                          product: product,
+                          isSaved: savedProductIds.contains(product.id),
+                          onTap: () => onProductTap(product),
+                          onSave: () => context.read<BuyerBloc>().add(
                             BuyerToggleFavorite(
                               userId: userId,
                               product: product,
                             ),
                           ),
-                    ).animate().fadeIn(delay: (index * 100).ms).slideY(begin: 0.1);
+                        )
+                        .animate()
+                        .fadeIn(delay: (index * 100).ms)
+                        .slideY(begin: 0.1);
                   },
                 ),
               ),
@@ -148,10 +216,13 @@ class HomeTab extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.primaryDark,
         borderRadius: BorderRadius.circular(28),
-        image: const DecorationImage(
-          image: NetworkImage('https://images.unsplash.com/photo-1590424753858-394a12e6e4a2?q=80&w=600&auto=format&fit=crop'),
+        image: DecorationImage(
+          image: NetworkImage(
+            'https://images.unsplash.com/photo-1590424753858-394a12e6e4a2?q=80&w=600&auto=format&fit=crop',
+          ),
           fit: BoxFit.cover,
           opacity: 0.25,
+          onError: (_, _) {},
         ),
       ),
       child: Column(
@@ -192,9 +263,9 @@ class HomeTab extends StatelessWidget {
     ).animate().fadeIn().scale(begin: const Offset(0.95, 0.95));
   }
 
-  Widget _buildCategoryScroll() {
+  Widget _buildCategoryScroll(ValueChanged<String>? onCategoryTap) {
     final categories = [
-      (Icons.home_outlined, 'Decor'),
+      (Icons.home_outlined, 'Home Decor'),
       (Icons.local_florist_outlined, 'Pottery'),
       (Icons.diamond_outlined, 'Jewellery'),
       (Icons.checkroom_outlined, 'Textiles'),
@@ -207,10 +278,13 @@ class HomeTab extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         itemCount: categories.length,
         itemBuilder: (context, i) {
-          return _CategoryCard(icon: categories[i].$1, label: categories[i].$2)
-              .animate()
-              .fadeIn(delay: (i * 50).ms)
-              .slideX(begin: 0.2);
+          return _CategoryCard(
+            icon: categories[i].$1,
+            label: categories[i].$2,
+            onTap: onCategoryTap == null
+                ? null
+                : () => onCategoryTap(categories[i].$2),
+          ).animate().fadeIn(delay: (i * 50).ms).slideX(begin: 0.2);
         },
       ),
     );
@@ -231,7 +305,7 @@ class _SectionTitle extends StatelessWidget {
         child: Text(
           title,
           style: GoogleFonts.playfairDisplay(
-            fontSize: 20, 
+            fontSize: 20,
             fontWeight: FontWeight.bold,
             color: AppColors.text,
           ),
@@ -239,7 +313,7 @@ class _SectionTitle extends StatelessWidget {
       ),
       if (actionLabel != null)
         TextButton(
-          onPressed: onAction, 
+          onPressed: onAction,
           child: Text(
             actionLabel!,
             style: GoogleFonts.montserrat(
@@ -255,41 +329,46 @@ class _SectionTitle extends StatelessWidget {
 class _CategoryCard extends StatelessWidget {
   final IconData icon;
   final String label;
+  final VoidCallback? onTap;
 
-  const _CategoryCard({required this.icon, required this.label});
+  const _CategoryCard({required this.icon, required this.label, this.onTap});
 
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(right: 16),
-    child: Column(
-      children: [
-        Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColors.outline),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(12),
+    child: Container(
+      margin: const EdgeInsets.only(right: 16),
+      child: Column(
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.outline),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 28),
           ),
-          child: Icon(icon, color: AppColors.primary, size: 28),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          label,
-          style: GoogleFonts.montserrat(
-            fontSize: 12, 
-            fontWeight: FontWeight.w600,
-            color: AppColors.mutedText,
+          const SizedBox(height: 10),
+          Text(
+            label,
+            style: GoogleFonts.montserrat(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.mutedText,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }

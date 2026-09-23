@@ -24,6 +24,8 @@ class BuyerBloc extends Bloc<BuyerEvent, BuyerState> {
     on<BuyerErrorOccurred>(_onErrorOccurred);
   }
 
+  BuyerRepository get repository => _repository;
+
   void _onWatchProducts(BuyerWatchProducts event, Emitter<BuyerState> emit) {
     emit(state.copyWith(isLoadingProducts: true));
     _productSubscription?.cancel();

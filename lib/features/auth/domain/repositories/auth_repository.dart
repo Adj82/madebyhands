@@ -8,6 +8,7 @@ abstract interface class AuthRepository {
     required String uid,
     required String email,
     required String name,
+    required String phone,
     required String role,
   });
   Future<Either<Failure, UserEntity>> getCurrentUser();

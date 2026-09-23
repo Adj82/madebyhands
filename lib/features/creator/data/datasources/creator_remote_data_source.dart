@@ -13,10 +13,7 @@ abstract interface class CreatorRemoteDataSource {
   Future<void> saveCreatorProfile(CreatorProfileModel profile);
 
   /// Uploads a single profile image to Firebase Storage.
-  Future<String> uploadProfileImage({
-    required File image,
-    required String uid,
-  });
+  Future<String> uploadProfileImage({required File image, required String uid});
 
   /// Uploads multiple portfolio images to Firebase Storage.
   Future<List<String>> uploadPortfolioImages({
@@ -74,7 +71,12 @@ abstract interface class CreatorRemoteDataSource {
   Future<List<CreatorOrderModel>> getCreatorOrders(String creatorUid);
 
   /// Updates the status of an order.
-  Future<void> updateOrderStatus(String orderId, String status, {String? rejectionReason, String? consignmentNumber});
+  Future<void> updateOrderStatus(
+    String orderId,
+    String status, {
+    String? rejectionReason,
+    String? consignmentNumber,
+  });
 }
 
 class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
@@ -122,15 +124,14 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
       if (!await image.exists()) {
         throw Exception("Source file does not exist at ${image.path}");
       }
-      
+
       // Use a deterministic path based on UID
-      final ref = firebaseStorage.ref().child('creator_profiles/$uid/profile_image.jpg');
-      
-      // Start upload
-      final uploadTask = ref.putFile(
-        image,
-        _imageMetadata,
+      final ref = firebaseStorage.ref().child(
+        'creator_profiles/$uid/profile_image.jpg',
       );
+
+      // Start upload
+      final uploadTask = ref.putFile(image, _imageMetadata);
 
       // Wait for completion
       final snapshot = await uploadTask;
@@ -144,7 +145,9 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
     } on FirebaseException catch (e) {
       // Catch specific Storage errors
       if (e.code == 'object-not-found') {
-        throw Exception('Firebase Storage Error: The profile image could not be found after upload. (Code: ${e.code})');
+        throw Exception(
+          'Firebase Storage Error: The profile image could not be found after upload. (Code: ${e.code})',
+        );
       }
       throw Exception('Firebase Storage Error: ${e.message} (Code: ${e.code})');
     } catch (e) {
@@ -162,14 +165,11 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
       for (var i = 0; i < images.length; i++) {
         if (!await images[i].exists()) continue;
 
-        final ref = firebaseStorage
-            .ref()
-            .child('creator_profiles/$uid/portfolio/image_${DateTime.now().millisecondsSinceEpoch}_$i.jpg');
-        
-        final uploadTask = ref.putFile(
-          images[i],
-          _imageMetadata,
+        final ref = firebaseStorage.ref().child(
+          'creator_profiles/$uid/portfolio/image_${DateTime.now().millisecondsSinceEpoch}_$i.jpg',
         );
+
+        final uploadTask = ref.putFile(images[i], _imageMetadata);
 
         final snapshot = await uploadTask;
 
@@ -196,7 +196,9 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
       if (!await file.exists()) {
         throw Exception("Source file does not exist at ${file.path}");
       }
-      final ref = firebaseStorage.ref().child('creator_profiles/$uid/verification/$fileName');
+      final ref = firebaseStorage.ref().child(
+        'creator_profiles/$uid/verification/$fileName',
+      );
       final uploadTask = ref.putFile(file);
       final snapshot = await uploadTask;
       if (snapshot.state == TaskState.success) {
@@ -225,18 +227,16 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
   Future<void> updateVerificationStatus(String uid, String status) async {
     try {
       final isVerified = status == 'Verified';
-      
+
       // 1. Update creator_profiles collection
-      await firestore
-          .collection('creator_profiles')
-          .doc(uid)
-          .update({'verificationStatus': status});
+      await firestore.collection('creator_profiles').doc(uid).update({
+        'verificationStatus': status,
+      });
 
       // 2. Update users collection (Single source of truth for Role & Verification)
-      await firestore
-          .collection('users')
-          .doc(uid)
-          .update({'isVerified': isVerified});
+      await firestore.collection('users').doc(uid).update({
+        'isVerified': isVerified,
+      });
 
       // 3. Update products visibility (Business/Data Layer enforcement)
       final productsQuery = await firestore
@@ -290,14 +290,11 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
       for (var i = 0; i < images.length; i++) {
         if (!await images[i].exists()) continue;
 
-        final ref = firebaseStorage
-            .ref()
-            .child('products/$uid/$productName/image_${timestamp}_$i.jpg');
-        
-        final uploadTask = ref.putFile(
-          images[i],
-          _imageMetadata,
+        final ref = firebaseStorage.ref().child(
+          'products/$uid/$productName/image_${timestamp}_$i.jpg',
         );
+
+        final uploadTask = ref.putFile(images[i], _imageMetadata);
 
         final snapshot = await uploadTask;
 
@@ -326,12 +323,10 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
         if (!await images[i].exists()) continue;
 
         final ref = firebaseStorage.ref().child(
-            'products/$uid/$productName/customizations/$customizationName/image_${timestamp}_$i.jpg');
-
-        final uploadTask = ref.putFile(
-          images[i],
-          _imageMetadata,
+          'products/$uid/$productName/customizations/$customizationName/image_${timestamp}_$i.jpg',
         );
+
+        final uploadTask = ref.putFile(images[i], _imageMetadata);
 
         final snapshot = await uploadTask;
 
@@ -416,14 +411,25 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
   }
 
   @override
-  Future<void> updateOrderStatus(String orderId, String status, {String? rejectionReason, String? consignmentNumber}) async {
+  Future<void> updateOrderStatus(
+    String orderId,
+    String status, {
+    String? rejectionReason,
+    String? consignmentNumber,
+  }) async {
     try {
-      final updateData = <String, dynamic>{'status': status};
+      final updateData = <String, dynamic>{
+        'status': status,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
       if (rejectionReason != null) {
         updateData['rejectionReason'] = rejectionReason;
       }
       if (consignmentNumber != null) {
         updateData['consignmentNumber'] = consignmentNumber;
+      }
+      if (status == 'Rejected' || status == 'Cancelled') {
+        updateData['payoutStatus'] = 'cancelled';
       }
       await firestore.collection('orders').doc(orderId).update(updateData);
     } catch (e) {

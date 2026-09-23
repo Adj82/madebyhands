@@ -63,11 +63,11 @@ class MyApp extends StatelessWidget {
                 );
               }
               if (state is AuthSuccess) {
-                // Intelligent Routing based on User Role & Admin Segregation
-                if (state.user.isAdminOrManager) {
-                  return AdminDashboardPage(currentUser: state.user);
-                } else if (state.user.role.toLowerCase() == 'creator' ||
-                    state.user.role.toLowerCase() == 'seller') {
+                // Intelligent Routing based on User Role
+                final role = state.user.role.toLowerCase();
+                if (role == 'admin') {
+                  return const AdminDashboardPage();
+                } else if (role == 'creator' || role == 'seller') {
                   return CreatorFlowWrapper(user: state.user);
                 } else {
                   return BuyerDashboardPage(

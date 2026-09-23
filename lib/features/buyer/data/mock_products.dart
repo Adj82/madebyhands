@@ -13,6 +13,7 @@ const mockProducts = <Product>[
     rating: 4.8,
     color: Color(0xFFD8BE8B),
     icon: Icons.shopping_basket_outlined,
+    creatorUid: 'creator-asha',
   ),
   Product(
     id: 'blue-pottery',
@@ -25,6 +26,7 @@ const mockProducts = <Product>[
     rating: 4.7,
     color: Color(0xFFAFC9D6),
     icon: Icons.local_florist_outlined,
+    creatorUid: 'creator-jaipur-clay',
   ),
   Product(
     id: 'silver-earrings',
@@ -37,6 +39,7 @@ const mockProducts = <Product>[
     rating: 4.9,
     color: Color(0xFFD8D6D1),
     icon: Icons.diamond_outlined,
+    creatorUid: 'creator-tara',
   ),
   Product(
     id: 'block-print-tote',
@@ -49,6 +52,7 @@ const mockProducts = <Product>[
     rating: 4.6,
     color: Color(0xFFE8AA91),
     icon: Icons.shopping_bag_outlined,
+    creatorUid: 'creator-rang',
   ),
   Product(
     id: 'soy-candle',
@@ -61,6 +65,7 @@ const mockProducts = <Product>[
     rating: 4.8,
     color: Color(0xFFD9A179),
     icon: Icons.light_mode_outlined,
+    creatorUid: 'creator-mitti',
   ),
   Product(
     id: 'wooden-toy',
@@ -73,5 +78,6 @@ const mockProducts = <Product>[
     rating: 4.7,
     color: Color(0xFFB8C99D),
     icon: Icons.toys_outlined,
+    creatorUid: 'creator-karigar',
   ),
 ];

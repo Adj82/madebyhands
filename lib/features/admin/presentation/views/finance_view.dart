@@ -3,50 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/admin/presentation/widgets/small_stat.dart';
-import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 
 class FinanceView extends StatelessWidget {
   const FinanceView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final authState = context.watch<AuthBloc>().state;
-    final currentUser = authState is AuthSuccess ? authState.user : null;
-    final isSuperAdmin = currentUser?.isSuperAdmin ?? true;
-
-    if (!isSuperAdmin) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.orange.shade200, width: 2),
-                ),
-                child: Icon(Icons.lock_rounded, size: 56, color: Colors.orange.shade800),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Financial Access Restricted',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.text),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'As per platform administration controls (SRS FR-20), platform balances, fee configurations, and creator payout releases are restricted to Super Admins.\n\nOperational Managers are not permitted to manage financial payouts.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: AppColors.mutedText, height: 1.5),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return BlocBuilder<AdminBloc, AdminState>(
       builder: (context, state) {
         return RefreshIndicator(
