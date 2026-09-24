@@ -1,32 +1,62 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
+import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 import 'package:madebyhands/features/creator/presentation/pages/creator_verification_page.dart';
 
-class CreatorHomeView extends StatelessWidget {
+class CreatorHomeView extends StatefulWidget {
   final CreatorProfile profile;
   const CreatorHomeView({super.key, required this.profile});
 
   @override
+  State<CreatorHomeView> createState() => _CreatorHomeViewState();
+}
+
+class _CreatorHomeViewState extends State<CreatorHomeView> {
+  bool _isRefreshing = false;
+
+  Future<void> _handleRefresh() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+
+    try {
+      final bloc = context.read<CreatorBloc>();
+      bloc.add(CreatorCheckProfileExists(widget.profile.uid));
+      bloc.add(CreatorFetchOrders(widget.profile.uid));
+      bloc.add(CreatorFetchCreatorProducts(widget.profile.uid));
+      await Future.delayed(const Duration(milliseconds: 600));
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildNotificationSection(),
-          const SizedBox(height: 20),
-          _buildStorefrontProminent(context),
-          const SizedBox(height: 30),
-          _buildVerificationStatus(context),
-          const SizedBox(height: 30),
-          const Text(
-            'Recent Performance',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 15),
-          _buildPerformanceSummary(),
-        ],
+    return RefreshIndicator(
+      onRefresh: _handleRefresh,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildNotificationSection(),
+            const SizedBox(height: 20),
+            _buildStorefrontProminent(context),
+            const SizedBox(height: 30),
+            _buildVerificationStatus(context),
+            const SizedBox(height: 30),
+            const Text(
+              'Recent Performance',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 15),
+            _buildPerformanceSummary(),
+          ],
+        ),
       ),
     );
   }
@@ -100,10 +130,10 @@ class CreatorHomeView extends StatelessWidget {
                     CircleAvatar(
                       radius: 30,
                       backgroundColor: AppColors.surface,
-                      backgroundImage: profile.profileImage.isNotEmpty
-                          ? NetworkImage(profile.profileImage)
+                      backgroundImage: widget.profile.profileImage.isNotEmpty
+                          ? NetworkImage(widget.profile.profileImage)
                           : null,
-                      child: profile.profileImage.isEmpty
+                      child: widget.profile.profileImage.isEmpty
                           ? const Icon(Icons.person,
                               size: 30, color: AppColors.primary)
                           : null,
@@ -114,7 +144,7 @@ class CreatorHomeView extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            profile.name,
+                            widget.profile.name,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 20,
@@ -122,7 +152,7 @@ class CreatorHomeView extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            profile.category,
+                            widget.profile.category,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.8),
                               fontSize: 14,
@@ -154,7 +184,7 @@ class CreatorHomeView extends StatelessWidget {
   }
 
   Widget _buildVerificationStatus(BuildContext context) {
-    final status = profile.verificationStatus;
+    final status = widget.profile.verificationStatus;
     final isVerified = status == 'Verified';
     final isInProcess = status == 'In-Process';
 
@@ -164,7 +194,7 @@ class CreatorHomeView extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(
-                builder: (_) => CreatorVerificationPage(profile: profile)),
+                builder: (_) => CreatorVerificationPage(profile: widget.profile)),
           );
         }
       },

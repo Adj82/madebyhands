@@ -29,6 +29,22 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
   File? _profileImage;
   final List<File> _portfolioImages = [];
   final List<String> _socialLinks = [];
+  bool _isRefreshing = false;
+
+  Future<void> _handleRefresh() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+
+    try {
+      context.read<CreatorBloc>().add(CreatorCheckProfileExists(widget.user.uid));
+      context.read<AdminBloc>().add(AdminLoadDataRequested());
+      await Future.delayed(const Duration(milliseconds: 600));
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -113,26 +129,30 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
         builder: (context, state) {
           if (state is CreatorLoading) return const Center(child: CircularProgressIndicator());
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _OnboardingHeader(),
-                  const SizedBox(height: 30),
-                  _buildProfileImagePicker(),
-                  const SizedBox(height: 30),
-                  _buildFormFields(),
-                  const SizedBox(height: 30),
-                  _buildSocialLinksSection(),
-                  const SizedBox(height: 30),
-                  _buildPortfolioSection(),
-                  const SizedBox(height: 50),
-                  FilledButton(onPressed: _submit, child: const Text('Launch My Studio')),
-                  const SizedBox(height: 30),
-                ],
+          return RefreshIndicator(
+            onRefresh: _handleRefresh,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _OnboardingHeader(),
+                    const SizedBox(height: 30),
+                    _buildProfileImagePicker(),
+                    const SizedBox(height: 30),
+                    _buildFormFields(),
+                    const SizedBox(height: 30),
+                    _buildSocialLinksSection(),
+                    const SizedBox(height: 30),
+                    _buildPortfolioSection(),
+                    const SizedBox(height: 50),
+                    FilledButton(onPressed: _submit, child: const Text('Launch My Studio')),
+                    const SizedBox(height: 30),
+                  ],
+                ),
               ),
             ),
           );

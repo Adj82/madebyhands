@@ -294,7 +294,10 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
     );
     res.fold(
       (l) => emit(CreatorFailure(l.message)),
-      (r) => add(CreatorFetchOrders(event.uid)),
+      (r) {
+        add(CreatorFetchOrders(event.uid));
+        add(CreatorFetchCreatorProducts(event.uid));
+      },
     );
   }
 }

@@ -15,6 +15,8 @@ class CreatorOrdersView extends StatefulWidget {
 }
 
 class _CreatorOrdersViewState extends State<CreatorOrdersView> {
+  bool _isRefreshing = false;
+
   @override
   void initState() {
     super.initState();
@@ -25,9 +27,36 @@ class _CreatorOrdersViewState extends State<CreatorOrdersView> {
     context.read<CreatorBloc>().add(CreatorFetchOrders(widget.profile.uid));
   }
 
+  Future<void> _handleRefresh() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+
+    try {
+      _fetchOrders();
+      await Future.delayed(const Duration(milliseconds: 600));
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<CreatorBloc, CreatorState>(
+    return BlocConsumer<CreatorBloc, CreatorState>(
+      listenWhen: (previous, current) => current is CreatorFailure,
+      listener: (context, state) {
+        if (state is CreatorFailure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+          _fetchOrders();
+        }
+      },
       buildWhen: (previous, current) =>
           current is CreatorOrdersLoaded ||
           current is CreatorLoading ||
@@ -41,11 +70,17 @@ class _CreatorOrdersViewState extends State<CreatorOrdersView> {
           final pendingOrders =
               state.orders.where((o) => o.status == 'Placed').toList();
           final activeOrders = state.orders
-              .where((o) => ['Accepted', 'Shipped', 'Delivered']
-                  .contains(o.status))
+              .where((o) => [
+                    'Accepted',
+                    'Shipped',
+                    'In Transit',
+                    'Out for Delivery',
+                    'Delivered'
+                  ].contains(o.status))
               .toList();
-          final completedOrders =
-              state.orders.where((o) => o.status == 'Completed').toList();
+          final completedOrders = state.orders
+              .where((o) => ['Completed', 'Delivered'].contains(o.status))
+              .toList();
 
           return DefaultTabController(
             length: 3,
@@ -88,17 +123,25 @@ class _CreatorOrdersViewState extends State<CreatorOrdersView> {
         }
 
         if (state is CreatorFailure) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('Error: ${state.message}'),
-                const SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: _fetchOrders,
-                  child: const Text('Retry'),
+          return RefreshIndicator(
+            onRefresh: _handleRefresh,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.5,
+                alignment: Alignment.center,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('Error: ${state.message}'),
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: _fetchOrders,
+                      child: const Text('Retry'),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           );
         }
@@ -109,7 +152,7 @@ class _CreatorOrdersViewState extends State<CreatorOrdersView> {
   }
 }
 
-class _OrderList extends StatelessWidget {
+class _OrderList extends StatefulWidget {
   final List<CreatorOrder> orders;
   final String emptyMessage;
   final bool isPending;
@@ -123,20 +166,62 @@ class _OrderList extends StatelessWidget {
   });
 
   @override
+  State<_OrderList> createState() => _OrderListState();
+}
+
+class _OrderListState extends State<_OrderList> {
+  bool _isRefreshing = false;
+
+  Future<void> _handleRefresh() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+
+    try {
+      context
+          .read<CreatorBloc>()
+          .add(CreatorFetchOrders(widget.profile.uid));
+      await Future.delayed(const Duration(milliseconds: 600));
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (orders.isEmpty) {
-      return Center(
-        child: Text(emptyMessage, style: const TextStyle(color: AppColors.mutedText)),
+    if (widget.orders.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _handleRefresh,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Container(
+            height: MediaQuery.of(context).size.height * 0.5,
+            alignment: Alignment.center,
+            child: Text(
+              widget.emptyMessage,
+              style: const TextStyle(color: AppColors.mutedText),
+            ),
+          ),
+        ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(15),
-      itemCount: orders.length,
-      itemBuilder: (context, index) {
-        final order = orders[index];
-        return _OrderCard(order: order, isPending: isPending, profile: profile);
-      },
+    return RefreshIndicator(
+      onRefresh: _handleRefresh,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(15),
+        itemCount: widget.orders.length,
+        itemBuilder: (context, index) {
+          final order = widget.orders[index];
+          return _OrderCard(
+            order: order,
+            isPending: widget.isPending,
+            profile: widget.profile,
+          );
+        },
+      ),
     );
   }
 }
@@ -287,7 +372,9 @@ class _StatusBadge extends StatelessWidget {
     switch (status) {
       case 'Placed': color = Colors.blue; break;
       case 'Accepted': color = Colors.orange; break;
-      case 'Shipped': color = Colors.purple; break;
+      case 'Shipped': color = Colors.indigo; break;
+      case 'In Transit': color = Colors.purple; break;
+      case 'Out for Delivery': color = Colors.deepOrange; break;
       case 'Delivered': color = Colors.teal; break;
       case 'Completed': color = Colors.green; break;
       case 'Rejected': color = Colors.red; break;
@@ -382,44 +469,66 @@ class _OrderDetailSheet extends StatelessWidget {
               ),
             ),
           ),
-          if (['Accepted', 'Shipped', 'Delivered'].contains(order.status))
+          if (order.status == 'Accepted')
             Padding(
               padding: const EdgeInsets.only(top: 20.0),
               child: SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => _updateStatus(context),
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-                  child: Text('Mark as ${_getNextStatus()}'),
+                child: ElevatedButton.icon(
+                  onPressed: () => _showConsignmentDialog(context),
+                  icon: const Icon(Icons.local_shipping_outlined),
+                  label: const Text('Mark as Shipped'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            )
+          else if (['Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Completed'].contains(order.status))
+            Padding(
+              padding: const EdgeInsets.only(top: 20.0),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.autorenew, color: AppColors.primary),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Automatic Courier Tracking Active',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Subsequent statuses are automatically synced via courier ref #${order.consignmentNumber ?? "N/A"}.',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.mutedText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
         ],
       ),
     );
-  }
-
-  String _getNextStatus() {
-    if (order.status == 'Accepted') return 'Shipped';
-    if (order.status == 'Shipped') return 'Delivered';
-    if (order.status == 'Delivered') return 'Completed';
-    return '';
-  }
-
-  void _updateStatus(BuildContext context) {
-    final nextStatus = _getNextStatus();
-    if (nextStatus.isEmpty) return;
-
-    if (nextStatus == 'Shipped') {
-      _showConsignmentDialog(context);
-    } else {
-      context.read<CreatorBloc>().add(CreatorUpdateOrderStatus(
-            orderId: order.id,
-            status: nextStatus,
-            uid: profile.uid,
-          ));
-      Navigator.pop(context);
-    }
   }
 
   void _showConsignmentDialog(BuildContext context) {
@@ -429,36 +538,65 @@ class _OrderDetailSheet extends StatelessWidget {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Enter Dispatch Details'),
+        title: const Text('Ship Order'),
         content: Form(
           key: formKey,
-          child: TextFormField(
-            controller: consignmentController,
-            decoration: const InputDecoration(
-              labelText: 'Consignment / Reference Number *',
-              hintText: 'e.g. tracking-123456',
-            ),
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Please enter the consignment or reference number provided by your courier/shipping carrier.',
+                style: TextStyle(fontSize: 12, color: AppColors.mutedText),
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: consignmentController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Consignment / Reference Number *',
+                  hintText: 'e.g. SP123456789IN',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (v) {
+                  final trimmed = v?.trim() ?? '';
+                  if (trimmed.isEmpty) {
+                    return 'Consignment number is required.';
+                  }
+                  if (trimmed.length < 3) {
+                    return 'Must be at least 3 characters long.';
+                  }
+                  return null;
+                },
+              ),
+            ],
           ),
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel')),
-          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
             onPressed: () {
               if (formKey.currentState!.validate()) {
-                context.read<CreatorBloc>().add(CreatorUpdateOrderStatus(
-                      orderId: order.id,
-                      status: 'Shipped',
-                      consignmentNumber: consignmentController.text.trim(),
-                      uid: profile.uid,
-                    ));
+                context.read<CreatorBloc>().add(
+                      CreatorUpdateOrderStatus(
+                        orderId: order.id,
+                        status: 'Shipped',
+                        consignmentNumber: consignmentController.text.trim(),
+                        uid: profile.uid,
+                      ),
+                    );
                 Navigator.pop(dialogContext); // Close dialog
                 Navigator.pop(context); // Close bottom sheet
               }
             },
-            child: const Text('Confirm Dispatch'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirm & Mark Shipped'),
           ),
         ],
       ),
