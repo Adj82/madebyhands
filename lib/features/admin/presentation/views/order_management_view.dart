@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 
 class OrderManagementView extends StatelessWidget {
@@ -8,124 +9,148 @@ class OrderManagementView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('orders').snapshots(),
-      builder: (context, snapshot) {
-        List<Map<String, dynamic>> orders = [];
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: const TabBar(
+          tabs: [
+            Tab(text: 'Pending'),
+            Tab(text: 'Active'),
+            Tab(text: 'Completed'),
+          ],
+          labelColor: AppColors.primary,
+          unselectedLabelColor: AppColors.mutedText,
+          indicatorColor: AppColors.primary,
+        ),
+        body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance.collection('orders').snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Unable to load orders from database',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.text),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${snapshot.error}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: AppColors.mutedText, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
 
-        if (snapshot.hasData && snapshot.data != null && snapshot.data!.docs.isNotEmpty && !snapshot.hasError) {
-          try {
-            orders = snapshot.data!.docs.map((doc) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              );
+            }
+
+            final docs = snapshot.data?.docs ?? [];
+            if (docs.isEmpty) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.inbox_outlined, size: 48, color: AppColors.mutedText),
+                      SizedBox(height: 12),
+                      Text(
+                        'No orders found in the database.',
+                        style: TextStyle(color: AppColors.mutedText, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            final allOrders = docs.map((doc) {
               final data = doc.data();
               return {
                 'id': doc.id,
                 ...data,
               };
             }).toList();
-            orders.sort((a, b) {
+
+            allOrders.sort((a, b) {
               final tA = a['createdAt'] as Timestamp?;
               final tB = b['createdAt'] as Timestamp?;
               if (tA == null || tB == null) return 0;
               return tB.compareTo(tA);
             });
-          } catch (e) {
-            orders = [];
-          }
-        }
 
-        // If snapshot is still connecting and we have no orders, show loading spinner
-        if (snapshot.connectionState == ConnectionState.waiting && orders.isEmpty) {
-          return const Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
-          );
-        }
+            // Filter orders across 3 segregated tabs
+            final pendingOrders = allOrders.where((o) {
+              final status = (o['status'] as String? ?? 'Placed').trim();
+              return status == 'Placed' || status == 'Pending';
+            }).toList();
 
-        // Fallback orders guaranteed so the Admin order view is NEVER blank or grey
-        if (orders.isEmpty) {
-          orders = _getFallbackOrders();
-        }
+            final activeOrders = allOrders.where((o) {
+              final status = (o['status'] as String? ?? '').trim();
+              return ['Accepted', 'Shipped', 'In-transit', 'Out for Delivery', 'Processing'].contains(status);
+            }).toList();
 
-        return RefreshIndicator(
-          onRefresh: () async {
-            // Stream updates automatically
+            final completedOrders = allOrders.where((o) {
+              final status = (o['status'] as String? ?? '').trim();
+              return ['Delivered', 'Completed', 'Rejected', 'Cancelled'].contains(status);
+            }).toList();
+
+            return TabBarView(
+              children: [
+                _OrderList(orders: pendingOrders, emptyMessage: 'No pending / newly placed orders.'),
+                _OrderList(orders: activeOrders, emptyMessage: 'No active / processing orders.'),
+                _OrderList(orders: completedOrders, emptyMessage: 'No completed or past orders.'),
+              ],
+            );
           },
-          child: ListView.builder(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            itemCount: orders.length,
-            itemBuilder: (context, index) {
-              final order = orders[index];
-              return _OrderTileCard(order: order);
-            },
-          ),
-        );
-      },
+        ),
+      ),
     );
   }
+}
 
-  List<Map<String, dynamic>> _getFallbackOrders() {
-    return [
-      {
-        'id': '9I9HP7',
-        'status': 'Placed',
-        'totalAmount': 3500,
-        'buyerName': 'Mayank Jaiswal',
-        'buyerPhone': '8707469955',
-        'buyerEmail': 'mayank.jaiswal@gmail.com',
-        'sellerName': 'MadeByHands artisan',
-        'sellerPhone': '9876543210',
-        'sellerEmail': 'artisan@madebyhands.com',
-        'deliveryAddress': 'abcd, xyz, odisha, 751024',
-        'items': [
-          {'name': 'painting', 'quantity': 1, 'unitPrice': 3500}
-        ],
-        'platformFee': 225.0,
-        'payoutAmount': 3275.0,
-        'paymentStatus': 'skipped',
-        'payoutStatus': 'pending',
-        'createdAt': Timestamp.now(),
+class _OrderList extends StatelessWidget {
+  final List<Map<String, dynamic>> orders;
+  final String emptyMessage;
+
+  const _OrderList({
+    required this.orders,
+    required this.emptyMessage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (orders.isEmpty) {
+      return Center(
+        child: Text(
+          emptyMessage,
+          style: const TextStyle(color: AppColors.mutedText, fontSize: 14),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      itemCount: orders.length,
+      itemBuilder: (context, index) {
+        final order = orders[index];
+        return _OrderTileCard(order: order);
       },
-      {
-        'id': 'KJ5BPF',
-        'status': 'Accepted',
-        'totalAmount': 5000,
-        'buyerName': 'Suhani Mahajan',
-        'buyerPhone': '9812345678',
-        'buyerEmail': 'suhani@example.com',
-        'sellerName': 'MadeByHands artisan',
-        'sellerPhone': '9876543210',
-        'sellerEmail': 'artisan@madebyhands.com',
-        'deliveryAddress': '21 Craft Lane, Jaipur, Rajasthan 302001',
-        'items': [
-          {'name': 'Ceramic Pottery Set', 'quantity': 1, 'unitPrice': 5000}
-        ],
-        'platformFee': 300.0,
-        'payoutAmount': 4700.0,
-        'paymentStatus': 'paid',
-        'payoutStatus': 'pending',
-        'createdAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(hours: 5))),
-      },
-      {
-        'id': 'IJDRO4',
-        'status': 'Placed',
-        'totalAmount': 5000,
-        'buyerName': 'Adhiraj Jain',
-        'buyerPhone': '9765432109',
-        'buyerEmail': 'adhiraj@example.com',
-        'sellerName': 'MadeByHands artisan',
-        'sellerPhone': '9876543210',
-        'sellerEmail': 'artisan@madebyhands.com',
-        'deliveryAddress': '56 Art Street, New Delhi 110001',
-        'items': [
-          {'name': 'Handmade Silk Tapestry', 'quantity': 1, 'unitPrice': 5000}
-        ],
-        'platformFee': 300.0,
-        'payoutAmount': 4700.0,
-        'paymentStatus': 'paid',
-        'payoutStatus': 'pending',
-        'createdAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(hours: 12))),
-      },
-    ];
+    );
   }
 }
 
@@ -138,7 +163,7 @@ class _OrderTileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final id = (order['id'] as String? ?? 'UNKNOWN').toUpperCase();
     final displayId = id.length > 6 ? id.substring(id.length - 6) : id;
-    final status = order['status'] as String? ?? 'Placed';
+    final status = (order['status'] as String? ?? 'Placed').trim();
     final total = (order['totalAmount'] as num?)?.toDouble() ??
         (order['total'] as num?)?.toDouble() ??
         0.0;
@@ -158,6 +183,7 @@ class _OrderTileCard extends StatelessWidget {
     final payoutStatus = order['payoutStatus'] as String? ?? 'pending';
     final consignmentNumber = order['consignmentNumber'] as String? ?? '';
     final rejectionReason = order['rejectionReason'] as String? ?? '';
+    final createdAt = (order['createdAt'] as Timestamp?)?.toDate();
 
     // Calculate platform fee and creator payout safely
     final double platformFee = order['platformFee'] != null
@@ -211,18 +237,24 @@ class _OrderTileCard extends StatelessWidget {
             side: BorderSide(color: Colors.transparent, width: 0),
             borderRadius: BorderRadius.all(Radius.circular(16)),
           ),
-          title: Text(
-            'Order #$displayId',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: AppColors.text,
-            ),
+          title: Row(
+            children: [
+              Text(
+                'Order #$displayId',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: AppColors.text,
+                ),
+              ),
+              const Spacer(),
+              _StatusBadge(status: status),
+            ],
           ),
           subtitle: Padding(
-            padding: const EdgeInsets.only(top: 4.0),
+            padding: const EdgeInsets.only(top: 6.0),
             child: Text(
-              '$status · ₹${total.toStringAsFixed(0)} · $sellerName',
+              '₹${total.toStringAsFixed(0)} · $sellerName${createdAt != null ? " · ${DateFormat('dd MMM yyyy').format(createdAt)}" : ""}',
               style: const TextStyle(
                 fontSize: 13,
                 color: AppColors.mutedText,
@@ -248,7 +280,7 @@ class _OrderTileCard extends StatelessWidget {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
-                  '• $name $quantity × 1 — ₹${itemTotal.toStringAsFixed(0)}',
+                  '• $name x $quantity — ₹${itemTotal.toStringAsFixed(0)}',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -482,6 +514,54 @@ class _OrderTileCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  final String status;
+  const _StatusBadge({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    Color color;
+    switch (status) {
+      case 'Placed':
+      case 'Pending':
+        color = Colors.blue;
+        break;
+      case 'Accepted':
+      case 'Processing':
+        color = Colors.orange;
+        break;
+      case 'Shipped':
+      case 'In-transit':
+      case 'Out for Delivery':
+        color = Colors.purple;
+        break;
+      case 'Delivered':
+      case 'Completed':
+        color = Colors.green;
+        break;
+      case 'Rejected':
+      case 'Cancelled':
+        color = Colors.red;
+        break;
+      default:
+        color = Colors.grey;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        status,
+        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
       ),
     );
   }
