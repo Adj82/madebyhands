@@ -12,6 +12,7 @@ class Product {
   final IconData icon;
   final String creatorUid;
   final List<String> images;
+  final int stock;
 
   const Product({
     required this.id,
@@ -25,5 +26,6 @@ class Product {
     required this.icon,
     this.creatorUid = '',
     this.images = const [],
+    this.stock = 0,
   });
 }

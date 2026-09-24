@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:madebyhands/core/services/shipping_tracking_service.dart';
 import 'package:madebyhands/features/creator/data/models/creator_order_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_product_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_profile_model.dart';
@@ -423,9 +424,62 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
           .collection('orders')
           .where('creatorId', isEqualTo: creatorUid)
           .get();
-      return snapshot.docs
-          .map((doc) => CreatorOrderModel.fromJson(doc.data(), doc.id))
-          .toList();
+
+      final orders = <CreatorOrderModel>[];
+
+      for (final doc in snapshot.docs) {
+        final data = Map<String, dynamic>.from(doc.data());
+        var status = data['status'] as String? ?? 'Placed';
+        final consignmentNumber = data['consignmentNumber'] as String?;
+        final shippedAt = (data['updatedAt'] as Timestamp?)?.toDate() ??
+            (data['createdAt'] as Timestamp?)?.toDate() ??
+            DateTime.now();
+
+        if (consignmentNumber != null &&
+            consignmentNumber.trim().isNotEmpty &&
+            ['Shipped', 'In Transit', 'Out for Delivery'].contains(status)) {
+          final trackingResult = await ShippingTrackingService.fetchTrackingStatus(
+            consignmentNumber: consignmentNumber,
+            shippedAt: shippedAt,
+            currentStatus: status,
+          );
+
+          if (trackingResult.status != status) {
+            status = trackingResult.status == 'Delivered'
+                ? 'Completed'
+                : trackingResult.status;
+            data['status'] = status;
+            data['carrierName'] = trackingResult.carrierName;
+            data['lastLocation'] = trackingResult.lastLocation;
+
+            final updateMap = <String, dynamic>{
+              'status': status,
+              'carrierName': trackingResult.carrierName,
+              'lastLocation': trackingResult.lastLocation,
+              'trackingUpdatedAt': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            };
+            if (status == 'Completed' || status == 'Delivered') {
+              updateMap['deliveredAt'] = FieldValue.serverTimestamp();
+            }
+
+            await firestore.collection('orders').doc(doc.id).update(updateMap);
+          }
+        } else if (status == 'Delivered') {
+          status = 'Completed';
+          data['status'] = status;
+          await firestore.collection('orders').doc(doc.id).update({
+            'status': 'Completed',
+            'deliveredAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+
+        orders.add(CreatorOrderModel.fromJson(data, doc.id));
+      }
+
+      orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return orders;
     } catch (e) {
       throw Exception(e.toString());
     }
@@ -439,22 +493,148 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
     String? consignmentNumber,
   }) async {
     try {
-      final updateData = <String, dynamic>{
-        'status': status,
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-      if (rejectionReason != null) {
-        updateData['rejectionReason'] = rejectionReason;
+      final orderRef = firestore.collection('orders').doc(orderId);
+      final orderSnap = await orderRef.get();
+      if (!orderSnap.exists) {
+        throw Exception('Order not found.');
       }
-      if (consignmentNumber != null) {
-        updateData['consignmentNumber'] = consignmentNumber;
+
+      final currentData = orderSnap.data() ?? <String, dynamic>{};
+      final currentStatus = currentData['status'] as String? ?? '';
+
+      // Requirement 2: Once marked Shipped, Creator must not manually change status
+      if (['Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Completed']
+              .contains(currentStatus) &&
+          status != currentStatus) {
+        throw Exception(
+          'Orders that are marked Shipped cannot be manually changed. Status updates are automatically tracked via external courier.',
+        );
       }
-      if (status == 'Rejected' || status == 'Cancelled') {
-        updateData['payoutStatus'] = 'cancelled';
+
+      // Requirement 1: Can mark as Shipped only after entering a valid consignment number
+      if (status == 'Shipped') {
+        final trimmedConsignment = consignmentNumber?.trim() ?? '';
+        if (trimmedConsignment.isEmpty || trimmedConsignment.length < 3) {
+          throw Exception(
+            'Please enter a valid consignment/reference number (at least 3 characters) to ship the order.',
+          );
+        }
       }
-      await firestore.collection('orders').doc(orderId).update(updateData);
+
+      if (status == 'Accepted') {
+        await firestore.runTransaction((transaction) async {
+          final txOrderSnap = await transaction.get(orderRef);
+          if (!txOrderSnap.exists) {
+            throw Exception('Order not found.');
+          }
+
+          final orderData = txOrderSnap.data() ?? <String, dynamic>{};
+          final txStatus = orderData['status'] as String? ?? '';
+
+          if (txStatus != 'Accepted') {
+            final rawItems = orderData['items'] as List<dynamic>? ?? const [];
+            final itemsToUpdate = <_ItemStockUpdate>[];
+
+            for (final rawItem in rawItems) {
+              if (rawItem is! Map) continue;
+              final itemMap = Map<String, dynamic>.from(rawItem);
+              final productId = itemMap['productId'] as String? ?? '';
+              final quantity = (itemMap['quantity'] as num?)?.round() ?? 1;
+              final itemName = itemMap['name'] as String? ?? 'Product';
+
+              if (productId.isNotEmpty) {
+                final productRef =
+                    firestore.collection('products').doc(productId);
+                final productSnap = await transaction.get(productRef);
+                itemsToUpdate.add(
+                  _ItemStockUpdate(
+                    ref: productRef,
+                    snap: productSnap,
+                    quantity: quantity,
+                    name: itemName,
+                  ),
+                );
+              }
+            }
+
+            for (final item in itemsToUpdate) {
+              if (!item.snap.exists) {
+                throw Exception(
+                  'Product "${item.name}" no longer exists in inventory.',
+                );
+              }
+
+              final productData = item.snap.data() ?? <String, dynamic>{};
+              final currentStock =
+                  (productData['stock'] as num?)?.toInt() ?? 0;
+
+              if (currentStock < item.quantity) {
+                throw Exception(
+                  'Cannot accept order: Insufficient stock for "${item.name}". Available: $currentStock, Ordered: ${item.quantity}.',
+                );
+              }
+
+              final newStock = currentStock - item.quantity;
+              if (newStock < 0) {
+                throw Exception(
+                  'Cannot accept order: Stock for "${item.name}" cannot become negative.',
+                );
+              }
+
+              item.newStock = newStock;
+            }
+
+            for (final item in itemsToUpdate) {
+              transaction.update(item.ref, {'stock': item.newStock});
+            }
+          }
+
+          final updateData = <String, dynamic>{
+            'status': status,
+            'updatedAt': FieldValue.serverTimestamp(),
+          };
+          if (rejectionReason != null) {
+            updateData['rejectionReason'] = rejectionReason;
+          }
+          if (consignmentNumber != null) {
+            updateData['consignmentNumber'] = consignmentNumber.trim();
+          }
+          transaction.update(orderRef, updateData);
+        });
+      } else {
+        final updateData = <String, dynamic>{
+          'status': status,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+        if (rejectionReason != null) {
+          updateData['rejectionReason'] = rejectionReason;
+        }
+        if (consignmentNumber != null) {
+          updateData['consignmentNumber'] = consignmentNumber.trim();
+        }
+        if (status == 'Rejected' || status == 'Cancelled') {
+          updateData['payoutStatus'] = 'cancelled';
+        }
+        await firestore.collection('orders').doc(orderId).update(updateData);
+      }
     } catch (e) {
       throw Exception(e.toString());
     }
   }
+}
+
+class _ItemStockUpdate {
+  final DocumentReference<Map<String, dynamic>> ref;
+  final DocumentSnapshot<Map<String, dynamic>> snap;
+  final int quantity;
+  final String name;
+  int newStock;
+
+  _ItemStockUpdate({
+    required this.ref,
+    required this.snap,
+    required this.quantity,
+    required this.name,
+    this.newStock = 0,
+  });
 }

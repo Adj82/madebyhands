@@ -132,6 +132,7 @@ class FirestoreBuyerRepository implements BuyerRepository {
       ),
       creatorUid: data['creatorUid'] as String? ?? '',
       images: List<String>.from(data['images'] as List? ?? const []),
+      stock: (data['stock'] as num?)?.round() ?? 0,
     );
   }
 

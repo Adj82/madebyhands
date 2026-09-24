@@ -19,6 +19,23 @@ class CreatorProductsView extends StatefulWidget {
 class _CreatorProductsViewState extends State<CreatorProductsView> {
   ProductSortCriteria _currentCriteria = ProductSortCriteria.date;
   bool _isAscending = false;
+  bool _isRefreshing = false;
+
+  Future<void> _handleRefresh() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+
+    try {
+      context
+          .read<CreatorBloc>()
+          .add(CreatorFetchCreatorProducts(widget.profile.uid));
+      await Future.delayed(const Duration(milliseconds: 600));
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -226,20 +243,28 @@ class _CreatorProductsViewState extends State<CreatorProductsView> {
                 }
 
                 if (state is CreatorFailure) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('Error: ${state.message}'),
-                        const SizedBox(height: 10),
-                        ElevatedButton(
-                          onPressed: () => context
-                              .read<CreatorBloc>()
-                              .add(CreatorFetchCreatorProducts(
-                                  widget.profile.uid)),
-                          child: const Text('Retry'),
+                  return RefreshIndicator(
+                    onRefresh: _handleRefresh,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Container(
+                        height: MediaQuery.of(context).size.height * 0.5,
+                        alignment: Alignment.center,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('Error: ${state.message}'),
+                            const SizedBox(height: 10),
+                            ElevatedButton(
+                              onPressed: () => context
+                                  .read<CreatorBloc>()
+                                  .add(CreatorFetchCreatorProducts(
+                                      widget.profile.uid)),
+                              child: const Text('Retry'),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   );
                 }
@@ -254,100 +279,174 @@ class _CreatorProductsViewState extends State<CreatorProductsView> {
   }
 }
 
-class _ProductList extends StatelessWidget {
+class _ProductList extends StatefulWidget {
   final CreatorProfile profile;
   final List<CreatorProduct> products;
   final String emptyMessage;
 
-  const _ProductList(
-      {required this.profile, required this.products, required this.emptyMessage});
+  const _ProductList({
+    required this.profile,
+    required this.products,
+    required this.emptyMessage,
+  });
+
+  @override
+  State<_ProductList> createState() => _ProductListState();
+}
+
+class _ProductListState extends State<_ProductList> {
+  bool _isRefreshing = false;
+
+  Future<void> _handleRefresh() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+
+    try {
+      context
+          .read<CreatorBloc>()
+          .add(CreatorFetchCreatorProducts(widget.profile.uid));
+      await Future.delayed(const Duration(milliseconds: 600));
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (products.isEmpty) {
-      return Center(
-        child: Text(emptyMessage,
-            style: const TextStyle(color: AppColors.mutedText)),
+    if (widget.products.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _handleRefresh,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Container(
+            height: MediaQuery.of(context).size.height * 0.5,
+            alignment: Alignment.center,
+            child: Text(
+              widget.emptyMessage,
+              style: const TextStyle(color: AppColors.mutedText),
+            ),
+          ),
+        ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(15, 10, 15, 80),
-      itemCount: products.length,
-      itemBuilder: (context, index) {
-        final product = products[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-            side: BorderSide(color: AppColors.outline.withValues(alpha: 0.5)),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(12),
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: product.images.isNotEmpty
-                  ? Image.network(product.images.first,
-                      width: 60, height: 60, fit: BoxFit.cover, errorBuilder: (c, e, s) =>
-                          Container(
-                              width: 60,
-                              height: 60,
-                              color: AppColors.outline,
-                              child: const Icon(Icons.image_not_supported)))
-                  : Container(
-                      width: 60,
-                      height: 60,
-                      color: AppColors.outline,
-                      child: const Icon(Icons.image)),
+    return RefreshIndicator(
+      onRefresh: _handleRefresh,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(15, 10, 15, 80),
+        itemCount: widget.products.length,
+        itemBuilder: (context, index) {
+          final product = widget.products[index];
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+              side: BorderSide(
+                color: AppColors.outline.withValues(alpha: 0.5),
+              ),
             ),
-            title: Text(product.name,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 4),
-                Text('₹${product.price} • Stock: ${product.stock}',
-                    style: const TextStyle(fontSize: 13, color: AppColors.primary, fontWeight: FontWeight.w600)),
-                Text('Category: ${product.category}',
-                    style: const TextStyle(fontSize: 11, color: AppColors.mutedText)),
-              ],
-            ),
-            trailing: product.status == 'Approved'
-                ? IconButton(
-                    icon: const Icon(Icons.edit_note, color: AppColors.primary),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => AddProductPage(
-                            profile: profile,
-                            initialProduct: product,
-                          ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.all(12),
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: product.images.isNotEmpty
+                    ? Image.network(
+                        product.images.first,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        errorBuilder: (c, e, s) => Container(
+                          width: 60,
+                          height: 60,
+                          color: AppColors.outline,
+                          child: const Icon(Icons.image_not_supported),
                         ),
-                      );
-                    },
-                  )
-                : Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: product.status == 'Rejected' ? Colors.red.shade50 : Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      product.status == 'Pending Approval' ? 'Pending' : 'Rejected',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: product.status == 'Rejected' ? Colors.red : Colors.orange.shade800,
+                      )
+                    : Container(
+                        width: 60,
+                        height: 60,
+                        color: AppColors.outline,
+                        child: const Icon(Icons.image),
                       ),
+              ),
+              title: Text(
+                product.name,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 4),
+                  Text(
+                    '₹${product.price} • Stock: ${product.stock}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-            onTap: () {
-              // Open product details (Admin review page can be reused or dedicated view)
-            },
-          ),
-        );
-      },
+                  Text(
+                    'Category: ${product.category}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.mutedText,
+                    ),
+                  ),
+                ],
+              ),
+              trailing: product.status == 'Approved'
+                  ? IconButton(
+                      icon: const Icon(
+                        Icons.edit_note,
+                        color: AppColors.primary,
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AddProductPage(
+                              profile: widget.profile,
+                              initialProduct: product,
+                            ),
+                          ),
+                        );
+                      },
+                    )
+                  : Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: product.status == 'Rejected'
+                            ? Colors.red.shade50
+                            : Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        product.status == 'Pending Approval'
+                            ? 'Pending'
+                            : 'Rejected',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: product.status == 'Rejected'
+                              ? Colors.red
+                              : Colors.orange.shade800,
+                        ),
+                      ),
+                    ),
+              onTap: () {},
+            ),
+          );
+        },
+      ),
     );
   }
 }

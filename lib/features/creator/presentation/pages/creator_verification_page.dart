@@ -22,6 +22,21 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
 
   File? _latestPhotoFile;
   File? _idCardFile;
+  bool _isRefreshing = false;
+
+  Future<void> _handleRefresh() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+
+    try {
+      context.read<CreatorBloc>().add(CreatorCheckProfileExists(widget.profile.uid));
+      await Future.delayed(const Duration(milliseconds: 600));
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -123,74 +138,78 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Creator Verification Request',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primary),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Provide your authentic business information to enable storefront access and product listings.',
-                    style: TextStyle(fontSize: 14, color: AppColors.mutedText),
-                  ),
-                  const SizedBox(height: 24),
-                  TextFormField(
-                    controller: _creatorNameController,
-                    decoration: const InputDecoration(
-                      labelText: "Creator's Full Name *",
-                      prefixIcon: Icon(Icons.person),
+          return RefreshIndicator(
+            onRefresh: _handleRefresh,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(24.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Creator Verification Request',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primary),
                     ),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 20),
-                  TextFormField(
-                    controller: _businessNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Business/Storefront Name *',
-                      prefixIcon: Icon(Icons.storefront),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Provide your authentic business information to enable storefront access and product listings.',
+                      style: TextStyle(fontSize: 14, color: AppColors.mutedText),
                     ),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 20),
-                  TextFormField(
-                    controller: _addressController,
-                    decoration: const InputDecoration(
-                      labelText: 'Current Registered Address *',
-                      prefixIcon: Icon(Icons.home_outlined),
+                    const SizedBox(height: 24),
+                    TextFormField(
+                      controller: _creatorNameController,
+                      decoration: const InputDecoration(
+                        labelText: "Creator's Full Name *",
+                        prefixIcon: Icon(Icons.person),
+                      ),
+                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                     ),
-                    maxLines: 3,
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 30),
-                  const Text('Documents (Optional)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 15),
-                  _buildFilePickerTile(
-                    title: 'Latest Photo',
-                    subtitle: 'Clear, well-lit portrait photo',
-                    file: _latestPhotoFile,
-                    existingUrl: widget.profile.latestPhoto,
-                    onTap: _pickLatestPhoto,
-                  ),
-                  const SizedBox(height: 15),
-                  _buildFilePickerTile(
-                    title: 'PAN Card / Identity Card',
-                    subtitle: 'Official government-issued ID card',
-                    file: _idCardFile,
-                    existingUrl: widget.profile.idCard,
-                    onTap: _pickIdCard,
-                  ),
-                  const SizedBox(height: 40),
-                  FilledButton(
-                    onPressed: _submit,
-                    child: Text(widget.profile.verificationStatus == 'Verified' ? 'Re-Submit & Await Review' : 'Submit for Verification'),
-                  ),
-                ],
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      controller: _businessNameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Business/Storefront Name *',
+                        prefixIcon: Icon(Icons.storefront),
+                      ),
+                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      controller: _addressController,
+                      decoration: const InputDecoration(
+                        labelText: 'Current Registered Address *',
+                        prefixIcon: Icon(Icons.home_outlined),
+                      ),
+                      maxLines: 3,
+                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 30),
+                    const Text('Documents (Optional)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 15),
+                    _buildFilePickerTile(
+                      title: 'Latest Photo',
+                      subtitle: 'Clear, well-lit portrait photo',
+                      file: _latestPhotoFile,
+                      existingUrl: widget.profile.latestPhoto,
+                      onTap: _pickLatestPhoto,
+                    ),
+                    const SizedBox(height: 15),
+                    _buildFilePickerTile(
+                      title: 'PAN Card / Identity Card',
+                      subtitle: 'Official government-issued ID card',
+                      file: _idCardFile,
+                      existingUrl: widget.profile.idCard,
+                      onTap: _pickIdCard,
+                    ),
+                    const SizedBox(height: 40),
+                    FilledButton(
+                      onPressed: _submit,
+                      child: Text(widget.profile.verificationStatus == 'Verified' ? 'Re-Submit & Await Review' : 'Submit for Verification'),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
