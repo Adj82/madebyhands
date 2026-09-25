@@ -1,0 +1,586 @@
+MADEBYHANDS
+Shared Firestore Schema
+Version 1 Team Approval Document
+Document detail
+Value
+Status
+Proposed for team approval
+Schema version
+1
+Prepared for
+Buyer, creator and admin developers
+Prepared on
+25 September 2026
+Scope
+Shared Firestore collections, fields, enums and ownership
+Requested decision
+Approve one canonical data contract before any panel is changed. After approval, all three developers should use the same collection names, field names, value types and enum values.
+This document is a proposal only. It does not deploy Firestore rules, migrate data, change Firebase access, or modify application code.
+Purpose and current problem
+Buyer, creator and admin screens currently read and write overlapping Firestore data with different names and shapes. Firestore accepts those variations, but the application then fails when one panel reads a document created by another panel.
+Area
+Conflicting examples
+Canonical decision
+Creator identity
+creatorUid, sellerId, artisan
+creatorId and creatorName
+Order amount
+total, totalAmount, subtotal
+buyerPayableAmount with subtotal retained
+Payout
+payoutAmount
+creatorNetAmount
+Address
+deliveryAddress string or mixed map
+shippingAddress map
+Status
+Placed, In Transit, In-transit
+lowercase snake_case enums
+Product approval
+status
+approvalStatus
+Expected outcome
+An order placed by a buyer is immediately readable by the assigned creator and the admin panel.
+Admin order management and finance screens use the same order totals and status values as the creator and buyer panels.
+Historical records remain readable during migration through temporary legacy aliases.
+New writes stop introducing additional field-name variations.
+Team conventions
+Use lowerCamelCase fields and plural snake_case collection names.
+Store enum values in lowercase snake_case. UI labels are presentation only.
+Store MVP money as whole INR integers, not formatted strings.
+Store dates as Firestore Timestamp values, never formatted strings.
+Store addresses as maps, never as a single string.
+Use null or omit an optional value instead of storing N/A.
+New writes use only this schema. Legacy aliases are read only during migration.
+All panels use one shared typed model and repository mapper. Screens do not cast raw Firestore maps independently.
+Shared documents include schemaVersion with value 1.
+Canonical enums
+Domain
+Allowed values
+User role
+buyer, creator, manager, super_admin
+Creator verification
+unverified, pending, verified, rejected
+Product approval
+pending, approved, rejected
+Order status
+placed, confirmed, processing, shipped, in_transit, out_for_delivery, delivered, rejected, cancelled
+Payment status
+skipped, pending, paid, failed, refunded
+Payout status
+pending, eligible, paid, cancelled
+Support status
+open, resolved
+Delivered, rejected and cancelled are terminal order states. Payout completion is represented by payoutStatus, not by another order status. The legacy role admin must be mapped to manager or super_admin.
+Collection map
+Collection path
+Primary purpose
+Main consumers
+users/{userId}
+Shared account identity and role
+All panels
+creator_profiles/{creatorId}
+Public creator profile and verification
+Creator and admin
+products/{productId}
+Catalogue and approval data
+All panels
+orders/{orderId}
+Cross-panel order, finance and tracking
+All panels
+users/{userId}/favorites/{productId}
+Buyer favourites
+Buyer
+users/{userId}/addresses/{addressId}
+Buyer saved addresses
+Buyer
+support_tickets/{ticketId}
+Buyer or creator support request
+Buyer, creator and admin
+support_tickets/{ticketId}/messages/{messageId}
+Ticket conversation
+Ticket participants
+categories/{categoryId}
+Shared catalogue categories
+All panels
+settings/platform_economics
+Fee and commission configuration
+Admin and order service
+Users and creator profiles
+users userId
+Field
+Type
+Required
+Meaning
+schemaVersion
+integer
+Yes
+Always 1
+uid
+string
+Yes
+Same as document ID
+name
+string
+Yes
+Display name
+email
+string
+Yes
+Lowercase where possible
+phone
+string
+Yes
+Ten digits for buyer and creator
+role
+enum string
+Yes
+Canonical user role
+isVerified
+boolean
+Yes
+Creator verification shortcut
+isSuspended
+boolean
+Yes
+Canonical account restriction
+createdAt
+timestamp
+Yes
+Server timestamp
+updatedAt
+timestamp
+Yes
+Server timestamp
+Do not use isActive for user suspension. isActive is reserved for product catalogue visibility.
+creator profiles creatorId
+Required fields are schemaVersion, uid, name, businessName, bio, category, location, socialLinks, portfolio, story, verificationStatus, createdAt and updatedAt. Optional fields are profileImage, address, latestPhoto and idCard. Private verification files must not be exposed by public-profile queries.
+Buyer subcollections
+Path
+Required fields
+Rule
+users/{userId}/favorites/{productId}
+schemaVersion, productId, createdAt
+Use product ID as document ID for idempotent writes
+users/{userId}/addresses/{addressId}
+schemaVersion, label, recipientName, phone, addressLine, city, state, postalCode, isDefault, createdAt, updatedAt
+Only one address per user may be default
+Products
+Canonical path  products productId
+Field
+Type
+Required
+Notes
+schemaVersion
+integer
+Yes
+Always 1
+name
+string
+Yes
+Product name
+description
+string
+Yes
+Product description
+images
+URL array
+Yes
+First image is the cover
+category
+string
+Yes
+Matches a category
+price
+integer
+Yes
+Base INR price
+stock
+integer
+Yes
+Must be zero or greater
+materials
+string
+No
+Product materials
+dimensions
+string
+No
+Human-readable
+weight
+string
+No
+Human-readable
+shippingInfo
+string
+No
+Estimate or details
+creatorId
+string
+Yes
+Canonical creator UID
+creatorName
+string
+Yes
+Display snapshot
+approvalStatus
+enum string
+Yes
+Product approval
+isActive
+boolean
+Yes
+Catalogue visibility
+isCustomizable
+boolean
+Yes
+Defaults to false
+customizations
+map array
+Yes
+Empty when unsupported
+ratingAverage
+number
+Yes
+Defaults to 0
+ratingCount
+integer
+Yes
+Defaults to 0
+wishlistCount
+integer
+Yes
+Defaults to 0
+orderCount
+integer
+Yes
+Defaults to 0
+approvedBy
+string
+No
+Admin UID
+approvedAt
+timestamp
+No
+Approval time
+createdAt
+timestamp
+Yes
+Server timestamp
+updatedAt
+timestamp
+Yes
+Server timestamp
+Each customizations map contains name, description, additionalPrice, images, isMultipleSelection and options. New writes must not use creatorUid, sellerId, sellerName, artisan or product status.
+Orders
+Canonical path  orders orderId. One checkout may contain multiple creators. Create one order per creator and use the same checkoutId for every order created by that checkout. This is the shared record that the buyer, assigned creator and admin panels read.
+Identity snapshots
+Field
+Type
+Required
+schemaVersion
+integer
+Yes
+checkoutId
+string
+Yes
+buyerId
+string
+Yes
+buyerName
+string
+Yes
+buyerEmail
+string
+Yes
+buyerPhone
+string
+Yes
+creatorId
+string
+Yes
+creatorName
+string
+Yes
+creatorEmail
+string
+No
+creatorPhone
+string
+No
+Items
+items is an array of immutable purchase snapshots with these fields
+Field
+Type
+Rule
+productId
+string
+Source product ID
+name
+string
+Product name at purchase
+imageUrl
+string or null
+Snapshot cover URL
+creatorId
+string
+Must match order creatorId
+creatorName
+string
+Display snapshot
+quantity
+integer
+Greater than zero
+baseUnitPrice
+integer
+Base INR price
+customizationUnitAmount
+integer
+Added per item
+unitPrice
+integer
+baseUnitPrice plus customizationUnitAmount
+lineTotal
+integer
+unitPrice multiplied by quantity
+customizations
+map array
+Selected customization snapshots
+Order address and finance
+Shipping address
+shippingAddress is always a map with these fields
+label: string or null
+recipientName: string
+phone: string
+addressLine: string
+city: string
+state: string
+postalCode: string
+Amounts
+Field
+Type
+Meaning
+subtotal
+integer
+Sum of item line totals
+shippingAmount
+integer
+Zero until applicable
+buyerPayableAmount
+integer
+Amount shown or charged to buyer
+flatFee
+integer
+Snapshotted flat fee
+commissionRate
+number
+Percentage such as 5
+commissionAmount
+integer
+Calculated commission
+platformFee
+integer
+Flat fee plus commission
+creatorNetAmount
+integer
+Pending creator payout
+Proposed MVP calculation
+subtotal = sum(items.lineTotal)
+buyerPayableAmount = subtotal + shippingAmount
+commissionAmount = subtotal > 999 ? round(subtotal * commissionRate / 100) : 0
+platformFee = min(subtotal, flatFee + commissionAmount)
+creatorNetAmount = subtotal - platformFee
+Approval required  Confirm whether the ₹50 flat fee is deducted from creator proceeds, as proposed above, or added to the buyer payable amount. Every panel must follow the same approved interpretation.
+Order lifecycle and ownership
+Field
+Type
+Required
+status
+order status enum
+Yes
+paymentStatus
+payment status enum
+Yes
+payoutStatus
+payout status enum
+Yes
+rejectionReason
+string
+No
+carrierName
+string
+No
+consignmentNumber
+string
+No
+trackingUrl
+URL string
+No
+lastLocation
+string
+No
+trackingUpdatedAt
+timestamp
+No
+createdAt
+timestamp
+Yes
+updatedAt
+timestamp
+Yes
+paidAt
+timestamp
+No
+deliveredAt
+timestamp
+No
+isSample
+boolean
+Yes
+Field ownership
+Actor
+Allowed responsibility
+Buyer
+Create identity snapshots, items, address, immutable totals, placed status and permitted payment status
+Creator
+Allowed fulfilment transitions plus rejection and tracking fields for assigned orders
+Manager
+Fulfilment and support operations allowed by role
+Super admin
+Corrections and payout fields
+Trusted payment backend
+Payment identifiers, status and timestamps
+No panel may recalculate historical totals after creation. Product prices, selected customization prices and platform fees are immutable order snapshots.
+Example canonical order
+schemaVersion: 1
+checkoutId: "CHK-abc123"
+buyerId: "buyerUid"
+buyerName: "Suhani"
+buyerEmail: "buyer@example.com"
+buyerPhone: "9876543210"
+creatorId: "creatorUid"
+creatorName: "Asha Weaves"
+items: [{
+  productId: "productId", name: "Handwoven Basket", imageUrl: null,
+  creatorId: "creatorUid", creatorName: "Asha Weaves", quantity: 1,
+  baseUnitPrice: 1200, customizationUnitAmount: 0,
+  unitPrice: 1200, lineTotal: 1200, customizations: []
+}]
+shippingAddress: {
+  label: "Home", recipientName: "Suhani", phone: "9876543210",
+  addressLine: "21 Craft Lane", city: "Jaipur",
+  state: "Rajasthan", postalCode: "302001"
+}
+subtotal: 1200
+shippingAmount: 0
+buyerPayableAmount: 1200
+flatFee: 50
+commissionRate: 5
+commissionAmount: 60
+platformFee: 110
+creatorNetAmount: 1090
+status: "placed"
+paymentStatus: "skipped"
+payoutStatus: "pending"
+isSample: false
+createdAt: server timestamp
+updatedAt: server timestamp
+Support categories and settings
+Support tickets
+Path
+Required fields
+support_tickets/{ticketId}
+schemaVersion, userId, userRole, userName, subject, status, lastMessage, createdAt, updatedAt
+support_tickets/{ticketId}/messages/{messageId}
+schemaVersion, senderId, senderRole, message, createdAt
+Categories
+Use a lowercase category slug as categories/{categoryId}, for example home_decor. Each document contains schemaVersion, name, slug, isActive, sortOrder, createdAt and updatedAt.
+Platform settings
+settings/platform_economics contains
+schemaVersion: 1
+flatFee: integer
+commissionRate: number
+updatedAt: timestamp
+updatedBy: string
+Use commissionRate, not percentFee, in new writes.
+Reserved SRS collections
+These names are reserved, but their detailed contracts require separate approval.
+products/{productId}/reviews/{reviewId}
+users/{userId}/notifications/{notificationId}
+conversations/{conversationId}/messages/{messageId}
+Legacy compatibility
+During migration, readers may temporarily accept the aliases below. Writers must never create them. Canonical values take priority whenever both versions exist.
+Legacy value
+Canonical value
+product creatorUid
+creatorId
+sellerId
+creatorId
+sellerName or artisan
+creatorName
+product status
+approvalStatus
+order totalAmount or total
+buyerPayableAmount then subtotal fallback
+payoutAmount
+creatorNetAmount
+deliveryAddress string
+shippingAddress map
+Placed or Pending
+placed
+Accepted or Confirmed
+confirmed
+Processing
+processing
+Shipped
+shipped
+In Transit or In-transit
+in_transit
+Out for Delivery
+out_for_delivery
+Delivered or Completed
+delivered
+Rejected
+rejected
+Cancelled
+cancelled
+settings percentFee
+commissionRate
+Migration guardrails
+Do not delete or bulk-rewrite production data before a reviewed migration plan exists.
+Do not remove legacy fallbacks until all production documents are verified.
+Deploy Firestore rules and indexes only after explicit Firebase access approval.
+Adoption plan
+All three developers and the product owner approve this contract.
+Freeze new Firestore field names until approval is complete.
+Create one shared model, mapper and enum helper set under the shared order feature.
+Add temporary legacy read fallbacks from the compatibility table.
+Update buyer, creator and admin writers to write canonical fields only.
+Update all screens to consume typed shared models instead of raw maps.
+Backfill existing documents with a separately reviewed migration script.
+Separately approve and deploy updated Firestore rules and indexes.
+Verify production documents and then remove legacy fallbacks.
+Decisions required before implementation
+Decision
+Proposed value
+Owner
+Admin roles
+manager and super_admin
+Team lead
+Order statuses
+Canonical lowercase snake_case list
+All developers
+₹50 flat fee
+Deduct from creator proceeds
+Product owner
+Product identity
+creatorId and creatorName
+All developers
+Product approval field
+approvalStatus
+Creator and admin developers
+One order per creator
+Shared checkoutId across split orders
+All developers
+Implementation boundary
+After approval, code changes should be made in a separate implementation step. Financial calculations and payment state should eventually move to a trusted backend instead of running exclusively in client applications.
