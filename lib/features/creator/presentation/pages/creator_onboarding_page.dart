@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -106,6 +107,35 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
     }
   }
 
+  ImageProvider? _getProfileImageProvider() {
+    if (_profileImage == null) return null;
+    if (kIsWeb) {
+      return NetworkImage(_profileImage!.path);
+    } else {
+      return FileImage(_profileImage!);
+    }
+  }
+
+  Widget _buildFileImageWidget(File file, {required double width, required double height}) {
+    if (kIsWeb) {
+      return Image.network(
+        file.path,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, color: Colors.grey),
+      );
+    } else {
+      return Image.file(
+        file,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, color: Colors.grey),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -172,7 +202,7 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
               CircleAvatar(
                 radius: 60,
                 backgroundColor: AppColors.outline,
-                backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
+                backgroundImage: _getProfileImageProvider(),
                 child: _profileImage == null ? const Icon(Icons.person, size: 60, color: Colors.white) : null,
               ),
               Positioned(
@@ -323,7 +353,7 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
           padding: const EdgeInsets.only(left: 12.0),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(15),
-            child: Image.file(file, width: 120, height: 120, fit: BoxFit.cover),
+            child: _buildFileImageWidget(file, width: 120, height: 120),
           ),
         ),
         Positioned(

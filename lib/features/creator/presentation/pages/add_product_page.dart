@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -325,7 +326,12 @@ class _AddProductPageState extends State<AddProductPage> {
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 12.0),
-          child: ClipRRect(borderRadius: BorderRadius.circular(15), child: Image.file(file, width: 120, height: 120, fit: BoxFit.cover)),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(15),
+            child: kIsWeb
+                ? Image.network(file.path, width: 120, height: 120, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.broken_image, color: Colors.grey))
+                : Image.file(file, width: 120, height: 120, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.broken_image, color: Colors.grey)),
+          ),
         ),
         Positioned(
           top: 5, right: 5,
@@ -698,7 +704,12 @@ class _CustomizationBlockState extends State<_CustomizationBlock> {
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 8.0),
-          child: ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.file(file, width: 80, height: 80, fit: BoxFit.cover)),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: kIsWeb
+                ? Image.network(file.path, width: 80, height: 80, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.broken_image, color: Colors.grey))
+                : Image.file(file, width: 80, height: 80, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.broken_image, color: Colors.grey)),
+          ),
         ),
         Positioned(
           top: 2, right: 2,
