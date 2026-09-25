@@ -7,10 +7,15 @@ class ApiConfigPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('API Configuration')),
+      appBar: AppBar(title: const Text('API & Gateway Configuration')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          const _ConfigHeader(title: 'Razorpay Payment Gateway'),
+          const _ConfigDetail(label: 'Key ID', value: 'rzp_test_TeNxd2gWeMmJRp'),
+          const _ConfigDetail(label: 'Key Secret', value: 'sidiuYNmi9trVNkkQOzvrDq9'),
+          const _ConfigDetail(label: 'Environment', value: 'Test / Live Sandbox'),
+          const SizedBox(height: 30),
           const _ConfigHeader(title: 'Firebase Project Settings'),
           const _ConfigDetail(label: 'Project ID', value: 'madebyhands-77f87'),
           const _ConfigDetail(label: 'Project Number', value: '745060405583'),
@@ -27,7 +32,7 @@ class ApiConfigPage extends StatelessWidget {
               children: [
                 Icon(Icons.warning_amber_rounded, color: Colors.orange),
                 SizedBox(width: 15),
-                Expanded(child: Text('Changes to these values require a new build and deployment.', style: TextStyle(fontSize: 12, color: Colors.brown))),
+                Expanded(child: Text('Changes to production API keys require redeploying environment variables.', style: TextStyle(fontSize: 12, color: Colors.brown))),
               ],
             ),
           )

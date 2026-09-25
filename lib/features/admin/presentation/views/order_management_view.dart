@@ -176,14 +176,29 @@ class _OrderTileCard extends StatelessWidget {
     final buyerEmail = order['buyerEmail'] as String? ?? '';
     final sellerPhone = order['sellerPhone'] as String? ?? 'N/A';
     final sellerEmail = order['sellerEmail'] as String? ?? '';
-    final address = order['deliveryAddress'] as String? ??
-        order['shippingAddress'] as String? ??
-        'Address unavailable';
     final paymentStatus = order['paymentStatus'] as String? ?? 'skipped';
     final payoutStatus = order['payoutStatus'] as String? ?? 'pending';
     final consignmentNumber = order['consignmentNumber'] as String? ?? '';
     final rejectionReason = order['rejectionReason'] as String? ?? '';
     final createdAt = (order['createdAt'] as Timestamp?)?.toDate();
+
+    // Safely extract address (whether stored as Map or String)
+    String address = 'Address unavailable';
+    final rawAddress = order['shippingAddress'] ?? order['deliveryAddress'];
+    if (rawAddress is Map) {
+      final map = Map<String, dynamic>.from(rawAddress);
+      final parts = [
+        map['addressLine'],
+        map['city'],
+        map['state'],
+        map['postalCode'],
+      ].whereType<String>().where((s) => s.trim().isNotEmpty).toList();
+      address = parts.isNotEmpty
+          ? parts.join(', ')
+          : (map['recipientName'] as String? ?? 'Address provided');
+    } else if (rawAddress is String && rawAddress.trim().isNotEmpty) {
+      address = rawAddress;
+    }
 
     // Calculate platform fee and creator payout safely
     final double platformFee = order['platformFee'] != null
@@ -193,18 +208,15 @@ class _OrderTileCard extends StatelessWidget {
         ? (order['payoutAmount'] as num).toDouble()
         : (total - platformFee);
 
-    // Items list
+    // Safely parse items list
     final rawItems = order['items'] as List<dynamic>? ?? [];
-    final items = rawItems.map((i) {
-      if (i is Map) {
-        final map = Map<String, dynamic>.from(i);
-        return {
-          'name': map['name'] as String? ?? 'Item',
-          'quantity': (map['quantity'] as num?)?.toInt() ?? 1,
-          'unitPrice': (map['unitPrice'] as num?)?.toDouble() ?? (map['price'] as num?)?.toDouble() ?? 0.0,
-        };
-      }
-      return {'name': 'Item', 'quantity': 1, 'unitPrice': 0.0};
+    final items = rawItems.whereType<Map>().map((i) {
+      final map = Map<String, dynamic>.from(i);
+      return {
+        'name': map['name'] as String? ?? 'Item',
+        'quantity': (map['quantity'] as num?)?.toInt() ?? 1,
+        'unitPrice': (map['unitPrice'] as num?)?.toDouble() ?? (map['price'] as num?)?.toDouble() ?? 0.0,
+      };
     }).toList();
 
     return Container(
