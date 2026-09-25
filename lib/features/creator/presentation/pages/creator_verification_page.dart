@@ -142,7 +142,12 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
             onRefresh: _handleRefresh,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(24.0),
+              padding: EdgeInsets.fromLTRB(
+                24.0,
+                24.0,
+                24.0,
+                MediaQuery.of(context).viewInsets.bottom + 24.0,
+              ),
               child: Form(
                 key: _formKey,
                 child: Column(

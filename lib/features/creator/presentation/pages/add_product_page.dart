@@ -232,7 +232,12 @@ class _AddProductPageState extends State<AddProductPage> {
           if (state is CreatorLoading) return const Center(child: CircularProgressIndicator());
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
+            padding: EdgeInsets.fromLTRB(
+              24.0,
+              24.0,
+              24.0,
+              MediaQuery.of(context).viewInsets.bottom + 24.0,
+            ),
             child: Form(
               key: _formKey,
               child: Column(

@@ -163,7 +163,12 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
             onRefresh: _handleRefresh,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              padding: EdgeInsets.fromLTRB(
+                24.0,
+                16.0,
+                24.0,
+                MediaQuery.of(context).viewInsets.bottom + 24.0,
+              ),
               child: Form(
                 key: _formKey,
                 child: Column(

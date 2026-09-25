@@ -29,7 +29,12 @@ class _PhoneCompletionPageState extends State<PhoneCompletionPage> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.fromLTRB(
+            24,
+            24,
+            24,
+            MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
           children: [
             const Icon(Icons.phone_android, size: 64),
             const SizedBox(height: 20),

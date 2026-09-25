@@ -52,67 +52,57 @@ class FinanceView extends StatelessWidget {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance.collection('orders').snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                  const SizedBox(height: 12),
+                  Text('Error loading financial data: ${snapshot.error}', style: const TextStyle(color: Colors.redAccent)),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+        }
+
         double totalPlatformRevenue = 0.0;
         List<Map<String, dynamic>> pendingPayoutOrders = [];
 
-        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-          for (var doc in snapshot.data!.docs) {
-            final data = doc.data();
-            final total = (data['totalAmount'] as num?)?.toDouble() ??
-                (data['total'] as num?)?.toDouble() ??
-                0.0;
-            final platformFee = data['platformFee'] != null
-                ? (data['platformFee'] as num).toDouble()
-                : (total > 999 ? (50.0 + (total * 0.05)) : 50.0);
-            final payoutAmount = data['payoutAmount'] != null
-                ? (data['payoutAmount'] as num).toDouble()
-                : (total - platformFee);
+        final docs = snapshot.data?.docs ?? [];
+        for (var doc in docs) {
+          final data = doc.data();
+          final total = (data['totalAmount'] as num?)?.toDouble() ??
+              (data['total'] as num?)?.toDouble() ??
+              0.0;
+          final platformFee = data['platformFee'] != null
+              ? (data['platformFee'] as num).toDouble()
+              : (total > 999 ? (50.0 + (total * 0.05)) : 50.0);
+          final payoutAmount = data['payoutAmount'] != null
+              ? (data['payoutAmount'] as num).toDouble()
+              : (total - platformFee);
 
-            totalPlatformRevenue += platformFee;
+          totalPlatformRevenue += platformFee;
 
-            final payoutStatus = data['payoutStatus'] as String? ?? 'pending';
-            final status = data['status'] as String? ?? 'Placed';
+          final payoutStatus = (data['payoutStatus'] as String? ?? 'pending').toLowerCase();
+          final status = (data['status'] as String? ?? 'Placed').toLowerCase();
 
-            if (payoutStatus == 'pending' && status != 'Rejected') {
-              pendingPayoutOrders.add({
-                'docId': doc.id,
-                'orderId': doc.id.length > 6 ? doc.id.substring(doc.id.length - 6).toUpperCase() : doc.id.toUpperCase(),
-                'sellerName': data['sellerName'] as String? ?? data['creatorName'] as String? ?? 'Artisan',
-                'payoutAmount': payoutAmount,
-                'status': status,
-                'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-              });
-            }
+          if (payoutStatus == 'pending' && status != 'rejected' && status != 'cancelled') {
+            pendingPayoutOrders.add({
+              'docId': doc.id,
+              'orderId': doc.id.length > 6 ? doc.id.substring(doc.id.length - 6).toUpperCase() : doc.id.toUpperCase(),
+              'sellerName': data['sellerName'] as String? ?? data['creatorName'] as String? ?? 'Artisan',
+              'payoutAmount': payoutAmount,
+              'status': data['status'] ?? 'Placed',
+              'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+            });
           }
-        } else {
-          // Fallback mock payouts if Firestore has no live orders yet
-          totalPlatformRevenue = 825.0;
-          pendingPayoutOrders = [
-            {
-              'docId': '9I9HP7',
-              'orderId': '9I9HP7',
-              'sellerName': 'MadeByHands artisan',
-              'payoutAmount': 3275.0,
-              'status': 'Placed',
-              'createdAt': DateTime.now().subtract(const Duration(hours: 2)),
-            },
-            {
-              'docId': 'KJ5BPF',
-              'orderId': 'KJ5BPF',
-              'sellerName': 'MadeByHands artisan',
-              'payoutAmount': 4700.0,
-              'status': 'Accepted',
-              'createdAt': DateTime.now().subtract(const Duration(hours: 6)),
-            },
-            {
-              'docId': 'IJDRO4',
-              'orderId': 'IJDRO4',
-              'sellerName': 'MadeByHands artisan',
-              'payoutAmount': 4700.0,
-              'status': 'Placed',
-              'createdAt': DateTime.now().subtract(const Duration(hours: 12)),
-            },
-          ];
         }
 
         return BlocBuilder<AdminBloc, AdminState>(
@@ -217,18 +207,18 @@ class FinanceView extends StatelessWidget {
                                           const SizedBox(height: 4),
                                           FilledButton.icon(
                                             onPressed: () async {
+                                              final messenger = ScaffoldMessenger.of(context);
+                                              final messageText = 'Payout of ₹${amount.toStringAsFixed(0)} released to $sellerName.';
                                               try {
                                                 await FirebaseFirestore.instance
                                                     .collection('orders')
                                                     .doc(docId)
                                                     .update({'payoutStatus': 'released'});
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(content: Text('Payout of ₹${amount.toStringAsFixed(0)} released to $sellerName.')),
+                                                messenger.showSnackBar(
+                                                  SnackBar(content: Text(messageText)),
                                                 );
                                               } catch (e) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(content: Text('Payout released for Order #$orderId.')),
-                                                );
+                                                // ignore
                                               }
                                             },
                                             icon: const Icon(Icons.check, size: 14),

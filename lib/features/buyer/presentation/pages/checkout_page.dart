@@ -115,7 +115,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
               .firstOrNull;
 
           return ListView(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              MediaQuery.of(context).viewInsets.bottom + 20,
+            ),
             children: [
               const Text(
                 'Delivery address',
