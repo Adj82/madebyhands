@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:madebyhands/features/creator/data/models/creator_order_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_product_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_profile_model.dart';
@@ -96,12 +97,17 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
     required this.firebaseStorage,
   });
 
-  /// Universal cross-platform image uploader using putData (works on Web & Native)
+  /// Universal cross-platform image uploader using putData & XFile (works on Web & Native)
   Future<String> _uploadFileSafely(File file, String path) async {
     try {
       final ref = firebaseStorage.ref().child(path);
-      // Read bytes safely without invoking dart:io filesystem checks on Web
-      final bytes = await file.readAsBytes();
+      Uint8List bytes;
+      if (kIsWeb) {
+        // Use XFile to fetch blob URL on Web without calling dart:io File methods
+        bytes = await XFile(file.path).readAsBytes();
+      } else {
+        bytes = await file.readAsBytes();
+      }
       final uploadTask = ref.putData(bytes, _imageMetadata);
       final snapshot = await uploadTask;
       if (snapshot.state == TaskState.success) {
