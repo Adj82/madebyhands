@@ -36,7 +36,6 @@ class BuyerDashboardPage extends StatefulWidget {
 
 class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
   late final BuyerCubit _navigationCubit;
-  String _shopCategory = 'All';
   SavedAddress? _selectedAddress;
   StreamSubscription<List<SavedAddress>>? _addressSubscription;
 
@@ -82,16 +81,29 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
               return ProductDetailsPage(
                 product: product,
                 isSaved: state.favoriteIds.contains(product.id),
+                cartQuantity: state.cartQuantities[product.id] ?? 0,
+                cartCount: state.cartQuantities.values.fold(
+                  0,
+                  (total, quantity) => total + quantity,
+                ),
                 onSave: () => buyerBloc.add(
                   BuyerToggleFavorite(
                     userId: widget.user.uid,
                     product: product,
                   ),
                 ),
-                onAddToCart: () {
-                  final current = state.cartQuantities[product.id] ?? 0;
-                  buyerBloc.add(BuyerUpdateCartQuantity(product, current + 1));
+                onCartQuantityChanged: (quantity) {
+                  buyerBloc.add(BuyerUpdateCartQuantity(product, quantity));
                 },
+                onOpenCart: () {
+                  Navigator.of(context).pop();
+                  _navigationCubit.changePage(3);
+                },
+                onBuyNow: () =>
+                    _openBuyNow(product, state.cartQuantities[product.id] ?? 0),
+                buyerRepository: buyerBloc.repository,
+                buyerId: widget.user.uid,
+                buyerName: widget.user.name,
               );
             },
           ),
@@ -100,8 +112,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
     );
   }
 
-  void _openShopCategory(String category) {
-    setState(() => _shopCategory = category);
+  void _openShop() {
     _navigationCubit.changePage(1);
   }
 
@@ -121,6 +132,27 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
           orderRepository: serviceLocator(),
           onOrderPlaced: () {
             for (final product in products) {
+              buyerBloc.add(BuyerUpdateCartQuantity(product, 0));
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  void _openBuyNow(Product product, int cartQuantity) {
+    final buyerBloc = context.read<BuyerBloc>();
+    final quantity = cartQuantity > 0 ? cartQuantity : 1;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CheckoutPage(
+          user: widget.user,
+          products: [product],
+          quantities: {product.id: quantity},
+          buyerRepository: serviceLocator(),
+          orderRepository: serviceLocator(),
+          onOrderPlaced: () {
+            if (buyerBloc.state.cartQuantities.containsKey(product.id)) {
               buyerBloc.add(BuyerUpdateCartQuantity(product, 0));
             }
           },
@@ -168,14 +200,9 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                     ),
                   ),
                   onProductTap: _openProduct,
-                  onBrowseAll: () => _openShopCategory('All'),
-                  onCategoryTap: _openShopCategory,
+                  onBrowseAll: _openShop,
                 ),
-                SearchTab(
-                  userId: widget.user.uid,
-                  onProductTap: _openProduct,
-                  initialCategory: _shopCategory,
-                ),
+                SearchTab(userId: widget.user.uid, onProductTap: _openProduct),
                 SavedTab(
                   userId: widget.user.uid,
                   onProductTap: _openProduct,
