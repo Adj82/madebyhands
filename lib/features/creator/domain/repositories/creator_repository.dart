@@ -1,13 +1,14 @@
 import 'dart:io';
 import 'package:fpdart/fpdart.dart';
 import 'package:madebyhands/core/error/failures.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_notification.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 
 abstract interface class CreatorRepository {
   Future<Either<Failure, CreatorProfile?>> getCreatorProfile(String uid);
-  
+
   Future<Either<Failure, void>> saveCreatorProfile({
     required String uid,
     required String name,
@@ -35,7 +36,10 @@ abstract interface class CreatorRepository {
 
   Future<Either<Failure, List<CreatorProfile>>> getAllCreatorProfiles();
 
-  Future<Either<Failure, void>> updateVerificationStatus(String uid, String status);
+  Future<Either<Failure, void>> updateVerificationStatus(
+    String uid,
+    String status,
+  );
 
   Future<Either<Failure, void>> addProduct({
     required String name,
@@ -87,7 +91,24 @@ abstract interface class CreatorRepository {
 
   Future<Either<Failure, List<CreatorOrder>>> getCreatorOrders(String uid);
 
-  Future<Either<Failure, void>> updateOrderStatus(String orderId, String status, {String? rejectionReason, String? consignmentNumber});
+  Future<Either<Failure, void>> updateOrderStatus(
+    String orderId,
+    String status, {
+    String? rejectionReason,
+    String? consignmentNumber,
+  });
+
+  Future<Either<Failure, List<CreatorNotification>>> getCreatorNotifications(
+    String creatorUid,
+  );
+
+  Future<Either<Failure, void>> markNotificationAsRead(
+    String notificationId,
+  );
+
+  Future<Either<Failure, void>> markAllNotificationsAsRead(
+    String creatorUid,
+  );
 }
 
 class CustomizationInput {

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_notification.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
@@ -29,6 +30,9 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
     on<CreatorUpdateProductStatus>(_onUpdateProductStatus);
     on<CreatorFetchOrders>(_onFetchOrders);
     on<CreatorUpdateOrderStatus>(_onUpdateOrderStatus);
+    on<CreatorFetchNotifications>(_onFetchNotifications);
+    on<CreatorMarkNotificationAsRead>(_onMarkNotificationAsRead);
+    on<CreatorMarkAllNotificationsAsRead>(_onMarkAllNotificationsAsRead);
   }
 
   void _onCheckProfileExists(
@@ -299,5 +303,35 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
         add(CreatorFetchCreatorProducts(event.uid));
       },
     );
+  }
+
+  void _onFetchNotifications(
+    CreatorFetchNotifications event,
+    Emitter<CreatorState> emit,
+  ) async {
+    if (state is! CreatorNotificationsLoaded) {
+      emit(CreatorLoading());
+    }
+    final res = await _creatorRepository.getCreatorNotifications(event.uid);
+    res.fold(
+      (l) => emit(CreatorFailure(l.message)),
+      (r) => emit(CreatorNotificationsLoaded(r)),
+    );
+  }
+
+  void _onMarkNotificationAsRead(
+    CreatorMarkNotificationAsRead event,
+    Emitter<CreatorState> emit,
+  ) async {
+    await _creatorRepository.markNotificationAsRead(event.notificationId);
+    add(CreatorFetchNotifications(event.uid));
+  }
+
+  void _onMarkAllNotificationsAsRead(
+    CreatorMarkAllNotificationsAsRead event,
+    Emitter<CreatorState> emit,
+  ) async {
+    await _creatorRepository.markAllNotificationsAsRead(event.uid);
+    add(CreatorFetchNotifications(event.uid));
   }
 }

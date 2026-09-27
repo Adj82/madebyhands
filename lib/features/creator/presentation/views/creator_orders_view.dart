@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
-import 'package:intl/intl.dart';
 
 class CreatorOrdersView extends StatefulWidget {
   final CreatorProfile profile;
@@ -14,13 +14,24 @@ class CreatorOrdersView extends StatefulWidget {
   State<CreatorOrdersView> createState() => _CreatorOrdersViewState();
 }
 
-class _CreatorOrdersViewState extends State<CreatorOrdersView> {
+class _CreatorOrdersViewState extends State<CreatorOrdersView>
+    with SingleTickerProviderStateMixin {
   bool _isRefreshing = false;
+  late TabController _tabController;
+  bool _hasUpdatedStatus = false;
+  String? _lastTargetStatus;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this, initialIndex: 0);
     _fetchOrders();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   void _fetchOrders() {
@@ -44,7 +55,8 @@ class _CreatorOrdersViewState extends State<CreatorOrdersView> {
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<CreatorBloc, CreatorState>(
-      listenWhen: (previous, current) => current is CreatorFailure,
+      listenWhen: (previous, current) =>
+          current is CreatorFailure || current is CreatorOrdersLoaded,
       listener: (context, state) {
         if (state is CreatorFailure) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -55,6 +67,16 @@ class _CreatorOrdersViewState extends State<CreatorOrdersView> {
             ),
           );
           _fetchOrders();
+        } else if (state is CreatorOrdersLoaded && _hasUpdatedStatus) {
+          _hasUpdatedStatus = false;
+          final targetIndex = (_lastTargetStatus == 'Rejected' ||
+                  _lastTargetStatus == 'Delivered' ||
+                  _lastTargetStatus == 'Completed')
+              ? 2
+              : 1;
+          if (_tabController.index != targetIndex) {
+            _tabController.animateTo(targetIndex);
+          }
         }
       },
       buildWhen: (previous, current) =>
@@ -72,53 +94,65 @@ class _CreatorOrdersViewState extends State<CreatorOrdersView> {
           final activeOrders = state.orders
               .where((o) => [
                     'Accepted',
+                    'Confirmed',
+                    'Processing',
+                    'In-Transit',
                     'Shipped',
-                    'In Transit',
-                    'Out for Delivery',
-                    'Delivered'
+                    'Out for Delivery'
                   ].contains(o.status))
               .toList();
           final completedOrders = state.orders
-              .where((o) => ['Completed', 'Delivered'].contains(o.status))
+              .where((o) => ['Delivered', 'Completed', 'Rejected'].contains(o.status))
               .toList();
 
-          return DefaultTabController(
-            length: 3,
-            child: Column(
-              children: [
-                const TabBar(
-                  labelColor: AppColors.primary,
-                  indicatorColor: AppColors.primary,
-                  tabs: [
-                    Tab(text: 'Pending'),
-                    Tab(text: 'Active'),
-                    Tab(text: 'Completed'),
+          return Column(
+            children: [
+              TabBar(
+                controller: _tabController,
+                labelColor: AppColors.primary,
+                indicatorColor: AppColors.primary,
+                tabs: const [
+                  Tab(text: 'Pending'),
+                  Tab(text: 'Active'),
+                  Tab(text: 'Completed'),
+                ],
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _OrderList(
+                      orders: pendingOrders,
+                      emptyMessage: 'No new orders.',
+                      isPending: true,
+                      profile: widget.profile,
+                      onStatusUpdateInitiated: (status) {
+                        _hasUpdatedStatus = true;
+                        _lastTargetStatus = status;
+                      },
+                    ),
+                    _OrderList(
+                      orders: activeOrders,
+                      emptyMessage: 'No active orders.',
+                      profile: widget.profile,
+                      onStatusUpdateInitiated: (status) {
+                        _hasUpdatedStatus = true;
+                        _lastTargetStatus = status;
+                      },
+                    ),
+                    _OrderList(
+                      orders: completedOrders,
+                      emptyMessage: 'No completed orders yet.',
+                      profile: widget.profile,
+                      onStatusUpdateInitiated: (status) {
+                        _hasUpdatedStatus = true;
+                        _lastTargetStatus = status;
+                      },
+                    ),
                   ],
                 ),
-                Expanded(
-                  child: TabBarView(
-                    children: [
-                      _OrderList(
-                        orders: pendingOrders,
-                        emptyMessage: 'No new orders.',
-                        isPending: true,
-                        profile: widget.profile,
-                      ),
-                      _OrderList(
-                        orders: activeOrders,
-                        emptyMessage: 'No active orders.',
-                        profile: widget.profile,
-                      ),
-                      _OrderList(
-                        orders: completedOrders,
-                        emptyMessage: 'No completed orders yet.',
-                        profile: widget.profile,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           );
         }
 
@@ -157,12 +191,14 @@ class _OrderList extends StatefulWidget {
   final String emptyMessage;
   final bool isPending;
   final CreatorProfile profile;
+  final ValueChanged<String> onStatusUpdateInitiated;
 
   const _OrderList({
     required this.orders,
     required this.emptyMessage,
     this.isPending = false,
     required this.profile,
+    required this.onStatusUpdateInitiated,
   });
 
   @override
@@ -219,6 +255,7 @@ class _OrderListState extends State<_OrderList> {
             order: order,
             isPending: widget.isPending,
             profile: widget.profile,
+            onStatusUpdateInitiated: widget.onStatusUpdateInitiated,
           );
         },
       ),
@@ -230,11 +267,13 @@ class _OrderCard extends StatelessWidget {
   final CreatorOrder order;
   final bool isPending;
   final CreatorProfile profile;
+  final ValueChanged<String> onStatusUpdateInitiated;
 
   const _OrderCard({
     required this.order,
     required this.isPending,
     required this.profile,
+    required this.onStatusUpdateInitiated,
   });
 
   @override
@@ -270,6 +309,18 @@ class _OrderCard extends StatelessWidget {
                 'Date: ${DateFormat('dd MMM yyyy, hh:mm a').format(order.createdAt)}',
                 style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
               ),
+              if (order.rejectionReason != null &&
+                  order.rejectionReason!.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Rejection Reason: ${order.rejectionReason}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
               const Divider(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -280,7 +331,11 @@ class _OrderCard extends StatelessWidget {
                   ),
                   Text(
                     '₹${order.totalAmount}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: AppColors.primary,
+                    ),
                   ),
                 ],
               ),
@@ -291,16 +346,21 @@ class _OrderCard extends StatelessWidget {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () => _handleReject(context),
-                        style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
                         child: const Text('Reject'),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () => _handleAccept(context),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-                        child: const Text('Accept'),
+                        onPressed: () => _handleConfirm(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Confirm Order'),
                       ),
                     ),
                   ],
@@ -313,12 +373,15 @@ class _OrderCard extends StatelessWidget {
     );
   }
 
-  void _handleAccept(BuildContext context) {
-    context.read<CreatorBloc>().add(CreatorUpdateOrderStatus(
-      orderId: order.id,
-      status: 'Accepted',
-      uid: profile.uid,
-    ));
+  void _handleConfirm(BuildContext context) {
+    onStatusUpdateInitiated('Confirmed');
+    context.read<CreatorBloc>().add(
+          CreatorUpdateOrderStatus(
+            orderId: order.id,
+            status: 'Confirmed',
+            uid: profile.uid,
+          ),
+        );
   }
 
   void _handleReject(BuildContext context) {
@@ -329,19 +392,27 @@ class _OrderCard extends StatelessWidget {
         title: const Text('Reject Order'),
         content: TextField(
           controller: reasonController,
-          decoration: const InputDecoration(hintText: 'Enter reason for rejection'),
+          decoration:
+              const InputDecoration(hintText: 'Enter reason for rejection'),
           maxLines: 2,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () {
-              context.read<CreatorBloc>().add(CreatorUpdateOrderStatus(
-                orderId: order.id,
-                status: 'Rejected',
-                rejectionReason: reasonController.text,
-                uid: profile.uid,
-              ));
+              final reason = reasonController.text.trim();
+              onStatusUpdateInitiated('Rejected');
+              context.read<CreatorBloc>().add(
+                    CreatorUpdateOrderStatus(
+                      orderId: order.id,
+                      status: 'Rejected',
+                      rejectionReason: reason.isEmpty ? 'Order rejected by creator' : reason,
+                      uid: profile.uid,
+                    ),
+                  );
               Navigator.pop(dialogContext);
             },
             child: const Text('Reject', style: TextStyle(color: Colors.red)),
@@ -356,8 +427,14 @@ class _OrderCard extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.background,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-      builder: (context) => _OrderDetailSheet(order: order, profile: profile),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (context) => _OrderDetailSheet(
+        order: order,
+        profile: profile,
+        onStatusUpdateInitiated: onStatusUpdateInitiated,
+      ),
     );
   }
 }
@@ -370,15 +447,36 @@ class _StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     Color color;
     switch (status) {
-      case 'Placed': color = Colors.blue; break;
-      case 'Accepted': color = Colors.orange; break;
-      case 'Shipped': color = Colors.indigo; break;
-      case 'In Transit': color = Colors.purple; break;
-      case 'Out for Delivery': color = Colors.deepOrange; break;
-      case 'Delivered': color = Colors.teal; break;
-      case 'Completed': color = Colors.green; break;
-      case 'Rejected': color = Colors.red; break;
-      default: color = Colors.grey;
+      case 'Placed':
+        color = Colors.blue;
+        break;
+      case 'Accepted':
+      case 'Confirmed':
+        color = Colors.orange;
+        break;
+      case 'Processing':
+        color = Colors.amber.shade800;
+        break;
+      case 'In-Transit':
+        color = Colors.purple;
+        break;
+      case 'Shipped':
+        color = Colors.indigo;
+        break;
+      case 'Out for Delivery':
+        color = Colors.deepOrange;
+        break;
+      case 'Delivered':
+        color = Colors.teal;
+        break;
+      case 'Completed':
+        color = Colors.green;
+        break;
+      case 'Rejected':
+        color = Colors.red;
+        break;
+      default:
+        color = Colors.grey;
     }
 
     return Container(
@@ -399,11 +497,39 @@ class _StatusBadge extends StatelessWidget {
 class _OrderDetailSheet extends StatelessWidget {
   final CreatorOrder order;
   final CreatorProfile profile;
+  final ValueChanged<String> onStatusUpdateInitiated;
 
-  const _OrderDetailSheet({required this.order, required this.profile});
+  const _OrderDetailSheet({
+    required this.order,
+    required this.profile,
+    required this.onStatusUpdateInitiated,
+  });
+
+  static String? getNextValidStatus(String currentStatus) {
+    switch (currentStatus) {
+      case 'Placed':
+        return 'Confirmed';
+      case 'Accepted':
+        return 'Confirmed';
+      case 'Confirmed':
+        return 'Processing';
+      case 'Processing':
+        return 'In-Transit';
+      case 'In-Transit':
+        return 'Shipped';
+      case 'Shipped':
+        return 'Out for Delivery';
+      case 'Out for Delivery':
+        return 'Delivered';
+      default:
+        return null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final nextStatus = getNextValidStatus(order.status);
+
     return Container(
       padding: const EdgeInsets.all(25),
       height: MediaQuery.of(context).size.height * 0.85,
@@ -413,8 +539,14 @@ class _OrderDetailSheet extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Order Details', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+              const Text(
+                'Order Details',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close),
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -424,60 +556,104 @@ class _OrderDetailSheet extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _infoRow('Order ID', '#${order.id.toUpperCase()}'),
-                  _infoRow('Date', DateFormat('dd MMM yyyy, hh:mm a').format(order.createdAt)),
-                  _infoRow('Status', order.status),
-                  if (order.consignmentNumber != null)
-                    _infoRow('Tracking ID', order.consignmentNumber!),
-                  if (order.rejectionReason != null)
-                    _infoRow('Rejection Reason', order.rejectionReason!, isWarning: true),
+                  _infoRow(
+                    'Date',
+                    DateFormat('dd MMM yyyy, hh:mm a').format(order.createdAt),
+                  ),
+                  _infoRow('Fulfillment Status', order.status),
+                  if (order.consignmentNumber != null &&
+                      order.consignmentNumber!.isNotEmpty)
+                    _infoRow('Consignment #', order.consignmentNumber!),
+                  if (order.rejectionReason != null &&
+                      order.rejectionReason!.trim().isNotEmpty)
+                    _infoRow(
+                      'Rejection Reason',
+                      order.rejectionReason!,
+                      isWarning: true,
+                    ),
                   const Divider(height: 40),
-                  const Text('Customer Information', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Customer Information',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 10),
                   Text(order.buyerName, style: const TextStyle(fontSize: 16)),
                   const SizedBox(height: 4),
-                  Text(order.deliveryAddress, style: const TextStyle(color: AppColors.mutedText)),
+                  Text(
+                    order.deliveryAddress,
+                    style: const TextStyle(color: AppColors.mutedText),
+                  ),
                   const Divider(height: 40),
-                  const Text('Order Items', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Order Items',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 15),
-                  ...order.items.map((item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                              Text('Qty: ${item.quantity}', style: const TextStyle(fontSize: 12, color: AppColors.mutedText)),
-                            ],
+                  ...order.items.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  'Qty: ${item.quantity}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.mutedText,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        Text('₹${item.unitPrice * item.quantity}'),
-                      ],
+                          Text('₹${item.unitPrice * item.quantity}'),
+                        ],
+                      ),
                     ),
-                  )),
+                  ),
                   const Divider(height: 40),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Total Amount', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      Text('₹${order.totalAmount}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                      const Text(
+                        'Total Amount',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        '₹${order.totalAmount}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
                     ],
                   ),
                 ],
               ),
             ),
           ),
-          if (order.status == 'Accepted')
+          if (nextStatus != null)
             Padding(
               padding: const EdgeInsets.only(top: 20.0),
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => _showConsignmentDialog(context),
-                  icon: const Icon(Icons.local_shipping_outlined),
-                  label: const Text('Mark as Shipped'),
+                  onPressed: () => _advanceStatus(context, nextStatus),
+                  icon: const Icon(Icons.arrow_forward),
+                  label: Text('Mark as $nextStatus'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
@@ -485,41 +661,56 @@ class _OrderDetailSheet extends StatelessWidget {
                 ),
               ),
             )
-          else if (['Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Completed'].contains(order.status))
+          else if (['Delivered', 'Completed'].contains(order.status))
             Padding(
               padding: const EdgeInsets.only(top: 20.0),
               child: Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.08),
+                  color: Colors.green.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                  border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.check_circle_outline, color: Colors.green),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Order has been successfully delivered and completed.',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else if (order.status == 'Rejected')
+            Padding(
+              padding: const EdgeInsets.only(top: 20.0),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.autorenew, color: AppColors.primary),
+                    const Icon(Icons.cancel_outlined, color: Colors.red),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Automatic Courier Tracking Active',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Subsequent statuses are automatically synced via courier ref #${order.consignmentNumber ?? "N/A"}.',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.mutedText,
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        'Order was rejected. Reason: ${order.rejectionReason ?? "N/A"}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: Colors.red,
+                        ),
                       ),
                     ),
                   ],
@@ -531,45 +722,89 @@ class _OrderDetailSheet extends StatelessWidget {
     );
   }
 
+  void _advanceStatus(BuildContext context, String nextStatus) {
+    if (nextStatus == 'In-Transit') {
+      _showConsignmentDialog(context);
+    } else {
+      onStatusUpdateInitiated(nextStatus);
+      context.read<CreatorBloc>().add(
+            CreatorUpdateOrderStatus(
+              orderId: order.id,
+              status: nextStatus,
+              consignmentNumber: order.consignmentNumber,
+              uid: profile.uid,
+            ),
+          );
+      Navigator.pop(context);
+    }
+  }
+
   void _showConsignmentDialog(BuildContext context) {
-    final consignmentController = TextEditingController();
+    final consignmentController = TextEditingController(
+      text: order.consignmentNumber ?? '',
+    );
+    final confirmConsignmentController = TextEditingController(
+      text: order.consignmentNumber ?? '',
+    );
     final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Ship Order'),
+        scrollable: true,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Enter Dispatch Details'),
         content: Form(
           key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Please enter the consignment or reference number provided by your courier/shipping carrier.',
-                style: TextStyle(fontSize: 12, color: AppColors.mutedText),
-              ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: consignmentController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Consignment / Reference Number *',
-                  hintText: 'e.g. SP123456789IN',
-                  border: OutlineInputBorder(),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Please enter and confirm the consignment or reference number to move this order to In-Transit.',
+                  style: TextStyle(fontSize: 12, color: AppColors.mutedText),
                 ),
-                validator: (v) {
-                  final trimmed = v?.trim() ?? '';
-                  if (trimmed.isEmpty) {
-                    return 'Consignment number is required.';
-                  }
-                  if (trimmed.length < 3) {
-                    return 'Must be at least 3 characters long.';
-                  }
-                  return null;
-                },
-              ),
-            ],
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: consignmentController,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Consignment / Reference Number *',
+                    hintText: 'e.g. SP123456789IN',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  validator: (v) {
+                    final trimmed = v?.trim() ?? '';
+                    if (trimmed.isEmpty) {
+                      return 'Consignment number is required.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: confirmConsignmentController,
+                  decoration: const InputDecoration(
+                    labelText: 'Confirm Consignment Number *',
+                    hintText: 'Re-enter consignment number',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  validator: (v) {
+                    final trimmed = v?.trim() ?? '';
+                    if (trimmed.isEmpty) {
+                      return 'Please confirm consignment number.';
+                    }
+                    if (trimmed != consignmentController.text.trim()) {
+                      return 'Consignment numbers do not match.';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -580,10 +815,11 @@ class _OrderDetailSheet extends StatelessWidget {
           ElevatedButton(
             onPressed: () {
               if (formKey.currentState!.validate()) {
+                onStatusUpdateInitiated('In-Transit');
                 context.read<CreatorBloc>().add(
                       CreatorUpdateOrderStatus(
                         orderId: order.id,
-                        status: 'Shipped',
+                        status: 'In-Transit',
                         consignmentNumber: consignmentController.text.trim(),
                         uid: profile.uid,
                       ),
@@ -596,7 +832,7 @@ class _OrderDetailSheet extends StatelessWidget {
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Confirm & Mark Shipped'),
+            child: const Text('Confirm & Move to In-Transit'),
           ),
         ],
       ),
@@ -608,8 +844,22 @@ class _OrderDetailSheet extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8.0),
       child: Row(
         children: [
-          SizedBox(width: 120, child: Text(label, style: const TextStyle(color: AppColors.mutedText))),
-          Expanded(child: Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: isWarning ? Colors.red : null))),
+          SizedBox(
+            width: 130,
+            child: Text(
+              label,
+              style: const TextStyle(color: AppColors.mutedText),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isWarning ? Colors.red : null,
+              ),
+            ),
+          ),
         ],
       ),
     );

@@ -172,3 +172,19 @@ final class CreatorUpdateOrderStatus extends CreatorEvent {
   final String uid; // to re-fetch
   CreatorUpdateOrderStatus({required this.orderId, required this.status, this.rejectionReason, this.consignmentNumber, required this.uid});
 }
+
+final class CreatorFetchNotifications extends CreatorEvent {
+  final String uid;
+  CreatorFetchNotifications(this.uid);
+}
+
+final class CreatorMarkNotificationAsRead extends CreatorEvent {
+  final String notificationId;
+  final String uid;
+  CreatorMarkNotificationAsRead({required this.notificationId, required this.uid});
+}
+
+final class CreatorMarkAllNotificationsAsRead extends CreatorEvent {
+  final String uid;
+  CreatorMarkAllNotificationsAsRead(this.uid);
+}

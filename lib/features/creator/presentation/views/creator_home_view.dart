@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
+import 'package:madebyhands/features/creator/presentation/pages/creator_notifications_page.dart';
 import 'package:madebyhands/features/creator/presentation/pages/creator_verification_page.dart';
 
 class CreatorHomeView extends StatefulWidget {
@@ -25,6 +26,7 @@ class _CreatorHomeViewState extends State<CreatorHomeView> {
       bloc.add(CreatorCheckProfileExists(widget.profile.uid));
       bloc.add(CreatorFetchOrders(widget.profile.uid));
       bloc.add(CreatorFetchCreatorProducts(widget.profile.uid));
+      bloc.add(CreatorFetchNotifications(widget.profile.uid));
       await Future.delayed(const Duration(milliseconds: 600));
     } finally {
       if (mounted) {
@@ -62,35 +64,72 @@ class _CreatorHomeViewState extends State<CreatorHomeView> {
   }
 
   Widget _buildNotificationSection() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.accent.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.notifications_active_outlined, color: AppColors.accent),
-          SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return BlocBuilder<CreatorBloc, CreatorState>(
+      buildWhen: (previous, current) => current is CreatorNotificationsLoaded,
+      builder: (context, state) {
+        String title = 'Welcome to Creator Studio!';
+        String message = 'Start by completing your verification to list products.';
+        bool hasUnread = false;
+
+        if (state is CreatorNotificationsLoaded && state.notifications.isNotEmpty) {
+          final topNotif = state.notifications.first;
+          title = topNotif.title;
+          message = topNotif.message;
+          hasUnread = state.notifications.any((n) => !n.isRead);
+        }
+
+        return InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CreatorNotificationsPage(widget.profile),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(15),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+            ),
+            child: Row(
               children: [
-                Text(
-                  'Welcome to Creator Studio!',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                Badge(
+                  isLabelVisible: hasUnread,
+                  backgroundColor: Colors.red,
+                  smallSize: 8,
+                  child: const Icon(Icons.notifications_active_outlined, color: AppColors.accent),
                 ),
-                Text(
-                  'Start by completing your verification to list products.',
-                  style: TextStyle(fontSize: 12, color: AppColors.mutedText),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        message,
+                        style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
+                const Icon(Icons.chevron_right, color: AppColors.mutedText, size: 20),
               ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

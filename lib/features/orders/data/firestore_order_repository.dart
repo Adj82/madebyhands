@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:madebyhands/core/services/shipping_tracking_service.dart';
 import 'package:madebyhands/features/orders/data/models/marketplace_order_model.dart';
 import 'package:madebyhands/features/orders/domain/entities/marketplace_order.dart';
 import 'package:madebyhands/features/orders/domain/repositories/order_repository.dart';
@@ -68,30 +67,8 @@ class FirestoreOrderRepository implements OrderRepository {
     final orderReferences = grouped.values
         .map((_) => firestore.collection('orders').doc())
         .toList();
-    final productReferences = items
-        .map((item) => firestore.collection('products').doc(item.productId))
-        .toList();
 
     await firestore.runTransaction((transaction) async {
-      final productSnapshots =
-          <String, DocumentSnapshot<Map<String, dynamic>>>{};
-      for (final reference in productReferences) {
-        productSnapshots[reference.id] = await transaction.get(reference);
-      }
-
-      for (final item in items) {
-        final product = productSnapshots[item.productId];
-        if (product == null || !product.exists) {
-          throw StateError('${item.name} is no longer available.');
-        }
-        final stock = (product.data()?['stock'] as num?)?.round();
-        if (stock != null && stock < item.quantity) {
-          throw StateError(
-            'Only $stock unit(s) of ${item.name} are available.',
-          );
-        }
-      }
-
       var orderIndex = 0;
       for (final entry in grouped.entries) {
         final creatorItems = entry.value;
@@ -105,7 +82,9 @@ class FirestoreOrderRepository implements OrderRepository {
           percentFee: percentFee,
         );
         final creatorName = creatorItems.first.creatorName;
-        transaction.set(orderReferences[orderIndex++], {
+        final orderDocRef = orderReferences[orderIndex++];
+
+        transaction.set(orderDocRef, {
           'checkoutId': checkoutId,
           'buyerId': buyerId,
           'buyerName': buyerName,
@@ -145,10 +124,44 @@ class FirestoreOrderRepository implements OrderRepository {
           'updatedAt': FieldValue.serverTimestamp(),
           'isSample': false,
         });
+
+        // Automatically create in-app notification for Creator
+        final notificationDocRef = firestore.collection('notifications').doc();
+        transaction.set(notificationDocRef, {
+          'creatorUid': entry.key,
+          'title': 'New Incoming Order! 🛒',
+          'message':
+              'You received a new order for ${creatorItems.length} item(s) totaling ₹$subtotal from $buyerName.',
+          'type': 'order',
+          'createdAt': FieldValue.serverTimestamp(),
+          'isRead': false,
+          'targetId': orderDocRef.id,
+        });
       }
     });
 
     return orderReferences.map((reference) => reference.id).toList();
+  }
+
+  static String? _getNextValidStatus(String currentStatus) {
+    switch (currentStatus) {
+      case 'Placed':
+        return 'Confirmed';
+      case 'Accepted':
+        return 'Confirmed';
+      case 'Confirmed':
+        return 'Processing';
+      case 'Processing':
+        return 'In-Transit';
+      case 'In-Transit':
+        return 'Shipped';
+      case 'Shipped':
+        return 'Out for Delivery';
+      case 'Out for Delivery':
+        return 'Delivered';
+      default:
+        return null;
+    }
   }
 
   @override
@@ -165,26 +178,33 @@ class FirestoreOrderRepository implements OrderRepository {
     }
 
     final currentData = orderSnap.data() ?? <String, dynamic>{};
-    final currentStatus = currentData['status'] as String? ?? '';
+    final currentStatus = currentData['status'] as String? ?? 'Placed';
 
-    if (['Shipped', 'In Transit', 'Out for Delivery', 'Delivered', 'Completed']
-            .contains(currentStatus) &&
-        status != currentStatus) {
+    if (status == 'Rejected') {
+      final updateData = <String, dynamic>{
+        'status': 'Rejected',
+        'rejectionReason': rejectionReason ?? 'Order rejected by creator',
+        'payoutStatus': 'cancelled',
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      await orderRef.update(updateData);
+      return;
+    }
+
+    final expectedNextStatus = _getNextValidStatus(currentStatus);
+    if (expectedNextStatus == null) {
       throw Exception(
-        'Orders that are marked Shipped cannot be manually changed. Status updates are automatically tracked via external courier.',
+        'Order is already in a final status ($currentStatus) and cannot be updated further.',
       );
     }
 
-    if (status == 'Shipped') {
-      final trimmedConsignment = consignmentNumber?.trim() ?? '';
-      if (trimmedConsignment.isEmpty || trimmedConsignment.length < 3) {
-        throw Exception(
-          'Please enter a valid consignment/reference number (at least 3 characters) to ship the order.',
-        );
-      }
+    if (status != expectedNextStatus) {
+      throw Exception(
+        'Invalid status transition from "$currentStatus" to "$status". The next valid status is "$expectedNextStatus".',
+      );
     }
 
-    if (status == 'Accepted') {
+    if (status == 'Confirmed' || status == 'Accepted') {
       await firestore.runTransaction((transaction) async {
         final txOrderSnap = await transaction.get(orderRef);
         if (!txOrderSnap.exists) {
@@ -194,7 +214,7 @@ class FirestoreOrderRepository implements OrderRepository {
         final orderData = txOrderSnap.data() ?? <String, dynamic>{};
         final txStatus = orderData['status'] as String? ?? '';
 
-        if (txStatus != 'Accepted') {
+        if (txStatus != 'Confirmed' && txStatus != 'Accepted') {
           final rawItems = orderData['items'] as List<dynamic>? ?? const [];
           final itemsToUpdate = <_RepoItemStockUpdate>[];
 
@@ -233,14 +253,14 @@ class FirestoreOrderRepository implements OrderRepository {
 
             if (currentStock < item.quantity) {
               throw Exception(
-                'Cannot accept order: Insufficient stock for "${item.name}". Available: $currentStock, Ordered: ${item.quantity}.',
+                'Cannot confirm order: Insufficient stock for "${item.name}". Available: $currentStock, Ordered: ${item.quantity}.',
               );
             }
 
             final newStock = currentStock - item.quantity;
             if (newStock < 0) {
               throw Exception(
-                'Cannot accept order: Stock for "${item.name}" cannot become negative.',
+                'Cannot confirm order: Stock for "${item.name}" cannot become negative.',
               );
             }
 
@@ -259,24 +279,23 @@ class FirestoreOrderRepository implements OrderRepository {
         if (rejectionReason != null) {
           updateData['rejectionReason'] = rejectionReason;
         }
-        if (consignmentNumber != null) {
+        if (consignmentNumber != null && consignmentNumber.trim().isNotEmpty) {
           updateData['consignmentNumber'] = consignmentNumber.trim();
         }
         transaction.update(orderRef, updateData);
       });
     } else {
-      final data = <String, dynamic>{
+      final updateData = <String, dynamic>{
         'status': status,
         'updatedAt': FieldValue.serverTimestamp(),
       };
-      if (rejectionReason != null) data['rejectionReason'] = rejectionReason;
-      if (consignmentNumber != null) {
-        data['consignmentNumber'] = consignmentNumber.trim();
+      if (consignmentNumber != null && consignmentNumber.trim().isNotEmpty) {
+        updateData['consignmentNumber'] = consignmentNumber.trim();
       }
-      if (status == 'Rejected' || status == 'Cancelled') {
-        data['payoutStatus'] = 'cancelled';
+      if (status == 'Delivered') {
+        updateData['deliveredAt'] = FieldValue.serverTimestamp();
       }
-      await firestore.collection('orders').doc(orderId).update(data);
+      await orderRef.update(updateData);
     }
   }
 
@@ -301,7 +320,7 @@ class FirestoreOrderRepository implements OrderRepository {
         .limit(1)
         .get();
     final buyer = buyers.docs.isEmpty ? null : buyers.docs.first;
-    final statuses = ['Placed', 'Accepted', 'Shipped', 'Completed'];
+    final statuses = ['Placed', 'Confirmed', 'Processing', 'Delivered'];
     final batch = firestore.batch();
     var created = 0;
 
@@ -387,6 +406,5 @@ class _RepoItemStockUpdate {
     required this.snap,
     required this.quantity,
     required this.name,
-    this.newStock = 0,
-  });
+  }) : newStock = 0;
 }
