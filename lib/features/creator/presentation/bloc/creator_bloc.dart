@@ -173,6 +173,7 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
       creatorUid: event.creatorUid,
       creatorName: event.creatorName,
       isCustomizable: event.isCustomizable,
+      predefinedCustomizations: event.predefinedCustomizations,
       customizations: event.customizations,
     );
 
@@ -203,6 +204,7 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
       creatorUid: event.creatorUid,
       creatorName: event.creatorName,
       isCustomizable: event.isCustomizable,
+      predefinedCustomizations: event.predefinedCustomizations,
       customizations: event.customizations,
       hasChanges: event.hasChanges,
     );

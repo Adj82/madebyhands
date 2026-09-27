@@ -55,6 +55,7 @@ abstract interface class CreatorRepository {
     required String creatorUid,
     required String creatorName,
     bool isCustomizable = false,
+    List<String> predefinedCustomizations = const [],
     List<CustomizationInput> customizations = const [],
   });
 
@@ -74,6 +75,7 @@ abstract interface class CreatorRepository {
     required String creatorUid,
     required String creatorName,
     required bool isCustomizable,
+    List<String> predefinedCustomizations = const [],
     required List<CustomizationInput> customizations,
     required bool hasChanges,
   });

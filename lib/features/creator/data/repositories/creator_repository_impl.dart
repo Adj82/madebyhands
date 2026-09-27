@@ -179,6 +179,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
     required String creatorUid,
     required String creatorName,
     bool isCustomizable = false,
+    List<String> predefinedCustomizations = const [],
     List<CustomizationInput> customizations = const [],
   }) async {
     try {
@@ -230,6 +231,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
         status: 'Pending Approval',
         isActive: false,
         isCustomizable: isCustomizable,
+        predefinedCustomizations: isCustomizable ? predefinedCustomizations : const [],
         customizations: customizationEntities,
         createdAt: DateTime.now(),
       );
@@ -258,6 +260,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
     required String creatorUid,
     required String creatorName,
     required bool isCustomizable,
+    List<String> predefinedCustomizations = const [],
     required List<CustomizationInput> customizations,
     required bool hasChanges,
   }) async {
@@ -319,6 +322,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
         status: 'Pending Approval', // Reset status
         isActive: false,           // Hide from storefront
         isCustomizable: isCustomizable,
+        predefinedCustomizations: isCustomizable ? predefinedCustomizations : const [],
         customizations: customizationEntities,
         createdAt: existingProduct.createdAt,
         editHistory: {

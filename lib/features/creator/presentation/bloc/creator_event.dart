@@ -76,6 +76,7 @@ final class CreatorAddProduct extends CreatorEvent {
   final String creatorUid;
   final String creatorName;
   final bool isCustomizable;
+  final List<String> predefinedCustomizations;
   final List<CustomizationInput> customizations;
 
   CreatorAddProduct({
@@ -92,6 +93,7 @@ final class CreatorAddProduct extends CreatorEvent {
     required this.creatorUid,
     required this.creatorName,
     this.isCustomizable = false,
+    this.predefinedCustomizations = const [],
     this.customizations = const [],
   });
 }
@@ -112,6 +114,7 @@ final class CreatorUpdateProduct extends CreatorEvent {
   final String creatorUid;
   final String creatorName;
   final bool isCustomizable;
+  final List<String> predefinedCustomizations;
   final List<CustomizationInput> customizations;
   final bool hasChanges;
 
@@ -131,6 +134,7 @@ final class CreatorUpdateProduct extends CreatorEvent {
     required this.creatorUid,
     required this.creatorName,
     required this.isCustomizable,
+    this.predefinedCustomizations = const [],
     required this.customizations,
     required this.hasChanges,
   });
