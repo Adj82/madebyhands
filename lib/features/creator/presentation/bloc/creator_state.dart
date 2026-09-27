@@ -45,6 +45,11 @@ final class CreatorOrdersLoaded extends CreatorState {
   CreatorOrdersLoaded(this.orders);
 }
 
+final class CreatorNotificationsLoaded extends CreatorState {
+  final List<CreatorNotification> notifications;
+  CreatorNotificationsLoaded(this.notifications);
+}
+
 final class CreatorFailure extends CreatorState {
   final String message;
   CreatorFailure(this.message);

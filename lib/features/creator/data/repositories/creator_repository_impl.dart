@@ -4,6 +4,7 @@ import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/features/creator/data/datasources/creator_remote_data_source.dart';
 import 'package:madebyhands/features/creator/data/models/creator_product_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_profile_model.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_notification.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
@@ -14,13 +15,21 @@ class CreatorRepositoryImpl implements CreatorRepository {
 
   CreatorRepositoryImpl(this.remoteDataSource);
 
+  String _cleanExceptionMessage(Object e) {
+    var msg = e.toString();
+    while (msg.startsWith('Exception: ')) {
+      msg = msg.substring(11);
+    }
+    return msg.trim();
+  }
+
   @override
   Future<Either<Failure, CreatorProfile?>> getCreatorProfile(String uid) async {
     try {
       final profile = await remoteDataSource.getCreatorProfile(uid);
       return right(profile);
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(Failure(_cleanExceptionMessage(e)));
     }
   }
 
@@ -71,7 +80,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
       await remoteDataSource.saveCreatorProfile(profileModel);
       return right(null);
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(Failure(_cleanExceptionMessage(e)));
     }
   }
 
@@ -131,7 +140,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
       await remoteDataSource.updateVerificationStatus(uid, 'In-Process');
       return right(null);
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(Failure(_cleanExceptionMessage(e)));
     }
   }
 
@@ -141,7 +150,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
       final profiles = await remoteDataSource.getAllCreatorProfiles();
       return right(profiles);
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(Failure(_cleanExceptionMessage(e)));
     }
   }
 
@@ -151,7 +160,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
       await remoteDataSource.updateVerificationStatus(uid, status);
       return right(null);
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(Failure(_cleanExceptionMessage(e)));
     }
   }
 
@@ -170,6 +179,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
     required String creatorUid,
     required String creatorName,
     bool isCustomizable = false,
+    List<String> predefinedCustomizations = const [],
     List<CustomizationInput> customizations = const [],
   }) async {
     try {
@@ -221,6 +231,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
         status: 'Pending Approval',
         isActive: false,
         isCustomizable: isCustomizable,
+        predefinedCustomizations: isCustomizable ? predefinedCustomizations : const [],
         customizations: customizationEntities,
         createdAt: DateTime.now(),
       );
@@ -228,7 +239,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
       await remoteDataSource.addProduct(newProduct);
       return right(null);
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(Failure(_cleanExceptionMessage(e)));
     }
   }
 
@@ -249,6 +260,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
     required String creatorUid,
     required String creatorName,
     required bool isCustomizable,
+    List<String> predefinedCustomizations = const [],
     required List<CustomizationInput> customizations,
     required bool hasChanges,
   }) async {
@@ -310,6 +322,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
         status: 'Pending Approval', // Reset status
         isActive: false,           // Hide from storefront
         isCustomizable: isCustomizable,
+        predefinedCustomizations: isCustomizable ? predefinedCustomizations : const [],
         customizations: customizationEntities,
         createdAt: existingProduct.createdAt,
         editHistory: {
@@ -325,7 +338,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
       await remoteDataSource.updateProduct(updatedProduct);
       return right(null);
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(Failure(_cleanExceptionMessage(e)));
     }
   }
 
@@ -335,7 +348,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
       final products = await remoteDataSource.getPendingProducts();
       return right(products);
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(Failure(_cleanExceptionMessage(e)));
     }
   }
 
@@ -345,7 +358,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
       final products = await remoteDataSource.getAdminAllProducts();
       return right(products);
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(Failure(_cleanExceptionMessage(e)));
     }
   }
 
@@ -355,7 +368,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
       final products = await remoteDataSource.getCreatorProducts(uid);
       return right(products);
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(Failure(_cleanExceptionMessage(e)));
     }
   }
 
@@ -375,7 +388,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
       );
       return right(null);
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(Failure(_cleanExceptionMessage(e)));
     }
   }
 
@@ -385,17 +398,76 @@ class CreatorRepositoryImpl implements CreatorRepository {
       final orders = await remoteDataSource.getCreatorOrders(uid);
       return right(orders);
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(Failure(_cleanExceptionMessage(e)));
     }
   }
 
   @override
-  Future<Either<Failure, void>> updateOrderStatus(String orderId, String status, {String? rejectionReason, String? consignmentNumber}) async {
+  Future<Either<Failure, void>> updateOrderStatus(
+    String orderId,
+    String status, {
+    String? rejectionReason,
+    String? consignmentNumber,
+  }) async {
     try {
-      await remoteDataSource.updateOrderStatus(orderId, status, rejectionReason: rejectionReason, consignmentNumber: consignmentNumber);
+      await remoteDataSource.updateOrderStatus(
+        orderId,
+        status,
+        rejectionReason: rejectionReason,
+        consignmentNumber: consignmentNumber,
+      );
       return right(null);
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(Failure(_cleanExceptionMessage(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<CreatorNotification>>> getCreatorNotifications(
+    String creatorUid,
+  ) async {
+    try {
+      final notifications =
+          await remoteDataSource.getCreatorNotifications(creatorUid);
+      return right(notifications.cast<CreatorNotification>());
+    } catch (e) {
+      return left(Failure(_cleanExceptionMessage(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> markNotificationAsRead(
+    String notificationId,
+  ) async {
+    try {
+      await remoteDataSource.markNotificationAsRead(notificationId);
+      return right(null);
+    } catch (e) {
+      return left(Failure(_cleanExceptionMessage(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> markAllNotificationsAsRead(
+    String creatorUid,
+  ) async {
+    try {
+      await remoteDataSource.markAllNotificationsAsRead(creatorUid);
+      return right(null);
+    } catch (e) {
+      return left(Failure(_cleanExceptionMessage(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteNotifications(
+    List<String> notificationIds,
+  ) async {
+    try {
+      await remoteDataSource.deleteNotifications(notificationIds);
+      return right(null);
+    } catch (e) {
+      return left(Failure(_cleanExceptionMessage(e)));
     }
   }
 }

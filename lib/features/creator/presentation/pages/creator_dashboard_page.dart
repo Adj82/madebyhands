@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
+import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
+import 'package:madebyhands/features/creator/presentation/pages/creator_notifications_page.dart';
 import 'package:madebyhands/features/creator/presentation/views/creator_earnings_view.dart';
 import 'package:madebyhands/features/creator/presentation/views/creator_home_view.dart';
 import 'package:madebyhands/features/creator/presentation/views/creator_orders_view.dart';
 import 'package:madebyhands/features/creator/presentation/views/creator_products_view.dart';
 import 'package:madebyhands/features/creator/presentation/views/creator_profile_view.dart';
-import 'package:madebyhands/init_dependencies.dart';
 import 'package:madebyhands/features/support/presentation/pages/support_center_page.dart';
-import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
+import 'package:madebyhands/init_dependencies.dart';
 
 class CreatorDashboardPage extends StatefulWidget {
   final CreatorProfile profile;
@@ -27,6 +30,9 @@ class _CreatorDashboardPageState extends State<CreatorDashboardPage> {
   @override
   void initState() {
     super.initState();
+    context
+        .read<CreatorBloc>()
+        .add(CreatorFetchNotifications(widget.profile.uid));
     _views = [
       CreatorHomeView(profile: widget.profile),
       CreatorProductsView(profile: widget.profile),
@@ -57,6 +63,7 @@ class _CreatorDashboardPageState extends State<CreatorDashboardPage> {
         ),
         centerTitle: true,
         actions: [
+          _buildNotificationAction(),
           IconButton(
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(
@@ -127,6 +134,36 @@ class _CreatorDashboardPageState extends State<CreatorDashboardPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildNotificationAction() {
+    return BlocBuilder<CreatorBloc, CreatorState>(
+      buildWhen: (previous, current) => current is CreatorNotificationsLoaded,
+      builder: (context, state) {
+        int unreadCount = 0;
+        if (state is CreatorNotificationsLoaded) {
+          unreadCount = state.notifications.where((n) => !n.isRead).length;
+        }
+
+        return IconButton(
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (BuildContext context) => CreatorNotificationsPage(
+                  widget.profile,
+                ),
+              ),
+            );
+          },
+          icon: Badge(
+            isLabelVisible: unreadCount > 0,
+            label: Text('$unreadCount'),
+            backgroundColor: Colors.red,
+            child: const Icon(Icons.notifications_outlined),
+          ),
+        );
+      },
     );
   }
 }

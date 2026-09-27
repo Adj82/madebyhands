@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:madebyhands/features/creator/data/models/creator_notification_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_order_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_product_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_profile_model.dart';
@@ -84,6 +85,21 @@ abstract interface class CreatorRemoteDataSource {
     String? rejectionReason,
     String? consignmentNumber,
   });
+
+  /// Fetches in-app notifications for a specific creator.
+  Future<List<CreatorNotificationModel>> getCreatorNotifications(String creatorUid);
+
+  /// Marks a specific notification as read.
+  Future<void> markNotificationAsRead(String notificationId);
+
+  /// Marks all unread notifications for a creator as read.
+  Future<void> markAllNotificationsAsRead(String creatorUid);
+
+  /// Creates a new notification document in Firestore.
+  Future<void> createNotification(CreatorNotificationModel notification);
+
+  /// Deletes specified notifications persistently from Firestore.
+  Future<void> deleteNotifications(List<String> notificationIds);
 }
 
 class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
@@ -375,11 +391,34 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
           .collection('orders')
           .where('creatorId', isEqualTo: creatorUid)
           .get();
-      return snapshot.docs
+      final list = snapshot.docs
           .map((doc) => CreatorOrderModel.fromJson(doc.data(), doc.id))
           .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
     } catch (e) {
       throw Exception(e.toString());
+    }
+  }
+
+  static String? _getNextValidStatus(String currentStatus) {
+    switch (currentStatus) {
+      case 'Placed':
+        return 'Confirmed';
+      case 'Accepted':
+        return 'Confirmed';
+      case 'Confirmed':
+        return 'Processing';
+      case 'Processing':
+        return 'In-Transit';
+      case 'In-Transit':
+        return 'Shipped';
+      case 'Shipped':
+        return 'Out for Delivery';
+      case 'Out for Delivery':
+        return 'Delivered';
+      default:
+        return null;
     }
   }
 
@@ -391,22 +430,260 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
     String? consignmentNumber,
   }) async {
     try {
-      final updateData = <String, dynamic>{
-        'status': status,
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-      if (rejectionReason != null) {
-        updateData['rejectionReason'] = rejectionReason;
+      final orderRef = firestore.collection('orders').doc(orderId);
+      final orderSnap = await orderRef.get();
+      if (!orderSnap.exists) {
+        throw Exception('Order not found.');
       }
-      if (consignmentNumber != null) {
-        updateData['consignmentNumber'] = consignmentNumber;
+
+      final currentData = orderSnap.data() ?? <String, dynamic>{};
+      final currentStatus = currentData['status'] as String? ?? 'Placed';
+
+      if (status == 'Rejected') {
+        final updateData = <String, dynamic>{
+          'status': 'Rejected',
+          'rejectionReason': rejectionReason ?? 'Order rejected by creator',
+          'payoutStatus': 'cancelled',
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+        await orderRef.update(updateData);
+        return;
       }
-      if (status == 'Rejected' || status == 'Cancelled') {
-        updateData['payoutStatus'] = 'cancelled';
+
+      final expectedNextStatus = _getNextValidStatus(currentStatus);
+      if (expectedNextStatus == null) {
+        throw Exception(
+          'Order is already in a final status ($currentStatus) and cannot be updated further.',
+        );
       }
-      await firestore.collection('orders').doc(orderId).update(updateData);
+
+      if (status != expectedNextStatus) {
+        throw Exception(
+          'Invalid status transition from "$currentStatus" to "$status". The next valid status is "$expectedNextStatus".',
+        );
+      }
+
+      if (status == 'Confirmed' || status == 'Accepted') {
+        await firestore.runTransaction((transaction) async {
+          final txOrderSnap = await transaction.get(orderRef);
+          if (!txOrderSnap.exists) {
+            throw Exception('Order not found.');
+          }
+
+          final orderData = txOrderSnap.data() ?? <String, dynamic>{};
+          final txStatus = orderData['status'] as String? ?? '';
+
+          if (txStatus != 'Confirmed' && txStatus != 'Accepted') {
+            final rawItems = orderData['items'] as List<dynamic>? ?? const [];
+            final itemsToUpdate = <_ItemStockUpdate>[];
+
+            for (final rawItem in rawItems) {
+              if (rawItem is! Map) continue;
+              final itemMap = Map<String, dynamic>.from(rawItem);
+              final productId = itemMap['productId'] as String? ?? '';
+              final quantity = (itemMap['quantity'] as num?)?.round() ?? 1;
+              final itemName = itemMap['name'] as String? ?? 'Product';
+
+              if (productId.isNotEmpty) {
+                final productRef =
+                    firestore.collection('products').doc(productId);
+                final productSnap = await transaction.get(productRef);
+                itemsToUpdate.add(
+                  _ItemStockUpdate(
+                    ref: productRef,
+                    snap: productSnap,
+                    quantity: quantity,
+                    name: itemName,
+                  ),
+                );
+              }
+            }
+
+            for (final item in itemsToUpdate) {
+              if (!item.snap.exists) {
+                throw Exception(
+                  'Product "${item.name}" no longer exists in inventory.',
+                );
+              }
+
+              final productData = item.snap.data() ?? <String, dynamic>{};
+              final currentStock =
+                  (productData['stock'] as num?)?.toInt() ?? 0;
+
+              if (currentStock < item.quantity) {
+                throw Exception(
+                  'Cannot confirm order: Insufficient stock for "${item.name}". Available: $currentStock, Ordered: ${item.quantity}.',
+                );
+              }
+
+              final newStock = currentStock - item.quantity;
+              if (newStock < 0) {
+                throw Exception(
+                  'Cannot confirm order: Stock for "${item.name}" cannot become negative.',
+                );
+              }
+
+              item.newStock = newStock;
+            }
+
+            for (final item in itemsToUpdate) {
+              transaction.update(item.ref, {'stock': item.newStock});
+            }
+          }
+
+          final updateData = <String, dynamic>{
+            'status': status,
+            'updatedAt': FieldValue.serverTimestamp(),
+          };
+          if (rejectionReason != null) {
+            updateData['rejectionReason'] = rejectionReason;
+          }
+          if (consignmentNumber != null && consignmentNumber.trim().isNotEmpty) {
+            updateData['consignmentNumber'] = consignmentNumber.trim();
+          }
+          transaction.update(orderRef, updateData);
+        });
+      } else {
+        final updateData = <String, dynamic>{
+          'status': status,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+        if (consignmentNumber != null && consignmentNumber.trim().isNotEmpty) {
+          updateData['consignmentNumber'] = consignmentNumber.trim();
+        }
+        if (status == 'Delivered') {
+          updateData['deliveredAt'] = FieldValue.serverTimestamp();
+        }
+        await orderRef.update(updateData);
+      }
     } catch (e) {
       throw Exception(e.toString());
     }
   }
+
+  @override
+  Future<List<CreatorNotificationModel>> getCreatorNotifications(
+    String creatorUid,
+  ) async {
+    try {
+      final snapshot = await firestore
+          .collection('notifications')
+          .where('creatorUid', isEqualTo: creatorUid)
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        final batch = firestore.batch();
+        final ref1 = firestore.collection('notifications').doc();
+        batch.set(ref1, {
+          'creatorUid': creatorUid,
+          'title': 'Welcome to Creator Studio! 🎉',
+          'message':
+              'Complete your profile and submit verification to start listing your handcrafted products.',
+          'type': 'announcement',
+          'createdAt': FieldValue.serverTimestamp(),
+          'isRead': false,
+        });
+
+        final ref2 = firestore.collection('notifications').doc();
+        batch.set(ref2, {
+          'creatorUid': creatorUid,
+          'title': 'Platform Announcement 📢',
+          'message':
+              'Ensure product listings feature accurate photos, materials, and available stock levels.',
+          'type': 'announcement',
+          'createdAt': FieldValue.serverTimestamp(),
+          'isRead': false,
+        });
+
+        await batch.commit();
+
+        final freshSnapshot = await firestore
+            .collection('notifications')
+            .where('creatorUid', isEqualTo: creatorUid)
+            .get();
+
+        final freshList = freshSnapshot.docs
+            .map((doc) => CreatorNotificationModel.fromJson(doc.data(), doc.id))
+            .toList();
+        freshList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return freshList;
+      }
+
+      final list = snapshot.docs
+          .map((doc) => CreatorNotificationModel.fromJson(doc.data(), doc.id))
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<void> markNotificationAsRead(String notificationId) async {
+    try {
+      await firestore
+          .collection('notifications')
+          .doc(notificationId)
+          .update({'isRead': true});
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<void> markAllNotificationsAsRead(String creatorUid) async {
+    try {
+      final snapshot = await firestore
+          .collection('notifications')
+          .where('creatorUid', isEqualTo: creatorUid)
+          .where('isRead', isEqualTo: false)
+          .get();
+      final batch = firestore.batch();
+      for (final doc in snapshot.docs) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+      await batch.commit();
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<void> createNotification(CreatorNotificationModel notification) async {
+    try {
+      await firestore.collection('notifications').add(notification.toJson());
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<void> deleteNotifications(List<String> notificationIds) async {
+    try {
+      final batch = firestore.batch();
+      for (final id in notificationIds) {
+        final docRef = firestore.collection('notifications').doc(id);
+        batch.delete(docRef);
+      }
+      await batch.commit();
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+}
+
+class _ItemStockUpdate {
+  final DocumentReference<Map<String, dynamic>> ref;
+  final DocumentSnapshot<Map<String, dynamic>> snap;
+  final int quantity;
+  final String name;
+  int newStock;
+
+  _ItemStockUpdate({
+    required this.ref,
+    required this.snap,
+    required this.quantity,
+    required this.name,
+  }) : newStock = 0;
 }

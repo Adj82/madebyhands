@@ -16,6 +16,7 @@ class CreatorProduct {
   final bool isActive;
   final DateTime createdAt;
   final bool isCustomizable;
+  final List<String> predefinedCustomizations;
   final List<ProductCustomization> customizations;
   final Map<String, dynamic>? editHistory; // Stores previous values for comparison
   final String approvedBy;
@@ -39,6 +40,7 @@ class CreatorProduct {
     required this.isActive,
     required this.createdAt,
     this.isCustomizable = false,
+    this.predefinedCustomizations = const [],
     this.customizations = const [],
     this.editHistory,
     this.approvedBy = '',
