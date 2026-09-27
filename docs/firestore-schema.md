@@ -1,7 +1,4 @@
-# Shared Firestore schema (superseded draft)
-
-> **Do not implement new work from this draft.** The proposed versioned contract
-> for buyer, creator, and admin is in `docs/shared-firestore-schema-v1.md`.
+# Shared Firestore schema
 
 This contract is shared by the buyer, creator, and admin panels. Firestore is schemaless, so the application models and repository mappers enforce these fields.
 
