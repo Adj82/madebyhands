@@ -33,6 +33,7 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
     on<CreatorFetchNotifications>(_onFetchNotifications);
     on<CreatorMarkNotificationAsRead>(_onMarkNotificationAsRead);
     on<CreatorMarkAllNotificationsAsRead>(_onMarkAllNotificationsAsRead);
+    on<CreatorDeleteNotifications>(_onDeleteNotifications);
   }
 
   void _onCheckProfileExists(
@@ -333,5 +334,16 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
   ) async {
     await _creatorRepository.markAllNotificationsAsRead(event.uid);
     add(CreatorFetchNotifications(event.uid));
+  }
+
+  void _onDeleteNotifications(
+    CreatorDeleteNotifications event,
+    Emitter<CreatorState> emit,
+  ) async {
+    final res = await _creatorRepository.deleteNotifications(event.notificationIds);
+    res.fold(
+      (l) => emit(CreatorFailure(l.message)),
+      (r) => add(CreatorFetchNotifications(event.uid)),
+    );
   }
 }

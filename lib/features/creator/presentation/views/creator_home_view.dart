@@ -17,6 +17,14 @@ class CreatorHomeView extends StatefulWidget {
 class _CreatorHomeViewState extends State<CreatorHomeView> {
   bool _isRefreshing = false;
 
+  @override
+  void initState() {
+    super.initState();
+    context
+        .read<CreatorBloc>()
+        .add(CreatorFetchNotifications(widget.profile.uid));
+  }
+
   Future<void> _handleRefresh() async {
     if (_isRefreshing) return;
     setState(() => _isRefreshing = true);
@@ -67,15 +75,24 @@ class _CreatorHomeViewState extends State<CreatorHomeView> {
     return BlocBuilder<CreatorBloc, CreatorState>(
       buildWhen: (previous, current) => current is CreatorNotificationsLoaded,
       builder: (context, state) {
-        String title = 'Welcome to Creator Studio!';
-        String message = 'Start by completing your verification to list products.';
-        bool hasUnread = false;
+        String title = "You're all caught up!";
+        String message = 'Check back later for new orders and updates.';
+        int unreadCount = 0;
 
-        if (state is CreatorNotificationsLoaded && state.notifications.isNotEmpty) {
-          final topNotif = state.notifications.first;
-          title = topNotif.title;
-          message = topNotif.message;
-          hasUnread = state.notifications.any((n) => !n.isRead);
+        if (state is CreatorNotificationsLoaded) {
+          final unreadNotifications =
+              state.notifications.where((n) => !n.isRead).toList();
+          unreadCount = unreadNotifications.length;
+
+          if (unreadCount > 0) {
+            title = unreadCount == 1
+                ? '1 new notification'
+                : '$unreadCount new notifications';
+            final latest = unreadNotifications.first;
+            message = latest.title.isNotEmpty
+                ? '${latest.title}: ${latest.message}'
+                : latest.message;
+          }
         }
 
         return InkWell(
@@ -99,10 +116,13 @@ class _CreatorHomeViewState extends State<CreatorHomeView> {
             child: Row(
               children: [
                 Badge(
-                  isLabelVisible: hasUnread,
+                  isLabelVisible: unreadCount > 0,
+                  label: Text('$unreadCount'),
                   backgroundColor: Colors.red,
-                  smallSize: 8,
-                  child: const Icon(Icons.notifications_active_outlined, color: AppColors.accent),
+                  child: const Icon(
+                    Icons.notifications_active_outlined,
+                    color: AppColors.accent,
+                  ),
                 ),
                 const SizedBox(width: 15),
                 Expanded(
@@ -111,20 +131,30 @@ class _CreatorHomeViewState extends State<CreatorHomeView> {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         message,
-                        style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.mutedText,
+                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: AppColors.mutedText, size: 20),
+                const Icon(
+                  Icons.chevron_right,
+                  color: AppColors.mutedText,
+                  size: 20,
+                ),
               ],
             ),
           ),

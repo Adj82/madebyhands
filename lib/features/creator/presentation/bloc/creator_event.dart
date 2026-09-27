@@ -188,3 +188,9 @@ final class CreatorMarkAllNotificationsAsRead extends CreatorEvent {
   final String uid;
   CreatorMarkAllNotificationsAsRead(this.uid);
 }
+
+final class CreatorDeleteNotifications extends CreatorEvent {
+  final List<String> notificationIds;
+  final String uid;
+  CreatorDeleteNotifications({required this.notificationIds, required this.uid});
+}

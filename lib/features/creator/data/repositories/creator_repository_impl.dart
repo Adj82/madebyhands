@@ -454,4 +454,16 @@ class CreatorRepositoryImpl implements CreatorRepository {
       return left(Failure(_cleanExceptionMessage(e)));
     }
   }
+
+  @override
+  Future<Either<Failure, void>> deleteNotifications(
+    List<String> notificationIds,
+  ) async {
+    try {
+      await remoteDataSource.deleteNotifications(notificationIds);
+      return right(null);
+    } catch (e) {
+      return left(Failure(_cleanExceptionMessage(e)));
+    }
+  }
 }

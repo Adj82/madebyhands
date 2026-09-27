@@ -109,6 +109,10 @@ abstract interface class CreatorRepository {
   Future<Either<Failure, void>> markAllNotificationsAsRead(
     String creatorUid,
   );
+
+  Future<Either<Failure, void>> deleteNotifications(
+    List<String> notificationIds,
+  );
 }
 
 class CustomizationInput {

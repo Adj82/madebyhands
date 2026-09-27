@@ -97,6 +97,9 @@ abstract interface class CreatorRemoteDataSource {
 
   /// Creates a new notification document in Firestore.
   Future<void> createNotification(CreatorNotificationModel notification);
+
+  /// Deletes specified notifications persistently from Firestore.
+  Future<void> deleteNotifications(List<String> notificationIds);
 }
 
 class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
@@ -635,6 +638,20 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
   Future<void> createNotification(CreatorNotificationModel notification) async {
     try {
       await firestore.collection('notifications').add(notification.toJson());
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<void> deleteNotifications(List<String> notificationIds) async {
+    try {
+      final batch = firestore.batch();
+      for (final id in notificationIds) {
+        final docRef = firestore.collection('notifications').doc(id);
+        batch.delete(docRef);
+      }
+      await batch.commit();
     } catch (e) {
       throw Exception(e.toString());
     }
