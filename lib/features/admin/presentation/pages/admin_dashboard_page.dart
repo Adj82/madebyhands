@@ -65,8 +65,11 @@ class AdminDashboardPage extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.admin_panel_settings,
-                            size: 44, color: Colors.white),
+                        Image.asset(
+                          'assets/images/logo.png',
+                          height: 40,
+                          errorBuilder: (c, e, s) => const Icon(Icons.admin_panel_settings, size: 40, color: Colors.white),
+                        ),
                         const SizedBox(height: 8),
                         const Text('MADEBYHANDS ADMIN',
                             style: TextStyle(

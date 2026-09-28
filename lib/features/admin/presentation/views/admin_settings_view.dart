@@ -25,9 +25,14 @@ class _AdminSettingsViewState extends State<AdminSettingsView> {
 
     return BlocBuilder<AdminBloc, AdminState>(
       builder: (context, state) {
-        return ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
+        return RefreshIndicator(
+          onRefresh: () async {
+            context.read<AdminBloc>().add(AdminLoadDataRequested());
+          },
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(20),
+            children: [
             const _SettingsSection(title: 'Platform Economics'),
             _buildConfigTile(
               'Flat Platform Fee',
@@ -113,7 +118,8 @@ class _AdminSettingsViewState extends State<AdminSettingsView> {
               child: const Text('Save Global Changes'),
             ),
           ],
-        );
+        ),
+      );
       },
     );
   }

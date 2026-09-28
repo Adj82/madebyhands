@@ -98,14 +98,20 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'MADEBYHANDS',
-                          style: GoogleFonts.montserrat(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 4,
-                          ),
+                        Row(
+                          children: [
+                            Image.asset('assets/images/logo.png', height: 36, errorBuilder: (c, e, s) => const SizedBox.shrink()),
+                            const SizedBox(width: 10),
+                            Text(
+                              'MADEBYHANDS',
+                              style: GoogleFonts.montserrat(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 3,
+                              ),
+                            ),
+                          ],
                         ).animate().fadeIn(duration: 800.ms).slideX(begin: -0.2),
                         if (_currentPage < _onboardingPages.length - 1)
                           TextButton(
