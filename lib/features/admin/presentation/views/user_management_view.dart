@@ -39,7 +39,7 @@ class UserManagementView extends StatelessWidget {
             }
 
             final docs = snapshot.data?.docs ?? [];
-            final allUsers = docs.map((doc) {
+            final List<UserEntity> allUsers = docs.map<UserEntity>((doc) {
               final data = doc.data();
               return UserEntity(
                 uid: doc.id,
@@ -49,12 +49,11 @@ class UserManagementView extends StatelessWidget {
                 role: data['role'] as String? ?? 'buyer',
                 isVerified: data['isVerified'] as bool? ?? false,
                 isSuspended: data['isSuspended'] as bool? ?? false,
-                createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
               );
             }).toList();
 
-            final buyers = allUsers.where((u) => u.role == 'buyer').toList();
-            final creators = allUsers.where((u) => u.role == 'creator' || u.role == 'seller').toList();
+            final List<UserEntity> buyers = allUsers.where((u) => u.role == 'buyer').toList();
+            final List<UserEntity> creators = allUsers.where((u) => u.role == 'creator' || u.role == 'seller').toList();
 
             return TabBarView(
               children: [
