@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
+import 'package:madebyhands/features/creator/presentation/pages/creator_onboarding_page.dart';
+import 'package:madebyhands/features/creator/presentation/pages/privacy_policy_page.dart';
+import 'package:madebyhands/features/creator/presentation/pages/terms_and_conditions_page.dart';
 
 class CreatorProfileView extends StatefulWidget {
   final CreatorProfile profile;
@@ -16,15 +20,24 @@ class CreatorProfileView extends StatefulWidget {
 class _CreatorProfileViewState extends State<CreatorProfileView> {
   bool _isRefreshing = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _checkProfile();
+  }
+
+  void _checkProfile() {
+    context.read<CreatorBloc>().add(CreatorCheckProfileExists(widget.profile.uid));
+  }
+
   Future<void> _handleRefresh() async {
     if (_isRefreshing) return;
     setState(() => _isRefreshing = true);
 
     try {
-      final bloc = context.read<CreatorBloc>();
-      bloc.add(CreatorCheckProfileExists(widget.profile.uid));
-      bloc.add(CreatorFetchCreatorProducts(widget.profile.uid));
-      bloc.add(CreatorFetchOrders(widget.profile.uid));
+      _checkProfile();
+      context.read<CreatorBloc>().add(CreatorFetchCreatorProducts(widget.profile.uid));
+      context.read<CreatorBloc>().add(CreatorFetchOrders(widget.profile.uid));
       await Future.delayed(const Duration(milliseconds: 600));
     } finally {
       if (mounted) {
@@ -35,61 +48,99 @@ class _CreatorProfileViewState extends State<CreatorProfileView> {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: _handleRefresh,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            _buildProfileCard(),
-            const SizedBox(height: 30),
-            _buildActionItem(
-              icon: Icons.edit_outlined,
-              title: 'Edit Creator Profile',
-              subtitle: 'Update bio, craft category, and links',
-              onTap: () {},
+    return BlocBuilder<CreatorBloc, CreatorState>(
+      buildWhen: (previous, current) =>
+          current is CreatorProfileLoaded ||
+          current is CreatorLoading ||
+          current is CreatorFailure,
+      builder: (context, state) {
+        final profile = (state is CreatorProfileLoaded)
+            ? state.profile
+            : widget.profile;
+
+        return RefreshIndicator(
+          onRefresh: _handleRefresh,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                _buildProfileCard(profile),
+                const SizedBox(height: 24),
+                _buildActionItem(
+                  icon: Icons.edit_outlined,
+                  title: 'Edit Creator Profile',
+                  subtitle: 'Update bio, craft category, story, and links',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CreatorOnboardingPage(
+                          user: UserEntity(
+                            uid: profile.uid,
+                            email: '',
+                            name: profile.name,
+                            role: 'creator',
+                          ),
+                          existingProfile: profile,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                _buildActionItem(
+                  icon: Icons.description_outlined,
+                  title: 'Terms & Conditions',
+                  subtitle: 'Read artisan platform terms and rules',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const TermsAndConditionsPage(),
+                      ),
+                    );
+                  },
+                ),
+                _buildActionItem(
+                  icon: Icons.privacy_tip_outlined,
+                  title: 'Privacy Policy',
+                  subtitle: 'View data protection policies',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PrivacyPolicyPage(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 30),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    context.read<AuthBloc>().add(AuthLogoutRequested());
+                  },
+                  icon: const Icon(Icons.logout, color: Colors.red),
+                  label:
+                      const Text('Log Out', style: TextStyle(color: Colors.red)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red),
+                    minimumSize: const Size(double.infinity, 52),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
             ),
-            _buildActionItem(
-              icon: Icons.collections_outlined,
-              title: 'Manage Portfolio',
-              subtitle: 'Add or remove showcase images',
-              onTap: () {},
-            ),
-            _buildActionItem(
-              icon: Icons.share_outlined,
-              title: 'Share Storefront',
-              subtitle: 'Let others discover your work',
-              onTap: () {},
-            ),
-            _buildActionItem(
-              icon: Icons.settings_outlined,
-              title: 'Store Settings',
-              subtitle: 'Payment and shipping preferences',
-              onTap: () {},
-            ),
-            const SizedBox(height: 40),
-            OutlinedButton.icon(
-              onPressed: () {
-                context.read<AuthBloc>().add(AuthLogoutRequested());
-              },
-              icon: const Icon(Icons.logout, color: Colors.red),
-              label: const Text('Logout', style: TextStyle(color: Colors.red)),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.red),
-                minimumSize: const Size(double.infinity, 52),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildProfileCard() {
+  Widget _buildProfileCard(CreatorProfile profile) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -101,52 +152,52 @@ class _CreatorProfileViewState extends State<CreatorProfileView> {
       child: Column(
         children: [
           CircleAvatar(
-            radius: 50,
+            radius: 46,
             backgroundColor: AppColors.outline,
-            backgroundImage: widget.profile.profileImage.isNotEmpty
-                ? NetworkImage(widget.profile.profileImage)
+            backgroundImage: profile.profileImage.isNotEmpty
+                ? NetworkImage(profile.profileImage)
                 : null,
-            child: widget.profile.profileImage.isEmpty
-                ? const Icon(Icons.person, size: 50, color: Colors.white)
+            child: profile.profileImage.isEmpty
+                ? const Icon(Icons.person, size: 46, color: Colors.white)
                 : null,
           ),
-          const SizedBox(height: 15),
+          const SizedBox(height: 12),
           Text(
-            widget.profile.name,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            profile.name,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
+          const SizedBox(height: 2),
           Text(
-            widget.profile.category,
-            style: const TextStyle(color: AppColors.mutedText, fontSize: 14),
+            profile.category,
+            style: const TextStyle(color: AppColors.mutedText, fontSize: 13),
           ),
-          const SizedBox(height: 20),
-          const Divider(),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStat('Products', '0'),
-              _buildStat('Rating', '5.0'),
-              _buildStat('Join Date', 'Sep 2026'),
-            ],
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: (profile.verificationStatus == 'Verified'
+                      ? Colors.green
+                      : (profile.verificationStatus == 'In-Process'
+                          ? Colors.orange
+                          : Colors.red))
+                  .withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              profile.verificationStatus,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: profile.verificationStatus == 'Verified'
+                    ? Colors.green
+                    : (profile.verificationStatus == 'In-Process'
+                        ? Colors.orange.shade800
+                        : Colors.red),
+              ),
+            ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStat(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
-        ),
-      ],
     );
   }
 
@@ -155,13 +206,15 @@ class _CreatorProfileViewState extends State<CreatorProfileView> {
     required String title,
     required String subtitle,
     required VoidCallback onTap,
+    Color? badgeColor,
   }) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: ListTile(
-        leading: Icon(icon, color: AppColors.primary),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        leading: Icon(icon, color: badgeColor ?? AppColors.primary),
+        title:
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
         trailing: const Icon(Icons.chevron_right, size: 20),
         onTap: onTap,
