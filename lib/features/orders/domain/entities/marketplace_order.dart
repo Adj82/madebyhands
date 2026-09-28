@@ -5,6 +5,9 @@ class MarketplaceOrderItem {
   final String creatorName;
   final int quantity;
   final int unitPrice;
+  final int baseUnitPrice;
+  final int customizationPrice;
+  final Map<String, List<String>> customizations;
 
   const MarketplaceOrderItem({
     required this.productId,
@@ -13,6 +16,9 @@ class MarketplaceOrderItem {
     required this.creatorName,
     required this.quantity,
     required this.unitPrice,
+    this.baseUnitPrice = 0,
+    this.customizationPrice = 0,
+    this.customizations = const {},
   });
 
   int get total => quantity * unitPrice;
@@ -80,6 +86,9 @@ class CheckoutOrderItem {
   final String creatorName;
   final int quantity;
   final int unitPrice;
+  final int baseUnitPrice;
+  final int customizationPrice;
+  final Map<String, List<String>> customizations;
 
   const CheckoutOrderItem({
     required this.productId,
@@ -88,6 +97,9 @@ class CheckoutOrderItem {
     required this.creatorName,
     required this.quantity,
     required this.unitPrice,
+    required this.baseUnitPrice,
+    this.customizationPrice = 0,
+    this.customizations = const {},
   });
 }
 

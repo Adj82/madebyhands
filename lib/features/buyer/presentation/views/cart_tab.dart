@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_empty_state.dart';
 
@@ -18,11 +19,14 @@ class CartTab extends StatelessWidget {
             .where((product) => state.cartQuantities.containsKey(product.id))
             .toList();
 
-        final subtotal = productsInCart.fold<int>(
-          0,
-          (total, product) =>
-              total + product.price * state.cartQuantities[product.id]!,
-        );
+        final subtotal = productsInCart.fold<int>(0, (total, product) {
+          final selection =
+              state.cartCustomizations[product.id] ??
+              const ProductCustomizationSelection();
+          return total +
+              selection.unitPriceFor(product) *
+                  state.cartQuantities[product.id]!;
+        });
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -52,6 +56,10 @@ class CartTab extends StatelessWidget {
                       itemBuilder: (context, index) {
                         final product = productsInCart[index];
                         final quantity = state.cartQuantities[product.id]!;
+                        final customization =
+                            state.cartCustomizations[product.id] ??
+                            const ProductCustomizationSelection();
+                        final unitPrice = customization.unitPriceFor(product);
                         return Card(
                           child: Padding(
                             padding: const EdgeInsets.all(12),
@@ -85,11 +93,28 @@ class CartTab extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 5),
                                       Text(
-                                        '₹${product.price}',
+                                        '₹$unitPrice',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w800,
                                         ),
                                       ),
+                                      if (!customization.isEmpty) ...[
+                                        const SizedBox(height: 5),
+                                        Text(
+                                          customization.values.entries
+                                              .map(
+                                                (entry) =>
+                                                    '${entry.key}: ${entry.value.join(', ')}',
+                                              )
+                                              .join(' · '),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: AppColors.mutedText,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -97,13 +122,14 @@ class CartTab extends StatelessWidget {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     IconButton(
-                                      onPressed: () =>
-                                          context.read<BuyerBloc>().add(
-                                            BuyerUpdateCartQuantity(
-                                              product,
-                                              quantity - 1,
+                                      onPressed: quantity >= product.stock
+                                          ? null
+                                          : () => context.read<BuyerBloc>().add(
+                                              BuyerUpdateCartQuantity(
+                                                product,
+                                                quantity - 1,
+                                              ),
                                             ),
-                                          ),
                                       icon: const Icon(
                                         Icons.remove_circle_outline,
                                       ),

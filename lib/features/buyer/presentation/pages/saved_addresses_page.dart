@@ -3,6 +3,16 @@ import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
 
+Future<SavedAddress?> showSavedAddressForm(
+  BuildContext context, {
+  SavedAddress? existing,
+}) => showModalBottomSheet<SavedAddress>(
+  context: context,
+  isScrollControlled: true,
+  useSafeArea: true,
+  builder: (_) => _AddressForm(address: existing),
+);
+
 class SavedAddressesPage extends StatelessWidget {
   final String userId;
   final BuyerRepository repository;
@@ -93,7 +103,14 @@ class SavedAddressesPage extends StatelessWidget {
                           PopupMenuButton<String>(
                             onSelected: (value) async {
                               if (value == 'edit') {
-                                await _showAddressForm(context, address);
+                                final updated = await showSavedAddressForm(
+                                  context,
+                                  existing: address,
+                                );
+                                if (!context.mounted) return;
+                                if (updated != null) {
+                                  await _saveAddress(context, updated);
+                                }
                               } else if (value == 'delete') {
                                 await _confirmDelete(context, address);
                               } else if (value == 'default') {
@@ -147,7 +164,13 @@ class SavedAddressesPage extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddressForm(context, null),
+        onPressed: () async {
+          final address = await showSavedAddressForm(context);
+          if (!context.mounted) return;
+          if (address != null) {
+            await _saveAddress(context, address);
+          }
+        },
         icon: const Icon(Icons.add),
         label: const Text('Add address'),
       ),
@@ -180,19 +203,9 @@ class SavedAddressesPage extends StatelessWidget {
     if (confirmed) await repository.deleteAddress(userId, address.id);
   }
 
-  Future<void> _showAddressForm(
-    BuildContext context,
-    SavedAddress? existing,
-  ) async {
-    final result = await showModalBottomSheet<SavedAddress>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => _AddressForm(address: existing),
-    );
-    if (result == null) return;
+  Future<void> _saveAddress(BuildContext context, SavedAddress address) async {
     try {
-      await repository.saveAddress(userId, result);
+      await repository.saveAddress(userId, address);
     } catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(

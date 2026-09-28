@@ -14,6 +14,13 @@ abstract interface class AuthRemoteDataSource {
     required String role,
   });
   Future<UserModel?> getCurrentUserData();
+  Future<UserModel> updateProfile({
+    required String uid,
+    required String name,
+    required String phone,
+  });
+  Future<void> sendPasswordReset(String email);
+  Future<void> requestAccountDeletion(UserModel user);
   Future<void> signOut();
 }
 
@@ -165,6 +172,54 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } catch (e) {
       return null;
     }
+  }
+
+  @override
+  Future<UserModel> updateProfile({
+    required String uid,
+    required String name,
+    required String phone,
+  }) async {
+    final reference = firestore.collection('users').doc(uid);
+    await reference.update({'name': name.trim(), 'phone': phone.trim()});
+    if (firebaseAuth.currentUser?.uid == uid) {
+      await firebaseAuth.currentUser?.updateDisplayName(name.trim());
+    }
+    final snapshot = await reference.get();
+    if (!snapshot.exists || snapshot.data() == null) {
+      throw StateError('User profile not found.');
+    }
+    return UserModel.fromJson(snapshot.data()!);
+  }
+
+  @override
+  Future<void> sendPasswordReset(String email) =>
+      firebaseAuth.sendPasswordResetEmail(email: email.trim());
+
+  @override
+  Future<void> requestAccountDeletion(UserModel user) async {
+    final ticket = firestore.collection('support_tickets').doc();
+    final firstMessage = ticket.collection('messages').doc();
+    final batch = firestore.batch();
+    batch.set(ticket, {
+      'userId': user.uid,
+      'userName': user.name,
+      'userEmail': user.email,
+      'userRole': user.role,
+      'subject': 'Account deletion request',
+      'category': 'Account',
+      'status': 'Open',
+      'lastMessage': 'Please permanently delete my MADEBYHANDS account.',
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    batch.set(firstMessage, {
+      'senderId': user.uid,
+      'senderRole': user.role,
+      'message': 'Please permanently delete my MADEBYHANDS account.',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
   }
 
   @override

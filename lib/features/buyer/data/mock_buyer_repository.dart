@@ -2,13 +2,19 @@ import 'dart:async';
 
 import 'package:madebyhands/features/buyer/data/mock_products.dart';
 import 'package:madebyhands/features/buyer/domain/entities/buyer_order.dart';
+import 'package:madebyhands/features/buyer/domain/entities/buyer_product_notification.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product_review.dart';
+import 'package:madebyhands/features/buyer/domain/entities/public_creator.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
 import 'package:madebyhands/features/orders/domain/order_status.dart';
 
 class MockBuyerRepository implements BuyerRepository {
+  final List<BuyerProductNotification> productNotifications;
+
+  MockBuyerRepository({this.productNotifications = const []});
+
   final Set<String> _favorites = {};
   final List<SavedAddress> _addresses = [
     const SavedAddress(
@@ -73,6 +79,27 @@ class MockBuyerRepository implements BuyerRepository {
   Stream<List<Product>> watchProducts() => Stream.value(mockProducts);
 
   @override
+  Stream<List<PublicCreator>> watchPublicCreators() => Stream.value(const [
+    PublicCreator(
+      uid: 'creator-asha',
+      name: 'Asha Weaves',
+      businessName: 'Asha Weaves',
+      bio: 'Handwoven homeware made with natural fibres.',
+      category: 'Textile & Fiber Art',
+      location: 'Jaipur, Rajasthan',
+      story: 'A family weaving practice carried forward by local artisans.',
+      isVerified: true,
+    ),
+    PublicCreator(
+      uid: 'creator-jaipur-clay',
+      name: 'Jaipur Clay Studio',
+      category: 'Pottery, Ceramics & Clay',
+      location: 'Jaipur, Rajasthan',
+      isVerified: true,
+    ),
+  ]);
+
+  @override
   Stream<Set<String>> watchFavoriteProductIds(String userId) async* {
     yield Set.unmodifiable(_favorites);
     yield* _favoriteChanges.stream;
@@ -90,6 +117,26 @@ class MockBuyerRepository implements BuyerRepository {
 
   @override
   Stream<List<BuyerOrder>> watchOrders(String userId) => Stream.value(_orders);
+
+  @override
+  Stream<List<BuyerProductNotification>> watchNewProductNotifications(
+    String userId,
+  ) => Stream.value(List.unmodifiable(productNotifications));
+
+  @override
+  Stream<List<BuyerProductNotification>> watchBuyerNotifications(
+    String userId,
+  ) => Stream.value([
+    ...productNotifications,
+    ..._orders.map(
+      (order) => BuyerProductNotification.order(
+        id: 'order-${order.id}-${order.status}',
+        orderId: order.id,
+        orderStatus: order.status,
+        publishedAt: order.updatedAt ?? order.createdAt,
+      ),
+    ),
+  ]);
 
   @override
   Stream<List<SavedAddress>> watchAddresses(String userId) async* {

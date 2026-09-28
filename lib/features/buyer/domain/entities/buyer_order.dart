@@ -3,12 +3,18 @@ class BuyerOrderItem {
   final String name;
   final int quantity;
   final int unitPrice;
+  final int baseUnitPrice;
+  final int customizationPrice;
+  final Map<String, List<String>> customizations;
 
   const BuyerOrderItem({
     required this.productId,
     required this.name,
     required this.quantity,
     required this.unitPrice,
+    this.baseUnitPrice = 0,
+    this.customizationPrice = 0,
+    this.customizations = const {},
   });
 
   int get total => quantity * unitPrice;

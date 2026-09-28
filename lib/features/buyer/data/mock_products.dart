@@ -14,6 +14,10 @@ const mockProducts = <Product>[
     color: Color(0xFFD8BE8B),
     icon: Icons.shopping_basket_outlined,
     creatorUid: 'creator-asha',
+    stock: 8,
+    materials: 'Natural dyed jute and cotton',
+    dimensions: '32 × 28 cm',
+    shippingInfo: 'Dispatches in 2–3 working days',
   ),
   Product(
     id: 'blue-pottery',
@@ -27,6 +31,10 @@ const mockProducts = <Product>[
     color: Color(0xFFAFC9D6),
     icon: Icons.local_florist_outlined,
     creatorUid: 'creator-jaipur-clay',
+    stock: 6,
+    materials: 'Hand-glazed ceramic',
+    dimensions: '24 cm high',
+    shippingInfo: 'Ships with protective recyclable packaging',
   ),
   Product(
     id: 'silver-earrings',
@@ -40,6 +48,7 @@ const mockProducts = <Product>[
     color: Color(0xFFD8D6D1),
     icon: Icons.diamond_outlined,
     creatorUid: 'creator-tara',
+    stock: 10,
   ),
   Product(
     id: 'block-print-tote',
@@ -53,6 +62,7 @@ const mockProducts = <Product>[
     color: Color(0xFFE8AA91),
     icon: Icons.shopping_bag_outlined,
     creatorUid: 'creator-rang',
+    stock: 12,
   ),
   Product(
     id: 'soy-candle',
@@ -66,6 +76,7 @@ const mockProducts = <Product>[
     color: Color(0xFFD9A179),
     icon: Icons.light_mode_outlined,
     creatorUid: 'creator-mitti',
+    stock: 7,
   ),
   Product(
     id: 'wooden-toy',
@@ -79,5 +90,6 @@ const mockProducts = <Product>[
     color: Color(0xFFB8C99D),
     icon: Icons.toys_outlined,
     creatorUid: 'creator-karigar',
+    stock: 5,
   ),
 ];

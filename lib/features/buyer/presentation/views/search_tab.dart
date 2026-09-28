@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
+import 'package:madebyhands/features/buyer/domain/entities/public_creator.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_empty_state.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
@@ -9,11 +10,13 @@ import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dar
 class SearchTab extends StatefulWidget {
   final String userId;
   final ValueChanged<Product> onProductTap;
+  final ValueChanged<PublicCreator>? onCreatorTap;
 
   const SearchTab({
     super.key,
     required this.userId,
     required this.onProductTap,
+    this.onCreatorTap,
   });
 
   @override
@@ -162,6 +165,14 @@ class _SearchTabState extends State<SearchTab> {
               product.category.toLowerCase().contains(normalizedQuery);
           return matchesCategory && matchesQuery;
         }).toList();
+        final normalizedQuery = _query.trim().toLowerCase();
+        final creators = state.creators.where((creator) {
+          if (normalizedQuery.isEmpty) return true;
+          return creator.displayName.toLowerCase().contains(normalizedQuery) ||
+              creator.name.toLowerCase().contains(normalizedQuery) ||
+              creator.category.toLowerCase().contains(normalizedQuery) ||
+              creator.location.toLowerCase().contains(normalizedQuery);
+        }).toList();
 
         return CustomScrollView(
           key: const PageStorageKey('buyer-search'),
@@ -235,6 +246,73 @@ class _SearchTabState extends State<SearchTab> {
                     ),
                   ],
                   const SizedBox(height: 18),
+                  if (creators.isNotEmpty) ...[
+                    const Text(
+                      'Creators',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 92,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: creators.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 10),
+                        itemBuilder: (context, index) {
+                          final creator = creators[index];
+                          return SizedBox(
+                            width: 230,
+                            child: Card(
+                              child: ListTile(
+                                onTap: widget.onCreatorTap == null
+                                    ? null
+                                    : () => widget.onCreatorTap!(creator),
+                                leading: CircleAvatar(
+                                  backgroundImage: creator.profileImage.isEmpty
+                                      ? null
+                                      : NetworkImage(creator.profileImage),
+                                  child: creator.profileImage.isEmpty
+                                      ? const Icon(Icons.storefront)
+                                      : null,
+                                ),
+                                title: Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        creator.displayName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (creator.isVerified)
+                                      const Padding(
+                                        padding: EdgeInsets.only(left: 4),
+                                        child: Icon(
+                                          Icons.verified,
+                                          size: 16,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                subtitle: Text(
+                                  creator.category.isEmpty
+                                      ? creator.location
+                                      : creator.category,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                  ],
                   Text(
                     '${products.length} pieces',
                     style: const TextStyle(fontWeight: FontWeight.w700),

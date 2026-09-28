@@ -1,19 +1,27 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:fpdart/fpdart.dart';
+import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
+import 'package:madebyhands/features/auth/domain/repositories/auth_repository.dart';
 import 'package:madebyhands/features/buyer/data/mock_buyer_repository.dart';
 import 'package:madebyhands/features/buyer/data/mock_products.dart';
-import 'package:madebyhands/features/buyer/domain/entities/buyer_order.dart';
+import 'package:madebyhands/features/buyer/domain/entities/buyer_product_notification.dart';
+import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/buyer_dashboard_page.dart';
-import 'package:madebyhands/features/buyer/presentation/pages/order_detail_page.dart';
+import 'package:madebyhands/features/buyer/presentation/pages/buyer_account_page.dart';
+import 'package:madebyhands/features/buyer/presentation/pages/checkout_page.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/product_details_page.dart';
+import 'package:madebyhands/features/orders/domain/entities/marketplace_order.dart';
+import 'package:madebyhands/features/orders/domain/repositories/order_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   final buyer = UserEntity(
     uid: 'buyer-1',
     email: 'suhani@example.com',
@@ -21,15 +29,16 @@ void main() {
     role: 'buyer',
   );
 
-  Widget buildDashboard() {
+  Widget buildDashboard({MockBuyerRepository? repository}) {
     return MaterialApp(
       theme: AppTheme.lightThemeMode,
       home: MultiBlocProvider(
         providers: [
           BlocProvider(
-            create: (_) => BuyerBloc(repository: MockBuyerRepository())
-              ..add(BuyerWatchProducts())
-              ..add(BuyerWatchFavorites(buyer.uid)),
+            create: (_) =>
+                BuyerBloc(repository: repository ?? MockBuyerRepository())
+                  ..add(BuyerWatchProducts())
+                  ..add(BuyerWatchFavorites(buyer.uid)),
           ),
           // We provide a dummy AuthBloc since the UI needs it for Logout
           // but we won't trigger any real auth actions here
@@ -62,7 +71,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Filter by category'), findsOneWidget);
     expect(find.text('Paintings & Fine Art'), findsOneWidget);
-    expect(find.text('Pottery, Ceramics & Clay'), findsOneWidget);
+    expect(
+      find.widgetWithText(CheckboxListTile, 'Pottery, Ceramics & Clay'),
+      findsOneWidget,
+    );
 
     await tester.tap(
       find.widgetWithText(CheckboxListTile, 'Paintings & Fine Art'),
@@ -95,10 +107,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'pottery');
     await tester.pump();
-    await tester.drag(
-      find.byKey(const PageStorageKey('buyer-search')),
-      const Offset(0, -350),
-    );
+    await tester.ensureVisible(find.text('Blue Pottery Vase'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Blue Pottery Vase'));
     await tester.pumpAndSettle();
@@ -124,6 +133,48 @@ void main() {
     expect(find.text('2'), findsWidgets);
   });
 
+  testWidgets('buyer receives and opens a matching new-product notification', (
+    tester,
+  ) async {
+    final product = mockProducts.firstWhere(
+      (item) => item.id == 'silver-earrings',
+    );
+    final repository = MockBuyerRepository(
+      productNotifications: [
+        BuyerProductNotification(
+          id: product.id,
+          product: product,
+          category: product.category,
+          publishedAt: DateTime(2026, 9, 28, 12),
+          reason: BuyerProductNotificationReason.purchased,
+        ),
+      ],
+    );
+    await tester.pumpWidget(buildDashboard(repository: repository));
+    await tester.pumpAndSettle();
+
+    final notificationButton = find.byTooltip('Open notifications');
+    expect(notificationButton, findsOneWidget);
+    expect(
+      find.descendant(of: notificationButton, matching: find.text('2')),
+      findsOneWidget,
+    );
+
+    await tester.tap(notificationButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Notifications'), findsOneWidget);
+    expect(find.text('New in Jewellery'), findsOneWidget);
+    expect(
+      find.textContaining('category you have purchased from'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('New in Jewellery'));
+    await tester.pumpAndSettle();
+    expect(find.text('Product details'), findsOneWidget);
+    expect(find.byTooltip('Save item'), findsOneWidget);
+  });
+
   testWidgets('buy now starts the direct checkout action', (tester) async {
     var buyNowPressed = false;
     await tester.pumpWidget(
@@ -137,7 +188,8 @@ void main() {
           onSave: () {},
           onCartQuantityChanged: (_) {},
           onOpenCart: () {},
-          onBuyNow: () => buyNowPressed = true,
+          onBuyNow: (_) => buyNowPressed = true,
+          onCustomizationChanged: (_) {},
           buyerRepository: MockBuyerRepository(),
           buyerId: buyer.uid,
           buyerName: buyer.name,
@@ -149,6 +201,129 @@ void main() {
     await tester.pump();
 
     expect(buyNowPressed, isTrue);
+  });
+
+  testWidgets(
+    'buyer selects seller customizations and receives adjusted price',
+    (tester) async {
+      const product = Product(
+        id: 'custom-journal',
+        name: 'Personalized Journal',
+        artisan: 'Paper Studio',
+        category: 'Paper, Books & Stationery',
+        description: 'A handmade journal.',
+        price: 999,
+        rating: 4.8,
+        color: Color(0xFFD8BE8B),
+        icon: Icons.menu_book_outlined,
+        creatorUid: 'creator-paper',
+        isCustomizable: true,
+        predefinedCustomizations: ['Color'],
+        customizations: [
+          BuyerProductCustomization(
+            name: 'Engraving',
+            description: 'Choose the engraving format.',
+            additionalPrice: 150,
+            options: ['Initials', 'Full name'],
+          ),
+        ],
+      );
+      var latestSelection = const ProductCustomizationSelection();
+      var buyNowSelection = const ProductCustomizationSelection();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightThemeMode,
+          home: ProductDetailsPage(
+            product: product,
+            isSaved: false,
+            cartQuantity: 0,
+            cartCount: 0,
+            onSave: () {},
+            onCartQuantityChanged: (_) {},
+            onOpenCart: () {},
+            onBuyNow: (selection) => buyNowSelection = selection,
+            onCustomizationChanged: (selection) => latestSelection = selection,
+            buyerRepository: MockBuyerRepository(),
+            buyerId: buyer.uid,
+            buyerName: buyer.name,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('Customize this product'),
+        350,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Color'),
+        'Forest green',
+      );
+      await tester.tap(find.text('Full name'));
+      await tester.pump();
+
+      expect(latestSelection.values['Color'], ['Forest green']);
+      expect(latestSelection.values['Engraving'], ['Full name']);
+      expect(latestSelection.additionalPrice, 150);
+      expect(find.textContaining('₹1149'), findsOneWidget);
+
+      await tester.tap(find.textContaining('Buy now'));
+      expect(buyNowSelection.additionalPrice, 150);
+      expect(buyNowSelection.values['Engraving'], ['Full name']);
+    },
+  );
+
+  testWidgets('checkout opens product information and new address form', (
+    tester,
+  ) async {
+    final product = mockProducts.first;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.lightThemeMode,
+        home: CheckoutPage(
+          user: buyer,
+          products: [product],
+          quantities: {product.id: 1},
+          customizations: const {},
+          buyerRepository: MockBuyerRepository(),
+          orderRepository: _FakeOrderRepository(),
+          onOrderPlaced: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Selected'), findsOneWidget);
+    expect(find.textContaining('21 Craft Lane'), findsOneWidget);
+    expect(find.text('Add new'), findsOneWidget);
+
+    final productTile = find.byKey(ValueKey('checkout-product-${product.id}'));
+    await tester.ensureVisible(productTile);
+    await tester.pumpAndSettle();
+    tester.widget<ListTile>(productTile).onTap!.call();
+    await tester.pumpAndSettle();
+    expect(find.text('Made by ${product.artisan}'), findsOneWidget);
+    expect(find.text(product.description), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Price per item'),
+      180,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Price per item'), findsOneWidget);
+
+    Navigator.of(tester.element(find.text('Price per item'))).pop();
+    await tester.pumpAndSettle();
+    await tester.fling(
+      find.byType(Scrollable).first,
+      const Offset(0, 1000),
+      1000,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add new'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add address'), findsOneWidget);
+    expect(find.text('Recipient name'), findsOneWidget);
   });
 
   testWidgets('verified buyer can submit and edit a product review', (
@@ -169,7 +344,8 @@ void main() {
           onSave: () {},
           onCartQuantityChanged: (_) {},
           onOpenCart: () {},
-          onBuyNow: () {},
+          onBuyNow: (_) {},
+          onCustomizationChanged: (_) {},
           buyerRepository: repository,
           buyerId: buyer.uid,
           buyerName: buyer.name,
@@ -220,7 +396,8 @@ void main() {
           onSave: () {},
           onCartQuantityChanged: (_) {},
           onOpenCart: () {},
-          onBuyNow: () {},
+          onBuyNow: (_) {},
+          onCustomizationChanged: (_) {},
           buyerRepository: MockBuyerRepository(),
           buyerId: buyer.uid,
           buyerName: buyer.name,
@@ -242,56 +419,209 @@ void main() {
     expect(find.text('Write a review'), findsNothing);
   });
 
-  testWidgets('buyer order details receive live seller shipment updates', (
+  testWidgets('buyer opens a creator profile and complete storefront', (
     tester,
   ) async {
-    final updates = StreamController<BuyerOrder>();
-    addTearDown(updates.close);
-    final placedOrder = BuyerOrder(
-      id: 'ORDER-1',
-      createdAt: DateTime(2026, 9, 28, 10),
-      updatedAt: DateTime(2026, 9, 28, 10),
-      status: 'Placed',
-      total: 899,
-      items: const [
-        BuyerOrderItem(
-          productId: 'blue-pottery',
-          name: 'Blue Pottery Vase',
-          quantity: 1,
-          unitPrice: 899,
-        ),
-      ],
-      deliveryAddress: '21 Craft Lane, Jaipur',
-    );
+    await tester.pumpWidget(buildDashboard());
+    await tester.pumpAndSettle();
 
+    await tester.tap(find.text('Shop').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Asha');
+    await tester.pumpAndSettle();
+
+    final creatorTile = find.widgetWithText(ListTile, 'Asha Weaves');
+    expect(creatorTile, findsOneWidget);
+    await tester.tap(creatorTile);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Creator story'), findsOneWidget);
+    expect(find.text('Storefront · 1 products'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Handwoven Storage Basket'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    final storefrontProduct = find
+        .ancestor(
+          of: find.text('Handwoven Storage Basket'),
+          matching: find.byType(InkWell),
+        )
+        .first;
+    await tester.tap(storefrontProduct);
+    await tester.pumpAndSettle();
+    expect(find.text('Product details'), findsOneWidget);
+    final detailsPage = tester.widget<ProductDetailsPage>(
+      find.byType(ProductDetailsPage),
+    );
+    expect(detailsPage.product.materials, 'Natural dyed jute and cotton');
+    expect(detailsPage.product.dimensions, '32 × 28 cm');
+    final productDetailsScroll = find
+        .descendant(
+          of: find.byType(ProductDetailsPage),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.drag(productDetailsScroll, const Offset(0, -900));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Natural dyed jute'), findsOneWidget);
+    expect(find.textContaining('32 × 28 cm'), findsOneWidget);
+  });
+
+  testWidgets('buyer can open an order status notification', (tester) async {
+    await tester.pumpWidget(buildDashboard());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Open notifications'));
+    await tester.pumpAndSettle();
+    expect(find.text('Order Delivered'), findsOneWidget);
+    await tester.tap(find.text('Order Delivered'));
+    await tester.pumpAndSettle();
+    expect(find.text('My orders'), findsOneWidget);
+  });
+
+  test('cart quantity is stock-limited and restored for the buyer', () async {
+    final firstBloc = BuyerBloc(repository: MockBuyerRepository());
+    addTearDown(firstBloc.close);
+    firstBloc.add(const BuyerLoadCart('buyer-persistence'));
+    firstBloc.add(BuyerWatchProducts());
+    await firstBloc.stream.firstWhere((state) => state.products.isNotEmpty);
+    final product = firstBloc.state.products.firstWhere(
+      (item) => item.id == 'blue-pottery',
+    );
+    firstBloc.add(BuyerUpdateCartQuantity(product, 500));
+    await firstBloc.stream.firstWhere(
+      (state) => state.cartQuantities[product.id] == product.stock,
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    final restoredBloc = BuyerBloc(repository: MockBuyerRepository());
+    addTearDown(restoredBloc.close);
+    restoredBloc.add(BuyerWatchProducts());
+    await restoredBloc.stream.firstWhere((state) => state.products.isNotEmpty);
+    restoredBloc.add(const BuyerLoadCart('buyer-persistence'));
+    await restoredBloc.stream.firstWhere(
+      (state) => state.cartQuantities[product.id] == product.stock,
+    );
+    expect(restoredBloc.state.cartQuantities[product.id], product.stock);
+  });
+
+  testWidgets('buyer updates profile and requests account deletion', (
+    tester,
+  ) async {
+    final repository = _FakeAccountAuthRepository();
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.lightThemeMode,
-        home: OrderDetailPage(order: placedOrder, orderUpdates: updates.stream),
+        home: BuyerAccountPage(
+          user: buyer,
+          repository: repository,
+          onProfileUpdated: (_) {},
+        ),
       ),
     );
 
-    expect(find.text('Order placed'), findsWidgets);
-    expect(find.text('Shipment progress'), findsOneWidget);
+    await tester.enterText(find.byType(TextFormField).at(0), 'Suhani Mahajan');
+    await tester.enterText(find.byType(TextFormField).at(1), '9876543210');
+    await tester.tap(find.text('Save profile'));
+    await tester.pumpAndSettle();
+    expect(repository.updatedName, 'Suhani Mahajan');
 
-    updates.add(
-      BuyerOrder(
-        id: placedOrder.id,
-        createdAt: placedOrder.createdAt,
-        updatedAt: DateTime(2026, 9, 28, 14, 30),
-        status: 'Shipped',
-        total: placedOrder.total,
-        items: placedOrder.items,
-        deliveryAddress: placedOrder.deliveryAddress,
-        consignmentNumber: 'SP123456789IN',
-        carrierName: 'India Post',
-      ),
-    );
-    await tester.pump();
-
-    expect(find.text('Shipped'), findsWidgets);
-    expect(find.text('Tracking details'), findsOneWidget);
-    expect(find.text('SP123456789IN'), findsOneWidget);
-    expect(find.text('India Post'), findsOneWidget);
+    await tester.ensureVisible(find.text('Request account deletion'));
+    await tester.tap(find.text('Request account deletion'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Submit request'));
+    await tester.pumpAndSettle();
+    expect(repository.deletionRequested, isTrue);
   });
+}
+
+class _FakeAccountAuthRepository implements AuthRepository {
+  String? updatedName;
+  bool deletionRequested = false;
+
+  @override
+  Future<Either<Failure, UserEntity>> updateProfile({
+    required String uid,
+    required String name,
+    required String phone,
+  }) async {
+    updatedName = name;
+    return right(
+      UserEntity(
+        uid: uid,
+        email: 'suhani@example.com',
+        name: name,
+        phone: phone,
+        role: 'buyer',
+      ),
+    );
+  }
+
+  @override
+  Future<Either<Failure, void>> requestAccountDeletion(UserEntity user) async {
+    deletionRequested = true;
+    return right(null);
+  }
+
+  @override
+  Future<Either<Failure, void>> sendPasswordReset(String email) async =>
+      right(null);
+
+  @override
+  Future<Either<Failure, UserEntity>> getCurrentUser() async =>
+      right(UserEntity(uid: 'buyer-1', email: '', name: '', role: 'buyer'));
+
+  @override
+  Future<Either<Failure, UserEntity>> signInWithGoogle() async =>
+      getCurrentUser();
+
+  @override
+  Future<Either<Failure, UserEntity>> signUpWithRole({
+    required String uid,
+    required String email,
+    required String name,
+    required String phone,
+    required String role,
+  }) async => getCurrentUser();
+
+  @override
+  Future<Either<Failure, void>> signOut() async => right(null);
+}
+
+class _FakeOrderRepository implements OrderRepository {
+  @override
+  Future<List<String>> placeOrders({
+    required String buyerId,
+    required String buyerName,
+    required String buyerPhone,
+    required CheckoutAddress address,
+    required List<CheckoutOrderItem> items,
+  }) async => ['order-1'];
+
+  @override
+  Future<void> releasePayout(String orderId) async {}
+
+  @override
+  Future<int> seedSampleOrders() async => 0;
+
+  @override
+  Future<void> updateOrderStatus(
+    String orderId,
+    String status, {
+    String? rejectionReason,
+    String? consignmentNumber,
+  }) async {}
+
+  @override
+  Stream<List<MarketplaceOrder>> watchAllOrders() => const Stream.empty();
+
+  @override
+  Stream<List<MarketplaceOrder>> watchBuyerOrders(String buyerId) =>
+      const Stream.empty();
+
+  @override
+  Stream<List<MarketplaceOrder>> watchCreatorOrders(String creatorId) =>
+      const Stream.empty();
 }

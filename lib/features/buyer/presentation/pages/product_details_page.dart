@@ -12,10 +12,13 @@ class ProductDetailsPage extends StatefulWidget {
   final VoidCallback onSave;
   final ValueChanged<int> onCartQuantityChanged;
   final VoidCallback onOpenCart;
-  final VoidCallback onBuyNow;
+  final ValueChanged<ProductCustomizationSelection> onBuyNow;
+  final ProductCustomizationSelection customizationSelection;
+  final ValueChanged<ProductCustomizationSelection> onCustomizationChanged;
   final BuyerRepository buyerRepository;
   final String buyerId;
   final String buyerName;
+  final VoidCallback? onCreatorTap;
 
   const ProductDetailsPage({
     super.key,
@@ -27,9 +30,12 @@ class ProductDetailsPage extends StatefulWidget {
     required this.onCartQuantityChanged,
     required this.onOpenCart,
     required this.onBuyNow,
+    this.customizationSelection = const ProductCustomizationSelection(),
+    required this.onCustomizationChanged,
     required this.buyerRepository,
     required this.buyerId,
     required this.buyerName,
+    this.onCreatorTap,
   });
 
   @override
@@ -39,11 +45,16 @@ class ProductDetailsPage extends StatefulWidget {
 class _ProductDetailsPageState extends State<ProductDetailsPage> {
   late bool _isSaved = widget.isSaved;
   late Future<ProductReviewEligibility> _reviewEligibility;
+  late Map<String, List<String>> _customizationValues;
 
   @override
   void initState() {
     super.initState();
     _reviewEligibility = _loadReviewEligibility();
+    _customizationValues = {
+      for (final entry in widget.customizationSelection.values.entries)
+        entry.key: List<String>.from(entry.value),
+    };
   }
 
   Future<ProductReviewEligibility> _loadReviewEligibility() =>
@@ -51,6 +62,38 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
         buyerId: widget.buyerId,
         productId: widget.product.id,
       );
+
+  ProductCustomizationSelection get _customizationSelection {
+    final values = <String, List<String>>{
+      for (final entry in _customizationValues.entries)
+        if (entry.value.any((value) => value.trim().isNotEmpty))
+          entry.key: entry.value
+              .map((value) => value.trim())
+              .where((value) => value.isNotEmpty)
+              .toList(),
+    };
+    final additionalPrice = widget.product.customizations
+        .where((customization) => values.containsKey(customization.name))
+        .fold<int>(
+          0,
+          (total, customization) => total + customization.additionalPrice,
+        );
+    return ProductCustomizationSelection(
+      values: values,
+      additionalPrice: additionalPrice,
+    );
+  }
+
+  void _updateCustomization(String name, List<String> values) {
+    setState(() {
+      if (values.every((value) => value.trim().isEmpty)) {
+        _customizationValues.remove(name);
+      } else {
+        _customizationValues[name] = values;
+      }
+    });
+    widget.onCustomizationChanged(_customizationSelection);
+  }
 
   @override
   void didUpdateWidget(covariant ProductDetailsPage oldWidget) {
@@ -63,6 +106,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
+    final customizationSelection = _customizationSelection;
+    final unitPrice = customizationSelection.unitPriceFor(product);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Product details'),
@@ -121,21 +166,50 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              const Icon(Icons.star_rounded, color: Color(0xFFE0A72F)),
-              Text(
-                '${product.rating}  ·  Made by ${product.artisan}',
-                style: const TextStyle(color: AppColors.mutedText),
+          InkWell(
+            onTap: widget.onCreatorTap,
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.star_rounded, color: Color(0xFFE0A72F)),
+                  Expanded(
+                    child: Text(
+                      '${product.rating}  ·  Made by ${product.artisan}',
+                      style: const TextStyle(color: AppColors.mutedText),
+                    ),
+                  ),
+                  if (widget.onCreatorTap != null)
+                    const Icon(Icons.chevron_right, size: 20),
+                ],
               ),
-            ],
+            ),
           ),
           const SizedBox(height: 22),
-          Text(
-            '₹${product.price}',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '₹$unitPrice',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              if (customizationSelection.additionalPrice > 0) ...[
+                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Text(
+                    'includes ₹${customizationSelection.additionalPrice} customization',
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 22),
           const Text(
@@ -151,6 +225,41 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
               color: AppColors.mutedText,
             ),
           ),
+          if (product.materials.isNotEmpty ||
+              product.dimensions.isNotEmpty ||
+              product.shippingInfo.isNotEmpty) ...[
+            const SizedBox(height: 22),
+            const Text(
+              'Product information',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            if (product.materials.isNotEmpty)
+              _DetailLine(
+                icon: Icons.texture,
+                text: 'Materials: ${product.materials}',
+              ),
+            if (product.dimensions.isNotEmpty)
+              _DetailLine(
+                icon: Icons.straighten,
+                text: 'Dimensions: ${product.dimensions}',
+              ),
+            if (product.shippingInfo.isNotEmpty)
+              _DetailLine(
+                icon: Icons.local_shipping_outlined,
+                text: product.shippingInfo,
+              ),
+          ],
+          if (product.isCustomizable &&
+              (product.predefinedCustomizations.isNotEmpty ||
+                  product.customizations.isNotEmpty)) ...[
+            const SizedBox(height: 24),
+            _ProductCustomizationSection(
+              product: product,
+              values: _customizationValues,
+              onChanged: _updateCustomization,
+            ),
+          ],
           const SizedBox(height: 22),
           const _DetailLine(
             icon: Icons.handyman_outlined,
@@ -179,7 +288,13 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
         child: Row(
           children: [
             Expanded(
-              child: widget.cartQuantity == 0
+              child: !product.isAvailable || product.stock <= 0
+                  ? OutlinedButton.icon(
+                      onPressed: null,
+                      icon: Icon(Icons.remove_shopping_cart_outlined),
+                      label: Text('Out of stock'),
+                    )
+                  : widget.cartQuantity == 0
                   ? OutlinedButton.icon(
                       onPressed: () {
                         widget.onCartQuantityChanged(1);
@@ -222,9 +337,11 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           ),
                           IconButton(
                             tooltip: 'Increase quantity',
-                            onPressed: () => widget.onCartQuantityChanged(
-                              widget.cartQuantity + 1,
-                            ),
+                            onPressed: widget.cartQuantity >= product.stock
+                                ? null
+                                : () => widget.onCartQuantityChanged(
+                                    widget.cartQuantity + 1,
+                                  ),
                             icon: const Icon(Icons.add),
                             color: AppColors.primary,
                           ),
@@ -235,10 +352,12 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
             const SizedBox(width: 12),
             Expanded(
               child: FilledButton.icon(
-                onPressed: widget.onBuyNow,
+                onPressed: !product.isAvailable || product.stock <= 0
+                    ? null
+                    : () => widget.onBuyNow(customizationSelection),
                 icon: const Icon(Icons.bolt),
                 label: Text(
-                  'Buy now  ·  ₹${product.price * (widget.cartQuantity == 0 ? 1 : widget.cartQuantity)}',
+                  'Buy now  ·  ₹${unitPrice * (widget.cartQuantity == 0 ? 1 : widget.cartQuantity)}',
                 ),
               ),
             ),
@@ -247,6 +366,199 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       ),
     );
   }
+}
+
+class _ProductCustomizationSection extends StatelessWidget {
+  final Product product;
+  final Map<String, List<String>> values;
+  final void Function(String name, List<String> values) onChanged;
+
+  const _ProductCustomizationSection({
+    required this.product,
+    required this.values,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: AppColors.outline),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.tune_rounded, color: AppColors.primary),
+            SizedBox(width: 10),
+            Text(
+              'Customize this product',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Selections are optional and will be shared with the creator.',
+          style: TextStyle(color: AppColors.mutedText),
+        ),
+        if (product.predefinedCustomizations.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          ...product.predefinedCustomizations.map(
+            (name) => Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: TextFormField(
+                key: ValueKey('predefined-${product.id}-$name'),
+                initialValue: values[name]?.firstOrNull ?? '',
+                onChanged: (value) => onChanged(name, [value]),
+                decoration: InputDecoration(
+                  labelText: name,
+                  hintText: _hintFor(name),
+                  prefixIcon: Icon(_iconFor(name)),
+                ),
+              ),
+            ),
+          ),
+        ],
+        ...product.customizations.map(
+          (customization) => _CustomizationChoice(
+            customization: customization,
+            selectedValues: values[customization.name] ?? const [],
+            onChanged: (selection) => onChanged(customization.name, selection),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  static String _hintFor(String name) => switch (name.toLowerCase()) {
+    'name/text' => 'Enter the name or text you want',
+    'color' => 'Enter your preferred colour',
+    'size' => 'Enter your preferred size',
+    'design' => 'Describe your preferred design',
+    'material' => 'Enter your preferred material',
+    _ => 'Enter your preference',
+  };
+
+  static IconData _iconFor(String name) => switch (name.toLowerCase()) {
+    'name/text' => Icons.edit_note,
+    'color' => Icons.palette_outlined,
+    'size' => Icons.aspect_ratio,
+    'design' => Icons.brush_outlined,
+    'material' => Icons.texture,
+    _ => Icons.tune,
+  };
+}
+
+class _CustomizationChoice extends StatelessWidget {
+  final BuyerProductCustomization customization;
+  final List<String> selectedValues;
+  final ValueChanged<List<String>> onChanged;
+
+  const _CustomizationChoice({
+    required this.customization,
+    required this.selectedValues,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 14),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                customization.name,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+            if (customization.additionalPrice > 0)
+              Text(
+                '+₹${customization.additionalPrice}',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+          ],
+        ),
+        if (customization.description.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            customization.description,
+            style: const TextStyle(color: AppColors.mutedText),
+          ),
+        ],
+        if (customization.images.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 72,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: customization.images.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, index) => ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.network(
+                  customization.images[index],
+                  width: 72,
+                  height: 72,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    width: 72,
+                    color: AppColors.background,
+                    child: const Icon(Icons.broken_image_outlined),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 10),
+        if (customization.options.isEmpty)
+          TextFormField(
+            key: ValueKey('custom-${customization.name}'),
+            initialValue: selectedValues.firstOrNull ?? '',
+            onChanged: (value) => onChanged([value]),
+            decoration: InputDecoration(
+              hintText: 'Enter your ${customization.name.toLowerCase()}',
+            ),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: customization.options.map((option) {
+              final selected = selectedValues.contains(option);
+              return customization.isMultipleSelection
+                  ? FilterChip(
+                      label: Text(option),
+                      selected: selected,
+                      onSelected: (isSelected) {
+                        final updated = List<String>.from(selectedValues);
+                        isSelected
+                            ? updated.add(option)
+                            : updated.remove(option);
+                        onChanged(updated);
+                      },
+                    )
+                  : ChoiceChip(
+                      label: Text(option),
+                      selected: selected,
+                      onSelected: (isSelected) =>
+                          onChanged(isSelected ? [option] : []),
+                    );
+            }).toList(),
+          ),
+      ],
+    ),
+  );
 }
 
 class _ProductReviewsSection extends StatelessWidget {

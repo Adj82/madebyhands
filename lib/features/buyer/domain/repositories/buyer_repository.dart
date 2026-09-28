@@ -1,10 +1,14 @@
 import 'package:madebyhands/features/buyer/domain/entities/buyer_order.dart';
+import 'package:madebyhands/features/buyer/domain/entities/buyer_product_notification.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product_review.dart';
+import 'package:madebyhands/features/buyer/domain/entities/public_creator.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 
 abstract interface class BuyerRepository {
   Stream<List<Product>> watchProducts();
+
+  Stream<List<PublicCreator>> watchPublicCreators();
 
   Stream<Set<String>> watchFavoriteProductIds(String userId);
 
@@ -21,6 +25,12 @@ abstract interface class BuyerRepository {
   Future<void> saveAddress(String userId, SavedAddress address);
 
   Future<void> deleteAddress(String userId, String addressId);
+
+  Stream<List<BuyerProductNotification>> watchNewProductNotifications(
+    String userId,
+  );
+
+  Stream<List<BuyerProductNotification>> watchBuyerNotifications(String userId);
 
   Stream<List<ProductReview>> watchProductReviews(String productId);
 
