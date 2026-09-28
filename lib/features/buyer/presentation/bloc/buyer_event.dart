@@ -9,6 +9,18 @@ sealed class BuyerEvent extends Equatable {
 
 final class BuyerWatchProducts extends BuyerEvent {}
 
+final class BuyerWatchCreators extends BuyerEvent {}
+
+final class BuyerCreatorsUpdated extends BuyerEvent {
+  final List<PublicCreator> creators;
+  const BuyerCreatorsUpdated(this.creators);
+}
+
+final class BuyerLoadCart extends BuyerEvent {
+  final String userId;
+  const BuyerLoadCart(this.userId);
+}
+
 final class BuyerProductsUpdated extends BuyerEvent {
   final List<Product> products;
   const BuyerProductsUpdated(this.products);
@@ -34,6 +46,13 @@ final class BuyerUpdateCartQuantity extends BuyerEvent {
   final Product product;
   final int quantity;
   const BuyerUpdateCartQuantity(this.product, this.quantity);
+}
+
+final class BuyerUpdateProductCustomization extends BuyerEvent {
+  final Product product;
+  final ProductCustomizationSelection selection;
+
+  const BuyerUpdateProductCustomization(this.product, this.selection);
 }
 
 final class BuyerErrorOccurred extends BuyerEvent {

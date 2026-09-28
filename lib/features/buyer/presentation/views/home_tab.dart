@@ -15,6 +15,8 @@ class HomeTab extends StatelessWidget {
   final VoidCallback onBrowseAll;
   final SavedAddress? selectedAddress;
   final VoidCallback? onAddressTap;
+  final int unreadNotificationCount;
+  final VoidCallback onNotificationsTap;
 
   const HomeTab({
     super.key,
@@ -24,6 +26,8 @@ class HomeTab extends StatelessWidget {
     required this.onBrowseAll,
     this.selectedAddress,
     this.onAddressTap,
+    required this.unreadNotificationCount,
+    required this.onNotificationsTap,
   });
 
   @override
@@ -78,8 +82,13 @@ class HomeTab extends StatelessWidget {
                         ),
                       ),
                       IconButton.filledTonal(
-                        onPressed: () {},
-                        icon: const Icon(Icons.notifications_none_rounded),
+                        tooltip: 'Open notifications',
+                        onPressed: onNotificationsTap,
+                        icon: Badge(
+                          isLabelVisible: unreadNotificationCount > 0,
+                          label: Text('$unreadNotificationCount'),
+                          child: const Icon(Icons.notifications_none_rounded),
+                        ),
                         style: IconButton.styleFrom(
                           backgroundColor: AppColors.surface,
                           foregroundColor: AppColors.primary,

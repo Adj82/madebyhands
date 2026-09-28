@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:madebyhands/features/buyer/domain/entities/buyer_order.dart';
+import 'package:madebyhands/features/buyer/domain/entities/buyer_product_notification.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product_review.dart';
+import 'package:madebyhands/features/buyer/domain/entities/public_creator.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
 import 'package:madebyhands/features/orders/domain/order_status.dart';
@@ -21,6 +25,33 @@ class FirestoreBuyerRepository implements BuyerRepository {
             .where((doc) => doc.data()['isActive'] != false)
             .map((doc) => _productFromDocument(doc))
             .toList(),
+      );
+
+  @override
+  Stream<List<PublicCreator>> watchPublicCreators() => firestore
+      .collection('creator_profiles')
+      .snapshots()
+      .map(
+        (snapshot) => snapshot.docs.map((document) {
+          final data = document.data();
+          return PublicCreator(
+            uid: data['uid'] as String? ?? document.id,
+            name: data['name'] as String? ?? '',
+            businessName: data['businessName'] as String? ?? '',
+            profileImage: data['profileImage'] as String? ?? '',
+            bio: data['bio'] as String? ?? '',
+            category: data['category'] as String? ?? '',
+            location: data['location'] as String? ?? '',
+            socialLinks: List<String>.from(
+              data['socialLinks'] as List? ?? const [],
+            ),
+            portfolio: List<String>.from(
+              data['portfolio'] as List? ?? const [],
+            ),
+            story: data['story'] as String? ?? '',
+            isVerified: data['verificationStatus'] == 'Verified',
+          );
+        }).toList(),
       );
 
   @override
@@ -62,6 +93,194 @@ class FirestoreBuyerRepository implements BuyerRepository {
         orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         return orders;
       });
+
+  @override
+  Stream<List<BuyerProductNotification>> watchNewProductNotifications(
+    String userId,
+  ) {
+    late final StreamController<List<BuyerProductNotification>> controller;
+    StreamSubscription? productSubscription;
+    StreamSubscription? favoriteSubscription;
+    StreamSubscription? orderSubscription;
+    QuerySnapshot<Map<String, dynamic>>? productSnapshot;
+    QuerySnapshot<Map<String, dynamic>>? favoriteSnapshot;
+    QuerySnapshot<Map<String, dynamic>>? orderSnapshot;
+
+    void emitNotifications() {
+      final products = productSnapshot;
+      final favorites = favoriteSnapshot;
+      final orders = orderSnapshot;
+      if (products == null || favorites == null || orders == null) return;
+
+      final productsById = {
+        for (final document in products.docs) document.id: document,
+      };
+      final wishlistedSince = <String, DateTime>{};
+      final purchasedSince = <String, DateTime>{};
+      final excludedProductIds = <String>{};
+      final fallbackInterestDate = DateTime.now();
+
+      void rememberInterest(
+        Map<String, DateTime> interests,
+        String category,
+        DateTime since,
+      ) {
+        final normalized = _normalizeCategory(category);
+        if (normalized.isEmpty) return;
+        final existing = interests[normalized];
+        if (existing == null || since.isBefore(existing)) {
+          interests[normalized] = since;
+        }
+      }
+
+      for (final favorite in favorites.docs) {
+        final productId =
+            favorite.data()['productId'] as String? ?? favorite.id;
+        final product = productsById[productId];
+        if (product == null) continue;
+        excludedProductIds.add(productId);
+        rememberInterest(
+          wishlistedSince,
+          product.data()['category'] as String? ?? '',
+          _timestamp(favorite.data()['savedAt']) ?? fallbackInterestDate,
+        );
+      }
+
+      for (final order in orders.docs) {
+        final data = order.data();
+        final orderedAt = _timestamp(data['createdAt']) ?? fallbackInterestDate;
+        final items = data['items'] as List<dynamic>? ?? const [];
+        for (final rawItem in items.whereType<Map>()) {
+          final item = Map<String, dynamic>.from(rawItem);
+          final productId = item['productId'] as String? ?? '';
+          if (productId.isNotEmpty) excludedProductIds.add(productId);
+          final category =
+              item['category'] as String? ??
+              productsById[productId]?.data()['category'] as String? ??
+              '';
+          rememberInterest(purchasedSince, category, orderedAt);
+        }
+      }
+
+      final notifications = <BuyerProductNotification>[];
+      for (final document in products.docs) {
+        final data = document.data();
+        if (data['isActive'] != true ||
+            excludedProductIds.contains(document.id)) {
+          continue;
+        }
+        final publishedAt =
+            _timestamp(data['approvedAt']) ?? _timestamp(data['createdAt']);
+        if (publishedAt == null) continue;
+        final category = data['category'] as String? ?? '';
+        final normalizedCategory = _normalizeCategory(category);
+        final wishlistDate = wishlistedSince[normalizedCategory];
+        final purchaseDate = purchasedSince[normalizedCategory];
+        final matchesWishlist =
+            wishlistDate != null && publishedAt.isAfter(wishlistDate);
+        final matchesPurchase =
+            purchaseDate != null && publishedAt.isAfter(purchaseDate);
+        if (!matchesWishlist && !matchesPurchase) continue;
+
+        notifications.add(
+          BuyerProductNotification(
+            id: document.id,
+            product: _productFromDocument(document),
+            category: category,
+            publishedAt: publishedAt,
+            reason: matchesWishlist && matchesPurchase
+                ? BuyerProductNotificationReason.both
+                : matchesWishlist
+                ? BuyerProductNotificationReason.wishlisted
+                : BuyerProductNotificationReason.purchased,
+          ),
+        );
+      }
+      notifications.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+      if (!controller.isClosed) controller.add(notifications);
+    }
+
+    controller = StreamController<List<BuyerProductNotification>>(
+      onListen: () {
+        productSubscription = firestore
+            .collection('products')
+            .snapshots()
+            .listen((snapshot) {
+              productSnapshot = snapshot;
+              emitNotifications();
+            }, onError: controller.addError);
+        favoriteSubscription = firestore
+            .collection('users')
+            .doc(userId)
+            .collection('favorites')
+            .snapshots()
+            .listen((snapshot) {
+              favoriteSnapshot = snapshot;
+              emitNotifications();
+            }, onError: controller.addError);
+        orderSubscription = firestore
+            .collection('orders')
+            .where('buyerId', isEqualTo: userId)
+            .snapshots()
+            .listen((snapshot) {
+              orderSnapshot = snapshot;
+              emitNotifications();
+            }, onError: controller.addError);
+      },
+      onCancel: () async {
+        await productSubscription?.cancel();
+        await favoriteSubscription?.cancel();
+        await orderSubscription?.cancel();
+      },
+    );
+    return controller.stream;
+  }
+
+  @override
+  Stream<List<BuyerProductNotification>> watchBuyerNotifications(
+    String userId,
+  ) {
+    late final StreamController<List<BuyerProductNotification>> controller;
+    StreamSubscription<List<BuyerProductNotification>>? productSubscription;
+    StreamSubscription<List<BuyerOrder>>? orderSubscription;
+    List<BuyerProductNotification> products = const [];
+    List<BuyerProductNotification> orders = const [];
+
+    void emit() {
+      final combined = [...products, ...orders]
+        ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+      if (!controller.isClosed) controller.add(combined);
+    }
+
+    controller = StreamController<List<BuyerProductNotification>>(
+      onListen: () {
+        productSubscription = watchNewProductNotifications(userId).listen((
+          value,
+        ) {
+          products = value;
+          emit();
+        }, onError: controller.addError);
+        orderSubscription = watchOrders(userId).listen((value) {
+          orders = value
+              .map(
+                (order) => BuyerProductNotification.order(
+                  id: 'order-${order.id}-${OrderStatus.normalize(order.status)}',
+                  orderId: order.id,
+                  orderStatus: order.status,
+                  publishedAt: order.updatedAt ?? order.createdAt,
+                ),
+              )
+              .toList();
+          emit();
+        }, onError: controller.addError);
+      },
+      onCancel: () async {
+        await productSubscription?.cancel();
+        await orderSubscription?.cancel();
+      },
+    );
+    return controller.stream;
+  }
 
   @override
   Stream<List<SavedAddress>> watchAddresses(String userId) => firestore
@@ -201,12 +420,36 @@ class FirestoreBuyerRepository implements BuyerRepository {
     final data = document.data();
     final category = data['category'] as String? ?? 'Handmade';
     final visual = _visualForCategory(category);
+    final rawCustomizations =
+        data['customizations'] as List<dynamic>? ?? const [];
+    final customizations = rawCustomizations
+        .whereType<Map>()
+        .map((raw) {
+          final customization = Map<String, dynamic>.from(raw);
+          return BuyerProductCustomization(
+            name: customization['name'] as String? ?? 'Customization',
+            description: customization['description'] as String? ?? '',
+            additionalPrice:
+                (customization['additionalPrice'] as num?)?.round() ?? 0,
+            images: List<String>.from(
+              customization['images'] as List? ?? const [],
+            ),
+            isMultipleSelection:
+                customization['isMultipleSelection'] as bool? ?? false,
+            options: List<String>.from(
+              customization['options'] as List? ?? const [],
+            ).where((option) => option.trim().isNotEmpty).toList(),
+          );
+        })
+        .where((customization) => customization.name.trim().isNotEmpty)
+        .toList();
     return Product(
       id: document.id,
       name: data['name'] as String? ?? 'Handmade piece',
       artisan:
           data['artisan'] as String? ??
           data['sellerName'] as String? ??
+          data['creatorName'] as String? ??
           'MadeByHands artisan',
       category: category,
       description: data['description'] as String? ?? '',
@@ -223,6 +466,17 @@ class FirestoreBuyerRepository implements BuyerRepository {
       creatorUid: data['creatorUid'] as String? ?? '',
       images: List<String>.from(data['images'] as List? ?? const []),
       stock: (data['stock'] as num?)?.round() ?? 0,
+      isAvailable:
+          data['isActive'] != false &&
+          ((data['stock'] as num?)?.round() ?? 0) > 0,
+      materials: data['materials'] as String? ?? '',
+      dimensions: data['dimensions'] as String? ?? '',
+      shippingInfo: data['shippingInfo'] as String? ?? '',
+      isCustomizable: data['isCustomizable'] as bool? ?? false,
+      predefinedCustomizations: List<String>.from(
+        data['predefinedCustomizations'] as List? ?? const [],
+      ).where((item) => item.trim().isNotEmpty).toList(),
+      customizations: customizations,
     );
   }
 
@@ -238,6 +492,12 @@ class FirestoreBuyerRepository implements BuyerRepository {
         name: item['name'] as String? ?? 'Handmade item',
         quantity: (item['quantity'] as num?)?.round() ?? 1,
         unitPrice: (item['unitPrice'] as num?)?.round() ?? 0,
+        baseUnitPrice:
+            (item['baseUnitPrice'] as num?)?.round() ??
+            (item['unitPrice'] as num?)?.round() ??
+            0,
+        customizationPrice: (item['customizationPrice'] as num?)?.round() ?? 0,
+        customizations: _customizations(item['customizations']),
       );
     }).toList();
     final address = data['shippingAddress'] ?? data['deliveryAddress'];
@@ -278,6 +538,18 @@ class FirestoreBuyerRepository implements BuyerRepository {
       : value is DateTime
       ? value
       : null;
+
+  String _normalizeCategory(String value) => value.trim().toLowerCase();
+
+  Map<String, List<String>> _customizations(Object? raw) {
+    if (raw is! Map) return const {};
+    return {
+      for (final entry in raw.entries)
+        entry.key.toString(): entry.value is List
+            ? List<String>.from(entry.value as List)
+            : [entry.value.toString()],
+    };
+  }
 
   SavedAddress _addressFromDocument(
     QueryDocumentSnapshot<Map<String, dynamic>> document,

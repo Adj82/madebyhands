@@ -7,6 +7,7 @@ class ProfileTab extends StatelessWidget {
   final VoidCallback onOrders;
   final VoidCallback onAddresses;
   final VoidCallback onSupport;
+  final VoidCallback onAccount;
   final VoidCallback onLogout;
 
   const ProfileTab({
@@ -15,6 +16,7 @@ class ProfileTab extends StatelessWidget {
     required this.onOrders,
     required this.onAddresses,
     required this.onSupport,
+    required this.onAccount,
     required this.onLogout,
   });
 
@@ -76,6 +78,12 @@ class ProfileTab extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
+        _ProfileTile(
+          icon: Icons.manage_accounts_outlined,
+          title: 'Account settings',
+          subtitle: 'Update profile, recovery and deletion',
+          onTap: onAccount,
+        ),
         _ProfileTile(
           icon: Icons.receipt_long_outlined,
           title: 'My orders',

@@ -3,13 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
+import 'package:madebyhands/features/buyer/domain/entities/buyer_product_notification.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
+import 'package:madebyhands/features/buyer/domain/entities/public_creator.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_cubit.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/order_history_page.dart';
+import 'package:madebyhands/features/buyer/presentation/pages/buyer_notifications_page.dart';
+import 'package:madebyhands/features/buyer/presentation/pages/buyer_account_page.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/checkout_page.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/product_details_page.dart';
+import 'package:madebyhands/features/buyer/presentation/pages/public_creator_storefront_page.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/saved_addresses_page.dart';
 import 'package:madebyhands/features/buyer/presentation/views/cart_tab.dart';
 import 'package:madebyhands/features/buyer/presentation/views/home_tab.dart';
@@ -19,6 +24,7 @@ import 'package:madebyhands/features/buyer/presentation/views/search_tab.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_empty_state.dart';
 import 'package:madebyhands/init_dependencies.dart';
 import 'package:madebyhands/features/support/presentation/pages/support_center_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class BuyerDashboardPage extends StatefulWidget {
   final UserEntity user;
@@ -36,37 +42,86 @@ class BuyerDashboardPage extends StatefulWidget {
 
 class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
   late final BuyerCubit _navigationCubit;
+  late UserEntity _currentUser;
   SavedAddress? _selectedAddress;
+  List<BuyerProductNotification> _notifications = const [];
+  final Set<String> _readNotificationIds = {};
   StreamSubscription<List<SavedAddress>>? _addressSubscription;
+  StreamSubscription<List<BuyerProductNotification>>? _notificationSubscription;
 
   @override
   void initState() {
     super.initState();
+    _currentUser = widget.user;
     _navigationCubit = BuyerCubit();
     // Initialize data streaming
     context.read<BuyerBloc>().add(BuyerWatchProducts());
-    context.read<BuyerBloc>().add(BuyerWatchFavorites(widget.user.uid));
-    _addressSubscription = context
-        .read<BuyerBloc>()
-        .repository
-        .watchAddresses(widget.user.uid)
-        .listen((addresses) {
+    context.read<BuyerBloc>().add(BuyerWatchCreators());
+    context.read<BuyerBloc>().add(BuyerWatchFavorites(_currentUser.uid));
+    context.read<BuyerBloc>().add(BuyerLoadCart(_currentUser.uid));
+    _restoreReadNotifications();
+    final repository = context.read<BuyerBloc>().repository;
+    _addressSubscription = repository.watchAddresses(_currentUser.uid).listen((
+      addresses,
+    ) {
+      if (!mounted) return;
+      final defaults = addresses.where((address) => address.isDefault);
+      setState(() {
+        _selectedAddress = defaults.isNotEmpty
+            ? defaults.first
+            : addresses.isNotEmpty
+            ? addresses.first
+            : null;
+      });
+    });
+    _notificationSubscription = repository
+        .watchBuyerNotifications(_currentUser.uid)
+        .listen((notifications) {
           if (!mounted) return;
-          final defaults = addresses.where((address) => address.isDefault);
           setState(() {
-            _selectedAddress = defaults.isNotEmpty
-                ? defaults.first
-                : addresses.isNotEmpty
-                ? addresses.first
-                : null;
+            _notifications = notifications;
+            final activeIds = notifications
+                .map((notification) => notification.id)
+                .toSet();
+            _readNotificationIds.removeWhere(
+              (notificationId) => !activeIds.contains(notificationId),
+            );
           });
-        });
+        }, onError: (_) {});
+  }
+
+  Future<void> _restoreReadNotifications() async {
+    List<String>? stored;
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      stored = preferences.getStringList(
+        'buyer_read_notifications_${_currentUser.uid}',
+      );
+    } catch (_) {
+      return;
+    }
+    if (!mounted || stored == null) return;
+    final restoredIds = stored;
+    setState(() => _readNotificationIds.addAll(restoredIds));
+  }
+
+  Future<void> _persistReadNotifications() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setStringList(
+        'buyer_read_notifications_${_currentUser.uid}',
+        _readNotificationIds.toList(),
+      );
+    } catch (_) {
+      // Read state still remains available for the current session.
+    }
   }
 
   @override
   void dispose() {
     _navigationCubit.close();
     _addressSubscription?.cancel();
+    _notificationSubscription?.cancel();
     super.dispose();
   }
 
@@ -88,22 +143,39 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                 ),
                 onSave: () => buyerBloc.add(
                   BuyerToggleFavorite(
-                    userId: widget.user.uid,
+                    userId: _currentUser.uid,
                     product: product,
                   ),
                 ),
                 onCartQuantityChanged: (quantity) {
                   buyerBloc.add(BuyerUpdateCartQuantity(product, quantity));
                 },
+                customizationSelection:
+                    state.cartCustomizations[product.id] ??
+                    const ProductCustomizationSelection(),
+                onCustomizationChanged: (selection) => buyerBloc.add(
+                  BuyerUpdateProductCustomization(product, selection),
+                ),
                 onOpenCart: () {
                   Navigator.of(context).pop();
                   _navigationCubit.changePage(3);
                 },
-                onBuyNow: () =>
-                    _openBuyNow(product, state.cartQuantities[product.id] ?? 0),
+                onBuyNow: (selection) => _openBuyNow(
+                  product,
+                  state.cartQuantities[product.id] ?? 0,
+                  selection,
+                ),
                 buyerRepository: buyerBloc.repository,
-                buyerId: widget.user.uid,
-                buyerName: widget.user.name,
+                buyerId: _currentUser.uid,
+                buyerName: _currentUser.name,
+                onCreatorTap: product.creatorUid.isEmpty
+                    ? null
+                    : () {
+                        final creator = state.creators
+                            .where((item) => item.uid == product.creatorUid)
+                            .firstOrNull;
+                        if (creator != null) _openCreator(creator);
+                      },
               );
             },
           ),
@@ -112,8 +184,60 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
     );
   }
 
+  void _openCreator(PublicCreator creator) {
+    final buyerBloc = context.read<BuyerBloc>();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: buyerBloc,
+          child: PublicCreatorStorefrontPage(
+            creator: creator,
+            buyerId: _currentUser.uid,
+            onProductTap: _openProduct,
+          ),
+        ),
+      ),
+    );
+  }
+
   void _openShop() {
     _navigationCubit.changePage(1);
+  }
+
+  void _openNotifications() {
+    final buyerRepository = context.read<BuyerBloc>().repository;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BuyerNotificationsPage(
+          notifications: _notifications,
+          readNotificationIds: _readNotificationIds,
+          onNotificationTap: (notification) {
+            setState(() => _readNotificationIds.add(notification.id));
+            _persistReadNotifications();
+            if (notification.product != null) {
+              _openProduct(notification.product!);
+            } else {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => OrderHistoryPage(
+                    userId: _currentUser.uid,
+                    repository: buyerRepository,
+                  ),
+                ),
+              );
+            }
+          },
+          onMarkAllRead: () {
+            setState(() {
+              _readNotificationIds.addAll(
+                _notifications.map((notification) => notification.id),
+              );
+            });
+            _persistReadNotifications();
+          },
+        ),
+      ),
+    );
   }
 
   void _openCheckout() {
@@ -125,10 +249,13 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => CheckoutPage(
-          user: widget.user,
+          user: _currentUser,
           products: products,
           quantities: Map<String, int>.from(state.cartQuantities),
-          buyerRepository: serviceLocator(),
+          customizations: Map<String, ProductCustomizationSelection>.from(
+            state.cartCustomizations,
+          ),
+          buyerRepository: buyerBloc.repository,
           orderRepository: serviceLocator(),
           onOrderPlaced: () {
             for (final product in products) {
@@ -140,16 +267,21 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
     );
   }
 
-  void _openBuyNow(Product product, int cartQuantity) {
+  void _openBuyNow(
+    Product product,
+    int cartQuantity,
+    ProductCustomizationSelection customization,
+  ) {
     final buyerBloc = context.read<BuyerBloc>();
     final quantity = cartQuantity > 0 ? cartQuantity : 1;
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => CheckoutPage(
-          user: widget.user,
+          user: _currentUser,
           products: [product],
           quantities: {product.id: quantity},
-          buyerRepository: serviceLocator(),
+          customizations: {product.id: customization},
+          buyerRepository: buyerBloc.repository,
           orderRepository: serviceLocator(),
           onOrderPlaced: () {
             if (buyerBloc.state.cartQuantities.containsKey(product.id)) {
@@ -188,23 +320,34 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
 
               final pages = [
                 HomeTab(
-                  userName: widget.user.name,
-                  userId: widget.user.uid,
+                  userName: _currentUser.name,
+                  userId: _currentUser.uid,
                   selectedAddress: _selectedAddress,
                   onAddressTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => SavedAddressesPage(
-                        userId: widget.user.uid,
-                        repository: serviceLocator(),
+                        userId: _currentUser.uid,
+                        repository: context.read<BuyerBloc>().repository,
                       ),
                     ),
                   ),
                   onProductTap: _openProduct,
                   onBrowseAll: _openShop,
+                  unreadNotificationCount: _notifications
+                      .where(
+                        (notification) =>
+                            !_readNotificationIds.contains(notification.id),
+                      )
+                      .length,
+                  onNotificationsTap: _openNotifications,
                 ),
-                SearchTab(userId: widget.user.uid, onProductTap: _openProduct),
+                SearchTab(
+                  userId: _currentUser.uid,
+                  onProductTap: _openProduct,
+                  onCreatorTap: _openCreator,
+                ),
                 SavedTab(
-                  userId: widget.user.uid,
+                  userId: _currentUser.uid,
                   onProductTap: _openProduct,
                   onBrowse: () => _navigationCubit.changePage(1),
                 ),
@@ -213,27 +356,38 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                   onCheckout: _openCheckout,
                 ),
                 ProfileTab(
-                  user: widget.user,
+                  user: _currentUser,
+                  onAccount: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => BuyerAccountPage(
+                        user: _currentUser,
+                        repository: serviceLocator(),
+                        onProfileUpdated: (user) {
+                          if (mounted) setState(() => _currentUser = user);
+                        },
+                      ),
+                    ),
+                  ),
                   onOrders: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => OrderHistoryPage(
-                        userId: widget.user.uid,
-                        repository: serviceLocator(),
+                        userId: _currentUser.uid,
+                        repository: context.read<BuyerBloc>().repository,
                       ),
                     ),
                   ),
                   onAddresses: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => SavedAddressesPage(
-                        userId: widget.user.uid,
-                        repository: serviceLocator(),
+                        userId: _currentUser.uid,
+                        repository: context.read<BuyerBloc>().repository,
                       ),
                     ),
                   ),
                   onSupport: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => SupportCenterPage(
-                        user: widget.user,
+                        user: _currentUser,
                         repository: serviceLocator(),
                       ),
                     ),
