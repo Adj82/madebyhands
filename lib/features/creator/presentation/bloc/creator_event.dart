@@ -76,6 +76,7 @@ final class CreatorAddProduct extends CreatorEvent {
   final String creatorUid;
   final String creatorName;
   final bool isCustomizable;
+  final List<String> predefinedCustomizations;
   final List<CustomizationInput> customizations;
 
   CreatorAddProduct({
@@ -92,6 +93,7 @@ final class CreatorAddProduct extends CreatorEvent {
     required this.creatorUid,
     required this.creatorName,
     this.isCustomizable = false,
+    this.predefinedCustomizations = const [],
     this.customizations = const [],
   });
 }
@@ -112,6 +114,7 @@ final class CreatorUpdateProduct extends CreatorEvent {
   final String creatorUid;
   final String creatorName;
   final bool isCustomizable;
+  final List<String> predefinedCustomizations;
   final List<CustomizationInput> customizations;
   final bool hasChanges;
 
@@ -131,6 +134,7 @@ final class CreatorUpdateProduct extends CreatorEvent {
     required this.creatorUid,
     required this.creatorName,
     required this.isCustomizable,
+    this.predefinedCustomizations = const [],
     required this.customizations,
     required this.hasChanges,
   });
@@ -171,4 +175,26 @@ final class CreatorUpdateOrderStatus extends CreatorEvent {
   final String? consignmentNumber;
   final String uid; // to re-fetch
   CreatorUpdateOrderStatus({required this.orderId, required this.status, this.rejectionReason, this.consignmentNumber, required this.uid});
+}
+
+final class CreatorFetchNotifications extends CreatorEvent {
+  final String uid;
+  CreatorFetchNotifications(this.uid);
+}
+
+final class CreatorMarkNotificationAsRead extends CreatorEvent {
+  final String notificationId;
+  final String uid;
+  CreatorMarkNotificationAsRead({required this.notificationId, required this.uid});
+}
+
+final class CreatorMarkAllNotificationsAsRead extends CreatorEvent {
+  final String uid;
+  CreatorMarkAllNotificationsAsRead(this.uid);
+}
+
+final class CreatorDeleteNotifications extends CreatorEvent {
+  final List<String> notificationIds;
+  final String uid;
+  CreatorDeleteNotifications({required this.notificationIds, required this.uid});
 }

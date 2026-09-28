@@ -13,7 +13,6 @@ class HomeTab extends StatelessWidget {
   final String userId;
   final ValueChanged<Product> onProductTap;
   final VoidCallback onBrowseAll;
-  final ValueChanged<String>? onCategoryTap;
   final SavedAddress? selectedAddress;
   final VoidCallback? onAddressTap;
 
@@ -23,7 +22,6 @@ class HomeTab extends StatelessWidget {
     required this.userId,
     required this.onProductTap,
     required this.onBrowseAll,
-    this.onCategoryTap,
     this.selectedAddress,
     this.onAddressTap,
   });
@@ -158,10 +156,6 @@ class HomeTab extends StatelessWidget {
                   const SizedBox(height: 10),
                   _buildExperienceBanner(),
                   const SizedBox(height: 30),
-                  const _SectionTitle(title: 'Shop by craft'),
-                  const SizedBox(height: 16),
-                  _buildCategoryScroll(onCategoryTap),
-                  const SizedBox(height: 30),
                   _SectionTitle(
                     title: 'Handpicked for you',
                     actionLabel: 'See all',
@@ -262,33 +256,6 @@ class HomeTab extends StatelessWidget {
       ),
     ).animate().fadeIn().scale(begin: const Offset(0.95, 0.95));
   }
-
-  Widget _buildCategoryScroll(ValueChanged<String>? onCategoryTap) {
-    final categories = [
-      (Icons.home_outlined, 'Home Decor'),
-      (Icons.local_florist_outlined, 'Pottery'),
-      (Icons.diamond_outlined, 'Jewellery'),
-      (Icons.checkroom_outlined, 'Textiles'),
-      (Icons.card_giftcard_outlined, 'Gifts'),
-    ];
-
-    return SizedBox(
-      height: 100,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: categories.length,
-        itemBuilder: (context, i) {
-          return _CategoryCard(
-            icon: categories[i].$1,
-            label: categories[i].$2,
-            onTap: onCategoryTap == null
-                ? null
-                : () => onCategoryTap(categories[i].$2),
-          ).animate().fadeIn(delay: (i * 50).ms).slideX(begin: 0.2);
-        },
-      ),
-    );
-  }
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -323,52 +290,5 @@ class _SectionTitle extends StatelessWidget {
           ),
         ),
     ],
-  );
-}
-
-class _CategoryCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-
-  const _CategoryCard({required this.icon, required this.label, this.onTap});
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(12),
-    child: Container(
-      margin: const EdgeInsets.only(right: 16),
-      child: Column(
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.outline),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Icon(icon, color: AppColors.primary, size: 28),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            label,
-            style: GoogleFonts.montserrat(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.mutedText,
-            ),
-          ),
-        ],
-      ),
-    ),
   );
 }

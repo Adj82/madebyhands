@@ -3,6 +3,7 @@ import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/buyer_order.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/order_detail_page.dart';
+import 'package:madebyhands/features/orders/domain/order_status.dart';
 
 class OrderHistoryPage extends StatelessWidget {
   final String userId;
@@ -50,7 +51,17 @@ class OrderHistoryPage extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => OrderDetailPage(order: order),
+                      builder: (_) => OrderDetailPage(
+                        order: order,
+                        orderUpdates: repository
+                            .watchOrders(userId)
+                            .map(
+                              (orders) => orders.firstWhere(
+                                (candidate) => candidate.id == order.id,
+                                orElse: () => order,
+                              ),
+                            ),
+                      ),
                     ),
                   ),
                   child: Padding(
@@ -76,6 +87,16 @@ class OrderHistoryPage extends StatelessWidget {
                           _date(order.createdAt),
                           style: const TextStyle(color: AppColors.mutedText),
                         ),
+                        if (order.updatedAt != null) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            'Updated ${_dateTime(order.updatedAt!)}',
+                            style: const TextStyle(
+                              color: AppColors.mutedText,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                         const Divider(height: 26),
                         Row(
                           children: [
@@ -109,6 +130,9 @@ class OrderHistoryPage extends StatelessWidget {
 
   static String _date(DateTime date) =>
       '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+
+  static String _dateTime(DateTime date) =>
+      '${_date(date)} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
 }
 
 class _StatusChip extends StatelessWidget {
@@ -117,21 +141,32 @@ class _StatusChip extends StatelessWidget {
   const _StatusChip({required this.status});
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-    decoration: BoxDecoration(
-      color: const Color(0xFFDDE5CA),
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Text(
-      status,
-      style: const TextStyle(
-        color: AppColors.primaryDark,
-        fontSize: 12,
-        fontWeight: FontWeight.w800,
+  Widget build(BuildContext context) {
+    final normalized = OrderStatus.normalize(status);
+    final color = switch (normalized) {
+      OrderStatus.delivered => Colors.green,
+      OrderStatus.rejected || OrderStatus.cancelled => Colors.red,
+      OrderStatus.outForDelivery => Colors.deepOrange,
+      OrderStatus.shipped || OrderStatus.inTransit => Colors.indigo,
+      _ => AppColors.primary,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
-    ),
-  );
+      child: Text(
+        OrderStatus.label(status),
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
 }
 
 class _OrderMessage extends StatelessWidget {
