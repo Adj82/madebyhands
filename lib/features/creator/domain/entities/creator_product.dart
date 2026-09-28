@@ -4,6 +4,7 @@ class CreatorProduct {
   final String description;
   final List<String> images;
   final String category;
+  final List<String> categories;
   final double price;
   final int stock;
   final String materials;
@@ -16,6 +17,7 @@ class CreatorProduct {
   final bool isActive;
   final DateTime createdAt;
   final bool isCustomizable;
+  final bool? isFramed;
   final List<String> predefinedCustomizations;
   final List<ProductCustomization> customizations;
   final Map<String, dynamic>? editHistory; // Stores previous values for comparison
@@ -28,6 +30,7 @@ class CreatorProduct {
     required this.description,
     required this.images,
     required this.category,
+    this.categories = const [],
     required this.price,
     required this.stock,
     required this.materials,
@@ -40,6 +43,7 @@ class CreatorProduct {
     required this.isActive,
     required this.createdAt,
     this.isCustomizable = false,
+    this.isFramed,
     this.predefinedCustomizations = const [],
     this.customizations = const [],
     this.editHistory,

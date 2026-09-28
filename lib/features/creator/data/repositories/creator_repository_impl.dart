@@ -170,6 +170,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
     required String description,
     required List<File> imageFiles,
     required String category,
+    List<String> categories = const [],
     required double price,
     required int stock,
     required String materials,
@@ -179,6 +180,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
     required String creatorUid,
     required String creatorName,
     bool isCustomizable = false,
+    bool? isFramed,
     List<String> predefinedCustomizations = const [],
     List<CustomizationInput> customizations = const [],
   }) async {
@@ -214,12 +216,19 @@ class CreatorRepositoryImpl implements CreatorRepository {
         }
       }
 
+      final categoriesList = categories.isNotEmpty
+          ? categories
+          : (category.isNotEmpty ? [category] : <String>[]);
+      final categoryStr =
+          categoriesList.isNotEmpty ? categoriesList.join(', ') : category;
+
       final newProduct = CreatorProductModel(
         id: '',
         name: name,
         description: description,
         images: imageUrls,
-        category: category,
+        category: categoryStr,
+        categories: categoriesList,
         price: price,
         stock: stock,
         materials: materials,
@@ -231,7 +240,9 @@ class CreatorRepositoryImpl implements CreatorRepository {
         status: 'Pending Approval',
         isActive: false,
         isCustomizable: isCustomizable,
-        predefinedCustomizations: isCustomizable ? predefinedCustomizations : const [],
+        isFramed: isFramed,
+        predefinedCustomizations:
+            isCustomizable ? predefinedCustomizations : const [],
         customizations: customizationEntities,
         createdAt: DateTime.now(),
       );
@@ -251,6 +262,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
     required List<File> newImageFiles,
     required List<String> existingImageUrls,
     required String category,
+    List<String> categories = const [],
     required double price,
     required int stock,
     required String materials,
@@ -260,6 +272,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
     required String creatorUid,
     required String creatorName,
     required bool isCustomizable,
+    bool? isFramed,
     List<String> predefinedCustomizations = const [],
     required List<CustomizationInput> customizations,
     required bool hasChanges,
@@ -305,12 +318,19 @@ class CreatorRepositoryImpl implements CreatorRepository {
       final allCreatorProductsRes = await remoteDataSource.getCreatorProducts(creatorUid);
       final existingProduct = allCreatorProductsRes.firstWhere((p) => p.id == productId);
 
+      final categoriesList = categories.isNotEmpty
+          ? categories
+          : (category.isNotEmpty ? [category] : <String>[]);
+      final categoryStr =
+          categoriesList.isNotEmpty ? categoriesList.join(', ') : category;
+
       final updatedProduct = CreatorProductModel(
         id: productId,
         name: name,
         description: description,
         images: finalImageUrls,
-        category: category,
+        category: categoryStr,
+        categories: categoriesList,
         price: price,
         stock: stock,
         materials: materials,
@@ -322,6 +342,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
         status: 'Pending Approval', // Reset status
         isActive: false,           // Hide from storefront
         isCustomizable: isCustomizable,
+        isFramed: isFramed,
         predefinedCustomizations: isCustomizable ? predefinedCustomizations : const [],
         customizations: customizationEntities,
         createdAt: existingProduct.createdAt,

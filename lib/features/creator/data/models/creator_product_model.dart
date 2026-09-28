@@ -8,6 +8,7 @@ class CreatorProductModel extends CreatorProduct {
     required super.description,
     required super.images,
     required super.category,
+    super.categories,
     required super.price,
     required super.stock,
     required super.materials,
@@ -20,6 +21,7 @@ class CreatorProductModel extends CreatorProduct {
     required super.isActive,
     required super.createdAt,
     super.isCustomizable,
+    super.isFramed,
     super.predefinedCustomizations,
     super.customizations,
     super.editHistory,
@@ -33,6 +35,9 @@ class CreatorProductModel extends CreatorProduct {
       'description': description,
       'images': images,
       'category': category,
+      'categories': categories.isNotEmpty
+          ? categories
+          : (category.isNotEmpty ? [category] : <String>[]),
       'price': price,
       'stock': stock,
       'materials': materials,
@@ -44,6 +49,7 @@ class CreatorProductModel extends CreatorProduct {
       'status': status,
       'isActive': isActive,
       'isCustomizable': isCustomizable,
+      'isFramed': isFramed,
       'predefinedCustomizations': predefinedCustomizations,
       'customizations': customizations.map((c) => c.toMap()).toList(),
       'createdAt': createdAt,
@@ -64,12 +70,22 @@ class CreatorProductModel extends CreatorProduct {
       options: List<String>.from(c['options'] ?? []),
     )).toList();
 
+    final rawCategories = json['categories'] as List<dynamic>?;
+    final List<String> categoriesList = rawCategories != null && rawCategories.isNotEmpty
+        ? List<String>.from(rawCategories)
+        : (json['category'] != null && (json['category'] as String).isNotEmpty)
+            ? [json['category'] as String]
+            : [];
+    final categoryStr = json['category'] as String? ??
+        (categoriesList.isNotEmpty ? categoriesList.join(', ') : '');
+
     return CreatorProductModel(
       id: id,
       name: json['name'] ?? '',
       description: json['description'] ?? '',
       images: List<String>.from(json['images'] ?? []),
-      category: json['category'] ?? '',
+      category: categoryStr,
+      categories: categoriesList,
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       stock: (json['stock'] as num?)?.toInt() ?? 0,
       materials: json['materials'] ?? '',
@@ -81,6 +97,7 @@ class CreatorProductModel extends CreatorProduct {
       status: json['status'] ?? 'Pending Approval',
       isActive: json['isActive'] ?? false,
       isCustomizable: json['isCustomizable'] ?? false,
+      isFramed: json['isFramed'] as bool?,
       predefinedCustomizations: List<String>.from(
         json['predefinedCustomizations'] ?? [],
       ),
