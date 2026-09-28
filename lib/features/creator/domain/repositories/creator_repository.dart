@@ -102,19 +102,16 @@ abstract interface class CreatorRepository {
     String status, {
     String? rejectionReason,
     String? consignmentNumber,
+    String? carrierName,
   });
 
   Future<Either<Failure, List<CreatorNotification>>> getCreatorNotifications(
     String creatorUid,
   );
 
-  Future<Either<Failure, void>> markNotificationAsRead(
-    String notificationId,
-  );
+  Future<Either<Failure, void>> markNotificationAsRead(String notificationId);
 
-  Future<Either<Failure, void>> markAllNotificationsAsRead(
-    String creatorUid,
-  );
+  Future<Either<Failure, void>> markAllNotificationsAsRead(String creatorUid);
 
   Future<Either<Failure, void>> deleteNotifications(
     List<String> notificationIds,

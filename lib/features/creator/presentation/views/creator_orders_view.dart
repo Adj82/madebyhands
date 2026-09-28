@@ -69,7 +69,8 @@ class _CreatorOrdersViewState extends State<CreatorOrdersView>
           _fetchOrders();
         } else if (state is CreatorOrdersLoaded && _hasUpdatedStatus) {
           _hasUpdatedStatus = false;
-          final targetIndex = (_lastTargetStatus == 'Rejected' ||
+          final targetIndex =
+              (_lastTargetStatus == 'Rejected' ||
                   _lastTargetStatus == 'Delivered' ||
                   _lastTargetStatus == 'Completed')
               ? 2
@@ -89,20 +90,26 @@ class _CreatorOrdersViewState extends State<CreatorOrdersView>
         }
 
         if (state is CreatorOrdersLoaded) {
-          final pendingOrders =
-              state.orders.where((o) => o.status == 'Placed').toList();
+          final pendingOrders = state.orders
+              .where((o) => o.status == 'Placed')
+              .toList();
           final activeOrders = state.orders
-              .where((o) => [
-                    'Accepted',
-                    'Confirmed',
-                    'Processing',
-                    'In-Transit',
-                    'Shipped',
-                    'Out for Delivery'
-                  ].contains(o.status))
+              .where(
+                (o) => [
+                  'Accepted',
+                  'Confirmed',
+                  'Processing',
+                  'In-Transit',
+                  'Shipped',
+                  'Out for Delivery',
+                ].contains(o.status),
+              )
               .toList();
           final completedOrders = state.orders
-              .where((o) => ['Delivered', 'Completed', 'Rejected'].contains(o.status))
+              .where(
+                (o) =>
+                    ['Delivered', 'Completed', 'Rejected'].contains(o.status),
+              )
               .toList();
 
           return Column(
@@ -213,9 +220,7 @@ class _OrderListState extends State<_OrderList> {
     setState(() => _isRefreshing = true);
 
     try {
-      context
-          .read<CreatorBloc>()
-          .add(CreatorFetchOrders(widget.profile.uid));
+      context.read<CreatorBloc>().add(CreatorFetchOrders(widget.profile.uid));
       await Future.delayed(const Duration(milliseconds: 600));
     } finally {
       if (mounted) {
@@ -307,7 +312,10 @@ class _OrderCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 'Date: ${DateFormat('dd MMM yyyy, hh:mm a').format(order.createdAt)}',
-                style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.mutedText,
+                ),
               ),
               if (order.rejectionReason != null &&
                   order.rejectionReason!.trim().isNotEmpty) ...[
@@ -376,12 +384,12 @@ class _OrderCard extends StatelessWidget {
   void _handleConfirm(BuildContext context) {
     onStatusUpdateInitiated('Confirmed');
     context.read<CreatorBloc>().add(
-          CreatorUpdateOrderStatus(
-            orderId: order.id,
-            status: 'Confirmed',
-            uid: profile.uid,
-          ),
-        );
+      CreatorUpdateOrderStatus(
+        orderId: order.id,
+        status: 'Confirmed',
+        uid: profile.uid,
+      ),
+    );
   }
 
   void _handleReject(BuildContext context) {
@@ -392,8 +400,9 @@ class _OrderCard extends StatelessWidget {
         title: const Text('Reject Order'),
         content: TextField(
           controller: reasonController,
-          decoration:
-              const InputDecoration(hintText: 'Enter reason for rejection'),
+          decoration: const InputDecoration(
+            hintText: 'Enter reason for rejection',
+          ),
           maxLines: 2,
         ),
         actions: [
@@ -406,13 +415,15 @@ class _OrderCard extends StatelessWidget {
               final reason = reasonController.text.trim();
               onStatusUpdateInitiated('Rejected');
               context.read<CreatorBloc>().add(
-                    CreatorUpdateOrderStatus(
-                      orderId: order.id,
-                      status: 'Rejected',
-                      rejectionReason: reason.isEmpty ? 'Order rejected by creator' : reason,
-                      uid: profile.uid,
-                    ),
-                  );
+                CreatorUpdateOrderStatus(
+                  orderId: order.id,
+                  status: 'Rejected',
+                  rejectionReason: reason.isEmpty
+                      ? 'Order rejected by creator'
+                      : reason,
+                  uid: profile.uid,
+                ),
+              );
               Navigator.pop(dialogContext);
             },
             child: const Text('Reject', style: TextStyle(color: Colors.red)),
@@ -488,7 +499,11 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         status,
-        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
@@ -564,6 +579,9 @@ class _OrderDetailSheet extends StatelessWidget {
                   if (order.consignmentNumber != null &&
                       order.consignmentNumber!.isNotEmpty)
                     _infoRow('Consignment #', order.consignmentNumber!),
+                  if (order.carrierName != null &&
+                      order.carrierName!.isNotEmpty)
+                    _infoRow('Carrier', order.carrierName!),
                   if (order.rejectionReason != null &&
                       order.rejectionReason!.trim().isNotEmpty)
                     _infoRow(
@@ -612,6 +630,16 @@ class _OrderDetailSheet extends StatelessWidget {
                                     color: AppColors.mutedText,
                                   ),
                                 ),
+                                if (item.customizations.isNotEmpty)
+                                  ...item.customizations.entries.map(
+                                    (entry) => Text(
+                                      '${entry.key}: ${entry.value.join(', ')}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.mutedText,
+                                      ),
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
@@ -669,7 +697,9 @@ class _OrderDetailSheet extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.green.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: Colors.green.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: const Row(
                   children: [
@@ -728,13 +758,13 @@ class _OrderDetailSheet extends StatelessWidget {
     } else {
       onStatusUpdateInitiated(nextStatus);
       context.read<CreatorBloc>().add(
-            CreatorUpdateOrderStatus(
-              orderId: order.id,
-              status: nextStatus,
-              consignmentNumber: order.consignmentNumber,
-              uid: profile.uid,
-            ),
-          );
+        CreatorUpdateOrderStatus(
+          orderId: order.id,
+          status: nextStatus,
+          consignmentNumber: order.consignmentNumber,
+          uid: profile.uid,
+        ),
+      );
       Navigator.pop(context);
     }
   }
@@ -745,6 +775,9 @@ class _OrderDetailSheet extends StatelessWidget {
     );
     final confirmConsignmentController = TextEditingController(
       text: order.consignmentNumber ?? '',
+    );
+    final carrierController = TextEditingController(
+      text: order.carrierName ?? '',
     );
     final formKey = GlobalKey<FormState>();
 
@@ -803,6 +836,22 @@ class _OrderDetailSheet extends StatelessWidget {
                     return null;
                   },
                 ),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: carrierController,
+                  decoration: const InputDecoration(
+                    labelText: 'Carrier / Courier Name *',
+                    hintText: 'e.g. India Post, Blue Dart',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  validator: (value) {
+                    if ((value?.trim() ?? '').isEmpty) {
+                      return 'Carrier name is required.';
+                    }
+                    return null;
+                  },
+                ),
               ],
             ),
           ),
@@ -817,13 +866,14 @@ class _OrderDetailSheet extends StatelessWidget {
               if (formKey.currentState!.validate()) {
                 onStatusUpdateInitiated('In-Transit');
                 context.read<CreatorBloc>().add(
-                      CreatorUpdateOrderStatus(
-                        orderId: order.id,
-                        status: 'In-Transit',
-                        consignmentNumber: consignmentController.text.trim(),
-                        uid: profile.uid,
-                      ),
-                    );
+                  CreatorUpdateOrderStatus(
+                    orderId: order.id,
+                    status: 'In-Transit',
+                    consignmentNumber: consignmentController.text.trim(),
+                    carrierName: carrierController.text.trim(),
+                    uid: profile.uid,
+                  ),
+                );
                 Navigator.pop(dialogContext); // Close dialog
                 Navigator.pop(context); // Close bottom sheet
               }

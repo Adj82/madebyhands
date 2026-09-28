@@ -181,8 +181,16 @@ final class CreatorUpdateOrderStatus extends CreatorEvent {
   final String status;
   final String? rejectionReason;
   final String? consignmentNumber;
+  final String? carrierName;
   final String uid; // to re-fetch
-  CreatorUpdateOrderStatus({required this.orderId, required this.status, this.rejectionReason, this.consignmentNumber, required this.uid});
+  CreatorUpdateOrderStatus({
+    required this.orderId,
+    required this.status,
+    this.rejectionReason,
+    this.consignmentNumber,
+    this.carrierName,
+    required this.uid,
+  });
 }
 
 final class CreatorFetchNotifications extends CreatorEvent {
@@ -193,7 +201,10 @@ final class CreatorFetchNotifications extends CreatorEvent {
 final class CreatorMarkNotificationAsRead extends CreatorEvent {
   final String notificationId;
   final String uid;
-  CreatorMarkNotificationAsRead({required this.notificationId, required this.uid});
+  CreatorMarkNotificationAsRead({
+    required this.notificationId,
+    required this.uid,
+  });
 }
 
 final class CreatorMarkAllNotificationsAsRead extends CreatorEvent {
@@ -204,5 +215,8 @@ final class CreatorMarkAllNotificationsAsRead extends CreatorEvent {
 final class CreatorDeleteNotifications extends CreatorEvent {
   final List<String> notificationIds;
   final String uid;
-  CreatorDeleteNotifications({required this.notificationIds, required this.uid});
+  CreatorDeleteNotifications({
+    required this.notificationIds,
+    required this.uid,
+  });
 }

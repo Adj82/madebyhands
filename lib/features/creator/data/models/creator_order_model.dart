@@ -14,6 +14,7 @@ class CreatorOrderModel extends CreatorOrder {
     required super.deliveryAddress,
     super.rejectionReason,
     super.consignmentNumber,
+    super.carrierName,
   });
 
   factory CreatorOrderModel.fromJson(Map<String, dynamic> json, String id) {
@@ -25,6 +26,9 @@ class CreatorOrderModel extends CreatorOrder {
         name: item['name'] as String? ?? 'Handmade item',
         quantity: (item['quantity'] as num?)?.round() ?? 1,
         unitPrice: (item['unitPrice'] as num?)?.round() ?? 0,
+        baseUnitPrice: (item['baseUnitPrice'] as num?)?.round() ?? 0,
+        customizationPrice: (item['customizationPrice'] as num?)?.round() ?? 0,
+        customizations: _customizations(item['customizations']),
       );
     }).toList();
 
@@ -45,6 +49,7 @@ class CreatorOrderModel extends CreatorOrder {
       ),
       rejectionReason: json['rejectionReason'],
       consignmentNumber: json['consignmentNumber'],
+      carrierName: json['carrierName'],
     );
   }
 
@@ -74,13 +79,27 @@ class CreatorOrderModel extends CreatorOrder {
               'name': item.name,
               'quantity': item.quantity,
               'unitPrice': item.unitPrice,
+              'baseUnitPrice': item.baseUnitPrice,
+              'customizationPrice': item.customizationPrice,
+              'customizations': item.customizations,
             },
           )
           .toList(),
       'deliveryAddress': deliveryAddress,
       'rejectionReason': rejectionReason,
       'consignmentNumber': consignmentNumber,
+      'carrierName': carrierName,
       'createdAt': createdAt, // Preserving original creation time on updates
     };
+  }
+
+  static Map<String, List<String>> _customizations(Object? value) {
+    if (value is! Map) return const {};
+    return value.map((key, rawValue) {
+      final values = rawValue is List
+          ? rawValue.map((item) => item.toString()).toList()
+          : <String>[rawValue.toString()];
+      return MapEntry(key.toString(), values);
+    });
   }
 }

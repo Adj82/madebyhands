@@ -5,12 +5,14 @@ class CreatorOrder {
   final String buyerId;
   final String buyerName;
   final DateTime createdAt;
-  final String status; // 'Placed', 'Accepted', 'Rejected', 'Shipped', 'Delivered', 'Completed'
+  final String
+  status; // 'Placed', 'Accepted', 'Rejected', 'Shipped', 'Delivered', 'Completed'
   final int totalAmount;
   final List<BuyerOrderItem> items;
   final String deliveryAddress;
   final String? rejectionReason;
   final String? consignmentNumber;
+  final String? carrierName;
 
   const CreatorOrder({
     required this.id,
@@ -23,5 +25,6 @@ class CreatorOrder {
     required this.deliveryAddress,
     this.rejectionReason,
     this.consignmentNumber,
+    this.carrierName,
   });
 }

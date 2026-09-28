@@ -60,8 +60,16 @@ class FirestoreOrderRepository implements OrderRepository {
     final checkoutId =
         'CHK-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}';
     final grouped = <String, List<CheckoutOrderItem>>{};
+    final requestedStock = <String, int>{};
+    final productNames = <String, String>{};
     for (final item in items) {
       grouped.putIfAbsent(item.creatorId, () => []).add(item);
+      requestedStock.update(
+        item.productId,
+        (quantity) => quantity + item.quantity,
+        ifAbsent: () => item.quantity,
+      );
+      productNames[item.productId] = item.name;
     }
 
     final orderReferences = grouped.values
@@ -69,6 +77,37 @@ class FirestoreOrderRepository implements OrderRepository {
         .toList();
 
     await firestore.runTransaction((transaction) async {
+      final stockUpdates = <_RepoItemStockUpdate>[];
+      for (final entry in requestedStock.entries) {
+        final productRef = firestore.collection('products').doc(entry.key);
+        final productSnapshot = await transaction.get(productRef);
+        if (!productSnapshot.exists) {
+          throw StateError(
+            'Product "${productNames[entry.key] ?? entry.key}" is no longer available.',
+          );
+        }
+        final data = productSnapshot.data() ?? const <String, dynamic>{};
+        final isActive = data['isActive'] != false;
+        final currentStock = (data['stock'] as num?)?.round() ?? 0;
+        if (!isActive || currentStock < entry.value) {
+          throw StateError(
+            'Only $currentStock unit(s) of "${productNames[entry.key] ?? entry.key}" are available.',
+          );
+        }
+        stockUpdates.add(
+          _RepoItemStockUpdate(
+            ref: productRef,
+            snap: productSnapshot,
+            quantity: entry.value,
+            name: productNames[entry.key] ?? entry.key,
+          )..newStock = currentStock - entry.value,
+        );
+      }
+
+      for (final update in stockUpdates) {
+        transaction.update(update.ref, {'stock': update.newStock});
+      }
+
       var orderIndex = 0;
       for (final entry in grouped.entries) {
         final creatorItems = entry.value;
@@ -100,6 +139,9 @@ class FirestoreOrderRepository implements OrderRepository {
                   'creatorName': item.creatorName,
                   'quantity': item.quantity,
                   'unitPrice': item.unitPrice,
+                  'baseUnitPrice': item.baseUnitPrice,
+                  'customizationPrice': item.customizationPrice,
+                  'customizations': item.customizations,
                 },
               )
               .toList(),
@@ -123,11 +165,24 @@ class FirestoreOrderRepository implements OrderRepository {
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
           'isSample': false,
+          'stockReserved': true,
         });
+      }
+    });
 
-        // Automatically create in-app notification for Creator
+    // Notifications are intentionally outside the order transaction. A
+    // notification permission/network failure must never roll back an order.
+    try {
+      final batch = firestore.batch();
+      var orderIndex = 0;
+      for (final entry in grouped.entries) {
+        final creatorItems = entry.value;
+        final subtotal = creatorItems.fold<int>(
+          0,
+          (total, item) => total + item.unitPrice * item.quantity,
+        );
         final notificationDocRef = firestore.collection('notifications').doc();
-        transaction.set(notificationDocRef, {
+        batch.set(notificationDocRef, {
           'creatorUid': entry.key,
           'title': 'New Incoming Order! 🛒',
           'message':
@@ -135,10 +190,14 @@ class FirestoreOrderRepository implements OrderRepository {
           'type': 'order',
           'createdAt': FieldValue.serverTimestamp(),
           'isRead': false,
-          'targetId': orderDocRef.id,
+          'targetId': orderReferences[orderIndex++].id,
         });
       }
-    });
+      await batch.commit();
+    } catch (_) {
+      // The order is already safely placed; creator dashboards also read the
+      // order collection directly, so notification failure is non-blocking.
+    }
 
     return orderReferences.map((reference) => reference.id).toList();
   }
@@ -214,7 +273,9 @@ class FirestoreOrderRepository implements OrderRepository {
         final orderData = txOrderSnap.data() ?? <String, dynamic>{};
         final txStatus = orderData['status'] as String? ?? '';
 
-        if (txStatus != 'Confirmed' && txStatus != 'Accepted') {
+        if (orderData['stockReserved'] != true &&
+            txStatus != 'Confirmed' &&
+            txStatus != 'Accepted') {
           final rawItems = orderData['items'] as List<dynamic>? ?? const [];
           final itemsToUpdate = <_RepoItemStockUpdate>[];
 
@@ -226,8 +287,9 @@ class FirestoreOrderRepository implements OrderRepository {
             final itemName = itemMap['name'] as String? ?? 'Product';
 
             if (productId.isNotEmpty) {
-              final productRef =
-                  firestore.collection('products').doc(productId);
+              final productRef = firestore
+                  .collection('products')
+                  .doc(productId);
               final productSnap = await transaction.get(productRef);
               itemsToUpdate.add(
                 _RepoItemStockUpdate(
@@ -248,8 +310,7 @@ class FirestoreOrderRepository implements OrderRepository {
             }
 
             final productData = item.snap.data() ?? <String, dynamic>{};
-            final currentStock =
-                (productData['stock'] as num?)?.toInt() ?? 0;
+            final currentStock = (productData['stock'] as num?)?.toInt() ?? 0;
 
             if (currentStock < item.quantity) {
               throw Exception(

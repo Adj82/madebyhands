@@ -81,6 +81,7 @@ service cloud.firestore {
             'updatedAt',
             'rejectionReason',
             'consignmentNumber',
+            'carrierName',
             'payoutStatus'
           ]));
       allow delete: if isAdmin();

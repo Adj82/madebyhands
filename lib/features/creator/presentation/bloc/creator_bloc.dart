@@ -13,10 +13,9 @@ part 'creator_state.dart';
 class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
   final CreatorRepository _creatorRepository;
 
-  CreatorBloc({
-    required CreatorRepository creatorRepository,
-  })  : _creatorRepository = creatorRepository,
-        super(CreatorInitial()) {
+  CreatorBloc({required CreatorRepository creatorRepository})
+    : _creatorRepository = creatorRepository,
+      super(CreatorInitial()) {
     on<CreatorCheckProfileExists>(_onCheckProfileExists);
     on<CreatorSubmitOnboarding>(_onSubmitOnboarding);
     on<CreatorSubmitVerification>(_onSubmitVerification);
@@ -42,16 +41,13 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
   ) async {
     emit(CreatorLoading());
     final res = await _creatorRepository.getCreatorProfile(event.uid);
-    res.fold(
-      (l) => emit(CreatorFailure(l.message)),
-      (r) {
-        if (r == null) {
-          emit(CreatorProfileNotFound());
-        } else {
-          emit(CreatorProfileLoaded(r));
-        }
-      },
-    );
+    res.fold((l) => emit(CreatorFailure(l.message)), (r) {
+      if (r == null) {
+        emit(CreatorProfileNotFound());
+      } else {
+        emit(CreatorProfileLoaded(r));
+      }
+    });
   }
 
   void _onSubmitOnboarding(
@@ -118,40 +114,41 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
     Emitter<CreatorState> emit,
   ) async {
     final currentState = state;
-    final List<CreatorProfile> previousProfiles = currentState is CreatorAllProfilesLoaded ? currentState.profiles : [];
+    final List<CreatorProfile> previousProfiles =
+        currentState is CreatorAllProfilesLoaded ? currentState.profiles : [];
 
-    final res = await _creatorRepository.updateVerificationStatus(event.uid, event.status);
-    res.fold(
-      (l) => emit(CreatorFailure(l.message)),
-      (r) {
-        if (previousProfiles.isNotEmpty) {
-          final updatedProfiles = previousProfiles.map((p) {
-            if (p.uid == event.uid) {
-              return CreatorProfile(
-                uid: p.uid,
-                name: p.name,
-                profileImage: p.profileImage,
-                bio: p.bio,
-                category: p.category,
-                location: p.location,
-                socialLinks: p.socialLinks,
-                portfolio: p.portfolio,
-                story: p.story,
-                verificationStatus: event.status,
-                businessName: p.businessName,
-                address: p.address,
-                latestPhoto: p.latestPhoto,
-                idCard: p.idCard,
-              );
-            }
-            return p;
-          }).toList();
-          emit(CreatorAllProfilesLoaded(updatedProfiles));
-        } else {
-          add(CreatorFetchAllProfiles());
-        }
-      },
+    final res = await _creatorRepository.updateVerificationStatus(
+      event.uid,
+      event.status,
     );
+    res.fold((l) => emit(CreatorFailure(l.message)), (r) {
+      if (previousProfiles.isNotEmpty) {
+        final updatedProfiles = previousProfiles.map((p) {
+          if (p.uid == event.uid) {
+            return CreatorProfile(
+              uid: p.uid,
+              name: p.name,
+              profileImage: p.profileImage,
+              bio: p.bio,
+              category: p.category,
+              location: p.location,
+              socialLinks: p.socialLinks,
+              portfolio: p.portfolio,
+              story: p.story,
+              verificationStatus: event.status,
+              businessName: p.businessName,
+              address: p.address,
+              latestPhoto: p.latestPhoto,
+              idCard: p.idCard,
+            );
+          }
+          return p;
+        }).toList();
+        emit(CreatorAllProfilesLoaded(updatedProfiles));
+      } else {
+        add(CreatorFetchAllProfiles());
+      }
+    });
   }
 
   void _onAddProduct(
@@ -271,12 +268,9 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
       approvedBy: event.approvedBy,
       approvedByEmail: event.approvedByEmail,
     );
-    res.fold(
-      (l) => emit(CreatorFailure(l.message)),
-      (r) {
-        add(CreatorFetchAdminAllProducts());
-      },
-    );
+    res.fold((l) => emit(CreatorFailure(l.message)), (r) {
+      add(CreatorFetchAdminAllProducts());
+    });
   }
 
   void _onFetchOrders(
@@ -302,14 +296,12 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
       event.status,
       rejectionReason: event.rejectionReason,
       consignmentNumber: event.consignmentNumber,
+      carrierName: event.carrierName,
     );
-    res.fold(
-      (l) => emit(CreatorFailure(l.message)),
-      (r) {
-        add(CreatorFetchOrders(event.uid));
-        add(CreatorFetchCreatorProducts(event.uid));
-      },
-    );
+    res.fold((l) => emit(CreatorFailure(l.message)), (r) {
+      add(CreatorFetchOrders(event.uid));
+      add(CreatorFetchCreatorProducts(event.uid));
+    });
   }
 
   void _onFetchNotifications(
@@ -346,7 +338,9 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
     CreatorDeleteNotifications event,
     Emitter<CreatorState> emit,
   ) async {
-    final res = await _creatorRepository.deleteNotifications(event.notificationIds);
+    final res = await _creatorRepository.deleteNotifications(
+      event.notificationIds,
+    );
     res.fold(
       (l) => emit(CreatorFailure(l.message)),
       (r) => add(CreatorFetchNotifications(event.uid)),

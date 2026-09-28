@@ -84,10 +84,13 @@ abstract interface class CreatorRemoteDataSource {
     String status, {
     String? rejectionReason,
     String? consignmentNumber,
+    String? carrierName,
   });
 
   /// Fetches in-app notifications for a specific creator.
-  Future<List<CreatorNotificationModel>> getCreatorNotifications(String creatorUid);
+  Future<List<CreatorNotificationModel>> getCreatorNotifications(
+    String creatorUid,
+  );
 
   /// Marks a specific notification as read.
   Future<void> markNotificationAsRead(String notificationId);
@@ -207,7 +210,10 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
     required String uid,
     required String fileName,
   }) async {
-    return _uploadFileSafely(file, 'creator_profiles/$uid/verification/$fileName');
+    return _uploadFileSafely(
+      file,
+      'creator_profiles/$uid/verification/$fileName',
+    );
   }
 
   @override
@@ -428,6 +434,7 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
     String status, {
     String? rejectionReason,
     String? consignmentNumber,
+    String? carrierName,
   }) async {
     try {
       final orderRef = firestore.collection('orders').doc(orderId);
@@ -473,7 +480,9 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
           final orderData = txOrderSnap.data() ?? <String, dynamic>{};
           final txStatus = orderData['status'] as String? ?? '';
 
-          if (txStatus != 'Confirmed' && txStatus != 'Accepted') {
+          if (orderData['stockReserved'] != true &&
+              txStatus != 'Confirmed' &&
+              txStatus != 'Accepted') {
             final rawItems = orderData['items'] as List<dynamic>? ?? const [];
             final itemsToUpdate = <_ItemStockUpdate>[];
 
@@ -485,8 +494,9 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
               final itemName = itemMap['name'] as String? ?? 'Product';
 
               if (productId.isNotEmpty) {
-                final productRef =
-                    firestore.collection('products').doc(productId);
+                final productRef = firestore
+                    .collection('products')
+                    .doc(productId);
                 final productSnap = await transaction.get(productRef);
                 itemsToUpdate.add(
                   _ItemStockUpdate(
@@ -507,8 +517,7 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
               }
 
               final productData = item.snap.data() ?? <String, dynamic>{};
-              final currentStock =
-                  (productData['stock'] as num?)?.toInt() ?? 0;
+              final currentStock = (productData['stock'] as num?)?.toInt() ?? 0;
 
               if (currentStock < item.quantity) {
                 throw Exception(
@@ -538,8 +547,12 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
           if (rejectionReason != null) {
             updateData['rejectionReason'] = rejectionReason;
           }
-          if (consignmentNumber != null && consignmentNumber.trim().isNotEmpty) {
+          if (consignmentNumber != null &&
+              consignmentNumber.trim().isNotEmpty) {
             updateData['consignmentNumber'] = consignmentNumber.trim();
+          }
+          if (carrierName != null && carrierName.trim().isNotEmpty) {
+            updateData['carrierName'] = carrierName.trim();
           }
           transaction.update(orderRef, updateData);
         });
@@ -550,6 +563,9 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
         };
         if (consignmentNumber != null && consignmentNumber.trim().isNotEmpty) {
           updateData['consignmentNumber'] = consignmentNumber.trim();
+        }
+        if (carrierName != null && carrierName.trim().isNotEmpty) {
+          updateData['carrierName'] = carrierName.trim();
         }
         if (status == 'Delivered') {
           updateData['deliveredAt'] = FieldValue.serverTimestamp();
@@ -622,10 +638,9 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
   @override
   Future<void> markNotificationAsRead(String notificationId) async {
     try {
-      await firestore
-          .collection('notifications')
-          .doc(notificationId)
-          .update({'isRead': true});
+      await firestore.collection('notifications').doc(notificationId).update({
+        'isRead': true,
+      });
     } catch (e) {
       throw Exception(e.toString());
     }
