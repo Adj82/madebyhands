@@ -67,6 +67,7 @@ final class CreatorAddProduct extends CreatorEvent {
   final String description;
   final List<File> imageFiles;
   final String category;
+  final List<String> categories;
   final double price;
   final int stock;
   final String materials;
@@ -76,6 +77,7 @@ final class CreatorAddProduct extends CreatorEvent {
   final String creatorUid;
   final String creatorName;
   final bool isCustomizable;
+  final bool? isFramed;
   final List<String> predefinedCustomizations;
   final List<CustomizationInput> customizations;
 
@@ -84,6 +86,7 @@ final class CreatorAddProduct extends CreatorEvent {
     required this.description,
     required this.imageFiles,
     required this.category,
+    this.categories = const [],
     required this.price,
     required this.stock,
     required this.materials,
@@ -93,6 +96,7 @@ final class CreatorAddProduct extends CreatorEvent {
     required this.creatorUid,
     required this.creatorName,
     this.isCustomizable = false,
+    this.isFramed,
     this.predefinedCustomizations = const [],
     this.customizations = const [],
   });
@@ -105,6 +109,7 @@ final class CreatorUpdateProduct extends CreatorEvent {
   final List<File> newImageFiles;
   final List<String> existingImageUrls;
   final String category;
+  final List<String> categories;
   final double price;
   final int stock;
   final String materials;
@@ -114,6 +119,7 @@ final class CreatorUpdateProduct extends CreatorEvent {
   final String creatorUid;
   final String creatorName;
   final bool isCustomizable;
+  final bool? isFramed;
   final List<String> predefinedCustomizations;
   final List<CustomizationInput> customizations;
   final bool hasChanges;
@@ -125,6 +131,7 @@ final class CreatorUpdateProduct extends CreatorEvent {
     required this.newImageFiles,
     required this.existingImageUrls,
     required this.category,
+    this.categories = const [],
     required this.price,
     required this.stock,
     required this.materials,
@@ -134,6 +141,7 @@ final class CreatorUpdateProduct extends CreatorEvent {
     required this.creatorUid,
     required this.creatorName,
     required this.isCustomizable,
+    this.isFramed,
     this.predefinedCustomizations = const [],
     required this.customizations,
     required this.hasChanges,
