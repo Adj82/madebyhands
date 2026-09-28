@@ -1,5 +1,6 @@
 import 'package:madebyhands/features/buyer/domain/entities/buyer_order.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
+import 'package:madebyhands/features/buyer/domain/entities/product_review.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 
 abstract interface class BuyerRepository {
@@ -20,4 +21,19 @@ abstract interface class BuyerRepository {
   Future<void> saveAddress(String userId, SavedAddress address);
 
   Future<void> deleteAddress(String userId, String addressId);
+
+  Stream<List<ProductReview>> watchProductReviews(String productId);
+
+  Future<ProductReviewEligibility> getProductReviewEligibility({
+    required String buyerId,
+    required String productId,
+  });
+
+  Future<void> submitProductReview({
+    required String buyerId,
+    required String buyerName,
+    required String productId,
+    required int rating,
+    required String comment,
+  });
 }

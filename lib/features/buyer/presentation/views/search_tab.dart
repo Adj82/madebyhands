@@ -9,13 +9,11 @@ import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dar
 class SearchTab extends StatefulWidget {
   final String userId;
   final ValueChanged<Product> onProductTap;
-  final String initialCategory;
 
   const SearchTab({
     super.key,
     required this.userId,
     required this.onProductTap,
-    this.initialCategory = 'All',
   });
 
   @override
@@ -24,44 +22,134 @@ class SearchTab extends StatefulWidget {
 
 class _SearchTabState extends State<SearchTab> {
   String _query = '';
-  String _category = 'All';
-
-  @override
-  void initState() {
-    super.initState();
-    _category = widget.initialCategory;
-  }
-
-  @override
-  void didUpdateWidget(covariant SearchTab oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.initialCategory != widget.initialCategory) {
-      _category = widget.initialCategory;
-    }
-  }
+  final Set<String> _selectedCategories = {};
 
   bool _matchesCategory(Product product) {
-    if (_category == 'All') return true;
-    final productCategory = product.category.trim().toLowerCase();
-    final selectedCategory = _category.trim().toLowerCase();
-    if (selectedCategory == 'home decor') {
-      return productCategory == 'home decor' || productCategory == 'decor';
+    if (_selectedCategories.isEmpty) return true;
+    final productCategory = _normalizeCategory(product.category);
+    return _selectedCategories.any((category) {
+      final acceptedNames =
+          _legacyCategoryAliases[category] ?? const <String>[];
+      return productCategory == _normalizeCategory(category) ||
+          acceptedNames.contains(productCategory);
+    });
+  }
+
+  Future<void> _openCategoryFilter() async {
+    final draftSelection = Set<String>.from(_selectedCategories);
+    final selection = await showModalBottomSheet<Set<String>>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: AppColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => FractionallySizedBox(
+          heightFactor: 0.88,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 12, 12),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Filter by category',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Select one or more categories',
+                            style: TextStyle(color: AppColors.mutedText),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Close filters',
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: buyerProductCategories.length,
+                  itemBuilder: (context, index) {
+                    final category = buyerProductCategories[index];
+                    return CheckboxListTile(
+                      value: draftSelection.contains(category),
+                      title: Text(category),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      activeColor: AppColors.primary,
+                      onChanged: (selected) {
+                        setModalState(() {
+                          selected == true
+                              ? draftSelection.add(category)
+                              : draftSelection.remove(category);
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                decoration: const BoxDecoration(
+                  color: AppColors.surface,
+                  border: Border(top: BorderSide(color: AppColors.outline)),
+                ),
+                child: Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => setModalState(draftSelection.clear),
+                      child: const Text('Clear all'),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(
+                          context,
+                          Set<String>.from(draftSelection),
+                        ),
+                        child: Text(
+                          draftSelection.isEmpty
+                              ? 'Show all products'
+                              : 'Apply (${draftSelection.length})',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (selection != null && mounted) {
+      setState(() {
+        _selectedCategories
+          ..clear()
+          ..addAll(selection);
+      });
     }
-    return productCategory == selectedCategory;
   }
 
   @override
   Widget build(BuildContext context) {
-    const categories = [
-      'All',
-      'Home Decor',
-      'Pottery',
-      'Jewellery',
-      'Textiles',
-      'Wellness',
-      'Gifts',
-    ];
-
     return BlocBuilder<BuyerBloc, BuyerState>(
       builder: (context, state) {
         final products = state.products.where((product) {
@@ -102,22 +190,50 @@ class _SearchTabState extends State<SearchTab> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  SizedBox(
-                    height: 42,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: categories.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        final category = categories[index];
-                        return ChoiceChip(
-                          label: Text(category),
-                          selected: category == _category,
-                          onSelected: (_) => setState(() => _category = category),
-                        );
-                      },
-                    ),
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _openCategoryFilter,
+                        icon: const Icon(Icons.tune),
+                        label: Text(
+                          _selectedCategories.isEmpty
+                              ? 'Filter'
+                              : 'Filter (${_selectedCategories.length})',
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 46),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                        ),
+                      ),
+                      if (_selectedCategories.isNotEmpty) ...[
+                        const SizedBox(width: 10),
+                        TextButton(
+                          onPressed: () => setState(_selectedCategories.clear),
+                          child: const Text('Clear'),
+                        ),
+                      ],
+                    ],
                   ),
+                  if (_selectedCategories.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 34,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _selectedCategories.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final category = _selectedCategories.elementAt(index);
+                          return InputChip(
+                            label: Text(category),
+                            onDeleted: () => setState(
+                              () => _selectedCategories.remove(category),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 18),
                   Text(
                     '${products.length} pieces',
@@ -133,7 +249,7 @@ class _SearchTabState extends State<SearchTab> {
                 child: BuyerEmptyState(
                   icon: Icons.search_off,
                   title: 'No pieces found',
-                  message: 'Try another search or category.',
+                  message: 'Try another search or change your filters.',
                 ),
               )
             else
@@ -155,11 +271,11 @@ class _SearchTabState extends State<SearchTab> {
                         isSaved: state.favoriteIds.contains(product.id),
                         onTap: () => widget.onProductTap(product),
                         onSave: () => context.read<BuyerBloc>().add(
-                              BuyerToggleFavorite(
-                                userId: widget.userId,
-                                product: product,
-                              ),
-                            ),
+                          BuyerToggleFavorite(
+                            userId: widget.userId,
+                            product: product,
+                          ),
+                        ),
                       );
                     },
                   ),
@@ -171,3 +287,82 @@ class _SearchTabState extends State<SearchTab> {
     );
   }
 }
+
+const buyerProductCategories = <String>[
+  'Paintings & Fine Art',
+  'Drawings & Illustrations',
+  'Digital Art & Design',
+  'Pottery, Ceramics & Clay',
+  'Sculptures & Figurines',
+  'Textile & Fiber Art',
+  'Fashion & Wearables',
+  'Jewellery & Accessories',
+  'Home Décor & Living',
+  'Wood, Bamboo & Natural Crafts',
+  'Paper, Books & Stationery',
+  'Traditional & Folk Art',
+  'Handicrafts & Artisan Goods',
+  'Toys, Dolls & Collectibles',
+  'Resin & Mixed-Material Art',
+  'Photography & Prints',
+  'Gifts & Personalized Creations',
+  'Other Creative Works',
+];
+
+String _normalizeCategory(String value) => value
+    .trim()
+    .toLowerCase()
+    .replaceAll('é', 'e')
+    .replaceAll('&', 'and')
+    .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+    .trim();
+
+final Map<String, List<String>> _legacyCategoryAliases =
+    {
+      'Paintings & Fine Art': ['painting', 'paintings', 'fine art'],
+      'Drawings & Illustrations': [
+        'drawing',
+        'drawings',
+        'illustration',
+        'illustrations',
+      ],
+      'Digital Art & Design': ['digital art', 'digital design'],
+      'Pottery, Ceramics & Clay': ['pottery', 'ceramics', 'ceramic', 'clay'],
+      'Sculptures & Figurines': [
+        'sculpture',
+        'sculptures',
+        'figurine',
+        'figurines',
+      ],
+      'Textile & Fiber Art': ['textile', 'textiles', 'fiber art', 'fibre art'],
+      'Fashion & Wearables': ['fashion', 'wearables', 'clothing'],
+      'Jewellery & Accessories': ['jewellery', 'jewelry', 'accessories'],
+      'Home Décor & Living': ['home decor', 'decor', 'home and living'],
+      'Wood, Bamboo & Natural Crafts': [
+        'wood',
+        'wooden',
+        'bamboo',
+        'natural crafts',
+      ],
+      'Paper, Books & Stationery': ['paper', 'books', 'stationery'],
+      'Traditional & Folk Art': ['traditional art', 'folk art'],
+      'Handicrafts & Artisan Goods': [
+        'handicrafts',
+        'artisan goods',
+        'handmade',
+      ],
+      'Toys, Dolls & Collectibles': ['toys', 'toy', 'dolls', 'collectibles'],
+      'Resin & Mixed-Material Art': [
+        'resin',
+        'mixed material art',
+        'mixed media',
+      ],
+      'Photography & Prints': ['photography', 'prints'],
+      'Gifts & Personalized Creations': ['gifts', 'gift', 'personalized'],
+      'Other Creative Works': ['other', 'wellness'],
+    }.map(
+      (category, aliases) => MapEntry(
+        category,
+        aliases.map(_normalizeCategory).toList(growable: false),
+      ),
+    );
