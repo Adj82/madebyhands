@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
-import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 
 class UserManagementView extends StatelessWidget {
@@ -132,15 +131,12 @@ class UserManagementView extends StatelessWidget {
                             value: 'suspend', 
                             child: Text(isSuspended ? 'Unsuspend User' : 'Suspend User', 
                                 style: TextStyle(color: isSuspended ? Colors.green : Colors.redAccent))),
-                        const PopupMenuItem(value: 'role', child: Text('Change Role')),
                       ],
                       onSelected: (val) {
                         if (val == 'view') {
                           _viewProfile(context, user);
                         } else if (val == 'suspend') {
                           context.read<AdminBloc>().add(AdminSuspendUserRequested(user.uid, !isSuspended));
-                        } else if (val == 'role') {
-                          _showChangeRoleDialog(context, user);
                         }
                       },
                     ),
@@ -162,77 +158,5 @@ class UserManagementView extends StatelessWidget {
          SnackBar(content: Text('Buyer account details for ${user.name}')),
        );
     }
-  }
-
-  void _showChangeRoleDialog(BuildContext context, UserEntity user) {
-    final authState = context.read<AuthBloc>().state;
-    final currentUser = authState is AuthSuccess ? authState.user : null;
-    final isSuperAdmin = currentUser?.isSuperAdmin ?? true;
-
-    if (!isSuperAdmin) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.lock_outline, color: Colors.orange),
-              SizedBox(width: 8),
-              Text('Access Restricted'),
-            ],
-          ),
-          content: const Text(
-            'Operational Managers cannot modify user roles or grant administrative access.\n\nOnly Super Admins have permission to manage and reassign user roles.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    final adminBloc = context.read<AdminBloc>();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Change Role for ${user.name}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('Buyer'),
-              onTap: () {
-                adminBloc.add(AdminChangeUserRoleRequested(user.uid, 'buyer'));
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Creator / Seller'),
-              onTap: () {
-                adminBloc.add(AdminChangeUserRoleRequested(user.uid, 'creator'));
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Operational Manager'),
-              onTap: () {
-                adminBloc.add(AdminChangeUserRoleRequested(user.uid, 'manager'));
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Super Admin'),
-              onTap: () {
-                adminBloc.add(AdminChangeUserRoleRequested(user.uid, 'super_admin'));
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
