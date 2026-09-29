@@ -98,7 +98,11 @@ class CreatorRepositoryImpl implements CreatorRepository {
     try {
       final existingProfile = await remoteDataSource.getCreatorProfile(uid);
       if (existingProfile == null) {
-        return left(Failure('Creator profile not found. Please complete onboarding first.'));
+        return left(
+          Failure(
+            'Creator profile not found. Please complete onboarding first.',
+          ),
+        );
       }
 
       String latestPhotoUrl = existingLatestPhotoUrl;
@@ -155,7 +159,10 @@ class CreatorRepositoryImpl implements CreatorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> updateVerificationStatus(String uid, String status) async {
+  Future<Either<Failure, void>> updateVerificationStatus(
+    String uid,
+    String status,
+  ) async {
     try {
       await remoteDataSource.updateVerificationStatus(uid, status);
       return right(null);
@@ -199,28 +206,32 @@ class CreatorRepositoryImpl implements CreatorRepository {
       List<ProductCustomization> customizationEntities = [];
       if (isCustomizable) {
         for (final input in customizations) {
-          final custImageUrls = await remoteDataSource.uploadCustomizationImages(
-            images: input.imageFiles,
-            uid: creatorUid,
-            productName: name,
-            customizationName: input.name,
+          final custImageUrls = await remoteDataSource
+              .uploadCustomizationImages(
+                images: input.imageFiles,
+                uid: creatorUid,
+                productName: name,
+                customizationName: input.name,
+              );
+          customizationEntities.add(
+            ProductCustomization(
+              name: input.name,
+              description: input.description,
+              additionalPrice: input.additionalPrice,
+              images: custImageUrls,
+              isMultipleSelection: input.isMultipleSelection,
+              options: input.options,
+            ),
           );
-          customizationEntities.add(ProductCustomization(
-            name: input.name,
-            description: input.description,
-            additionalPrice: input.additionalPrice,
-            images: custImageUrls,
-            isMultipleSelection: input.isMultipleSelection,
-            options: input.options,
-          ));
         }
       }
 
       final categoriesList = categories.isNotEmpty
           ? categories
           : (category.isNotEmpty ? [category] : <String>[]);
-      final categoryStr =
-          categoriesList.isNotEmpty ? categoriesList.join(', ') : category;
+      final categoryStr = categoriesList.isNotEmpty
+          ? categoriesList.join(', ')
+          : category;
 
       final newProduct = CreatorProductModel(
         id: '',
@@ -241,8 +252,9 @@ class CreatorRepositoryImpl implements CreatorRepository {
         isActive: false,
         isCustomizable: isCustomizable,
         isFramed: isFramed,
-        predefinedCustomizations:
-            isCustomizable ? predefinedCustomizations : const [],
+        predefinedCustomizations: isCustomizable
+            ? predefinedCustomizations
+            : const [],
         customizations: customizationEntities,
         createdAt: DateTime.now(),
       );
@@ -297,32 +309,40 @@ class CreatorRepositoryImpl implements CreatorRepository {
       List<ProductCustomization> customizationEntities = [];
       if (isCustomizable) {
         for (final input in customizations) {
-          final custImageUrls = await remoteDataSource.uploadCustomizationImages(
-            images: input.imageFiles,
-            uid: creatorUid,
-            productName: name,
-            customizationName: input.name,
+          final custImageUrls = await remoteDataSource
+              .uploadCustomizationImages(
+                images: input.imageFiles,
+                uid: creatorUid,
+                productName: name,
+                customizationName: input.name,
+              );
+          customizationEntities.add(
+            ProductCustomization(
+              name: input.name,
+              description: input.description,
+              additionalPrice: input.additionalPrice,
+              images: custImageUrls,
+              isMultipleSelection: input.isMultipleSelection,
+              options: input.options,
+            ),
           );
-          customizationEntities.add(ProductCustomization(
-            name: input.name,
-            description: input.description,
-            additionalPrice: input.additionalPrice,
-            images: custImageUrls,
-            isMultipleSelection: input.isMultipleSelection,
-            options: input.options,
-          ));
         }
       }
 
       // 3. Get existing product to store in history
-      final allCreatorProductsRes = await remoteDataSource.getCreatorProducts(creatorUid);
-      final existingProduct = allCreatorProductsRes.firstWhere((p) => p.id == productId);
+      final allCreatorProductsRes = await remoteDataSource.getCreatorProducts(
+        creatorUid,
+      );
+      final existingProduct = allCreatorProductsRes.firstWhere(
+        (p) => p.id == productId,
+      );
 
       final categoriesList = categories.isNotEmpty
           ? categories
           : (category.isNotEmpty ? [category] : <String>[]);
-      final categoryStr =
-          categoriesList.isNotEmpty ? categoriesList.join(', ') : category;
+      final categoryStr = categoriesList.isNotEmpty
+          ? categoriesList.join(', ')
+          : category;
 
       final updatedProduct = CreatorProductModel(
         id: productId,
@@ -340,10 +360,12 @@ class CreatorRepositoryImpl implements CreatorRepository {
         creatorUid: creatorUid,
         creatorName: creatorName,
         status: 'Pending Approval', // Reset status
-        isActive: false,           // Hide from storefront
+        isActive: false, // Hide from storefront
         isCustomizable: isCustomizable,
         isFramed: isFramed,
-        predefinedCustomizations: isCustomizable ? predefinedCustomizations : const [],
+        predefinedCustomizations: isCustomizable
+            ? predefinedCustomizations
+            : const [],
         customizations: customizationEntities,
         createdAt: existingProduct.createdAt,
         editHistory: {
@@ -384,7 +406,9 @@ class CreatorRepositoryImpl implements CreatorRepository {
   }
 
   @override
-  Future<Either<Failure, List<CreatorProduct>>> getCreatorProducts(String uid) async {
+  Future<Either<Failure, List<CreatorProduct>>> getCreatorProducts(
+    String uid,
+  ) async {
     try {
       final products = await remoteDataSource.getCreatorProducts(uid);
       return right(products);
@@ -414,7 +438,9 @@ class CreatorRepositoryImpl implements CreatorRepository {
   }
 
   @override
-  Future<Either<Failure, List<CreatorOrder>>> getCreatorOrders(String uid) async {
+  Future<Either<Failure, List<CreatorOrder>>> getCreatorOrders(
+    String uid,
+  ) async {
     try {
       final orders = await remoteDataSource.getCreatorOrders(uid);
       return right(orders);
@@ -429,6 +455,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
     String status, {
     String? rejectionReason,
     String? consignmentNumber,
+    String? carrierName,
   }) async {
     try {
       await remoteDataSource.updateOrderStatus(
@@ -436,6 +463,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
         status,
         rejectionReason: rejectionReason,
         consignmentNumber: consignmentNumber,
+        carrierName: carrierName,
       );
       return right(null);
     } catch (e) {
@@ -448,8 +476,9 @@ class CreatorRepositoryImpl implements CreatorRepository {
     String creatorUid,
   ) async {
     try {
-      final notifications =
-          await remoteDataSource.getCreatorNotifications(creatorUid);
+      final notifications = await remoteDataSource.getCreatorNotifications(
+        creatorUid,
+      );
       return right(notifications.cast<CreatorNotification>());
     } catch (e) {
       return left(Failure(_cleanExceptionMessage(e)));

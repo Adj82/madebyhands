@@ -46,6 +46,9 @@ class MarketplaceOrderModel extends MarketplaceOrder {
             'Creator',
         quantity: (item['quantity'] as num?)?.round() ?? 1,
         unitPrice: (item['unitPrice'] as num?)?.round() ?? 0,
+        baseUnitPrice: (item['baseUnitPrice'] as num?)?.round() ?? 0,
+        customizationPrice: (item['customizationPrice'] as num?)?.round() ?? 0,
+        customizations: _customizations(item['customizations']),
       );
     }).toList();
     final address = data['shippingAddress'] ?? data['deliveryAddress'];
@@ -97,5 +100,15 @@ class MarketplaceOrderModel extends MarketplaceOrder {
       ].whereType<String>().where((value) => value.isNotEmpty).join(', ');
     }
     return 'Address unavailable';
+  }
+
+  static Map<String, List<String>> _customizations(Object? value) {
+    if (value is! Map) return const {};
+    return value.map((key, rawValue) {
+      final values = rawValue is List
+          ? rawValue.map((item) => item.toString()).toList()
+          : <String>[rawValue.toString()];
+      return MapEntry(key.toString(), values);
+    });
   }
 }
