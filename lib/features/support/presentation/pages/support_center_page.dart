@@ -194,6 +194,8 @@ class _SupportConversationPageState extends State<SupportConversationPage> {
       ),
       body: Column(
         children: [
+          if (widget.ticket.isAccountDeletionRequest)
+            _buildAccountDeletionHeader(),
           Expanded(
             child: StreamBuilder<List<SupportMessage>>(
               stream: widget.repository.watchMessages(widget.ticket.id),
@@ -268,6 +270,206 @@ class _SupportConversationPageState extends State<SupportConversationPage> {
       senderId: widget.senderId,
       senderRole: widget.senderRole,
       message: text,
+    );
+  }
+
+  Widget _buildAccountDeletionHeader() {
+    final ticket = widget.ticket;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.red),
+              const SizedBox(width: 8),
+              const Text(
+                'Account Deletion Request',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.red,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: (ticket.requestStatus == 'Approved'
+                          ? Colors.green
+                          : (ticket.requestStatus == 'Rejected'
+                              ? Colors.red
+                              : Colors.orange))
+                      .withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  ticket.requestStatus,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: ticket.requestStatus == 'Approved'
+                        ? Colors.green
+                        : (ticket.requestStatus == 'Rejected'
+                            ? Colors.red
+                            : Colors.orange.shade800),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Creator: ${ticket.userName} (${ticket.userId})',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Reason for deletion:',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            ticket.reason.isNotEmpty ? ticket.reason : ticket.lastMessage,
+            style: const TextStyle(fontSize: 14),
+          ),
+          if (widget.canResolve &&
+              widget.ticket.isOpen &&
+              ticket.requestStatus == 'Pending') ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _rejectDeletion,
+                    icon: const Icon(Icons.close, color: Colors.red),
+                    label: const Text('Reject Request'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _approveDeletion,
+                    icon: const Icon(Icons.delete_forever),
+                    label: const Text('Approve Deletion'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _approveDeletion() {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Confirm Account Deletion'),
+        content: Text(
+          'Are you sure you want to approve and execute account deletion for "${widget.ticket.userName}"?\n\nThis will deactivate their profile, user role, and all product listings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              await widget.repository.approveAccountDeletion(
+                ticketId: widget.ticket.id,
+                creatorUid: widget.ticket.userId,
+              );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Account deletion approved and executed.'),
+                  ),
+                );
+                Navigator.pop(context);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Approve & Deactivate'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _rejectDeletion() {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Reject Deletion Request'),
+        content: TextField(
+          controller: reasonController,
+          decoration: const InputDecoration(
+            hintText: 'Reason for rejecting account deletion *',
+          ),
+          maxLines: 2,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final text = reasonController.text.trim();
+              if (text.isEmpty) return;
+              Navigator.pop(dialogCtx);
+              await widget.repository.rejectAccountDeletion(
+                ticketId: widget.ticket.id,
+                creatorUid: widget.ticket.userId,
+                rejectionReason: text,
+              );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Account deletion request rejected.'),
+                  ),
+                );
+                Navigator.pop(context);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Reject Request'),
+          ),
+        ],
+      ),
     );
   }
 }
