@@ -19,6 +19,15 @@ class ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      elevation: 1,
+      color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+          color: const Color(0xFF8B261D).withValues(alpha: 0.35),
+          width: 0.8,
+        ),
+      ),
       clipBehavior: Clip.antiAlias,
       margin: EdgeInsets.zero,
       child: InkWell(
@@ -48,12 +57,12 @@ class ProductCard extends StatelessWidget {
                         isSaved ? Icons.favorite : Icons.favorite_border,
                       ),
                       style: IconButton.styleFrom(
-                        backgroundColor: AppColors.surface.withValues(
-                          alpha: 0.9,
+                        backgroundColor: const Color(0xFFFAF6EE).withValues(
+                          alpha: 0.92,
                         ),
                         foregroundColor: isSaved
-                            ? Colors.redAccent
-                            : AppColors.text,
+                            ? const Color(0xFF8B261D)
+                            : const Color(0xFF8B261D).withValues(alpha: 0.7),
                       ),
                     ),
                   ),
@@ -72,6 +81,7 @@ class ProductCard extends StatelessWidget {
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       height: 1.2,
+                      color: Color(0xFF8B261D),
                     ),
                   ),
                   const SizedBox(height: 5),
@@ -93,6 +103,7 @@ class ProductCard extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
+                            color: Color(0xFF2C1810),
                           ),
                         ),
                       ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 
 Future<SavedAddress?> showSavedAddressForm(
   BuildContext context, {
@@ -10,6 +11,7 @@ Future<SavedAddress?> showSavedAddressForm(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
+  backgroundColor: const Color(0xFFFAF6EE),
   builder: (_) => _AddressForm(address: existing),
 );
 
@@ -25,154 +27,199 @@ class SavedAddressesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Saved addresses')),
-      body: StreamBuilder<List<SavedAddress>>(
-        stream: repository.watchAddresses(userId),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('Could not load addresses: ${snapshot.error}'),
-            );
-          }
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final addresses = snapshot.data!;
-          if (addresses.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.location_on_outlined,
-                      size: 64,
-                      color: AppColors.primary,
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'No saved addresses',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Add an address for quicker checkout.',
-                      style: TextStyle(color: AppColors.mutedText),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-            itemCount: addresses.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final address = addresses[index];
-              return Card(
+    return BuyerBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text(
+            'Saved addresses',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF8B261D),
+            ),
+          ),
+          iconTheme: const IconThemeData(color: Color(0xFF8B261D)),
+        ),
+        body: StreamBuilder<List<SavedAddress>>(
+          stream: repository.watchAddresses(userId),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(
+                child: Text('Could not load addresses: ${snapshot.error}'),
+              );
+            }
+            if (!snapshot.hasData) {
+              return const Center(
+                child: CircularProgressIndicator(color: Color(0xFF8B261D)),
+              );
+            }
+            final addresses = snapshot.data!;
+            if (addresses.isEmpty) {
+              return const Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(32),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Row(
-                              children: [
-                                Text(
-                                  address.label,
-                                  style: const TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                if (address.isDefault) ...[
-                                  const SizedBox(width: 8),
-                                  const Chip(label: Text('Default')),
-                                ],
-                              ],
-                            ),
-                          ),
-                          PopupMenuButton<String>(
-                            onSelected: (value) async {
-                              if (value == 'edit') {
-                                final updated = await showSavedAddressForm(
-                                  context,
-                                  existing: address,
-                                );
-                                if (!context.mounted) return;
-                                if (updated != null) {
-                                  await _saveAddress(context, updated);
-                                }
-                              } else if (value == 'delete') {
-                                await _confirmDelete(context, address);
-                              } else if (value == 'default') {
-                                await repository.saveAddress(
-                                  userId,
-                                  address.copyWith(isDefault: true),
-                                );
-                              }
-                            },
-                            itemBuilder: (_) => [
-                              const PopupMenuItem(
-                                value: 'edit',
-                                child: Text('Edit'),
-                              ),
-                              if (!address.isDefault)
-                                const PopupMenuItem(
-                                  value: 'default',
-                                  child: Text('Make default'),
-                                ),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Text('Delete'),
-                              ),
-                            ],
-                          ),
-                        ],
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 64,
+                        color: Color(0xFF8B261D),
                       ),
+                      SizedBox(height: 16),
                       Text(
-                        address.recipientName,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        address.formatted,
-                        style: const TextStyle(
-                          height: 1.4,
-                          color: AppColors.mutedText,
+                        'No saved addresses',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF8B261D),
                         ),
                       ),
-                      const SizedBox(height: 5),
+                      SizedBox(height: 8),
                       Text(
-                        address.phone,
-                        style: const TextStyle(color: AppColors.mutedText),
+                        'Add an address for quicker checkout.',
+                        style: TextStyle(color: AppColors.mutedText),
                       ),
                     ],
                   ),
                 ),
               );
-            },
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final address = await showSavedAddressForm(context);
-          if (!context.mounted) return;
-          if (address != null) {
-            await _saveAddress(context, address);
-          }
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Add address'),
+            }
+            return ListView.separated(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+              itemCount: addresses.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final address = addresses[index];
+                return Card(
+                  elevation: 1,
+                  color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: const BorderSide(
+                      color: Color(0xFF8B261D),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Text(
+                                    address.label,
+                                    style: const TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF8B261D),
+                                    ),
+                                  ),
+                                  if (address.isDefault) ...[
+                                    const SizedBox(width: 8),
+                                    const Chip(
+                                      backgroundColor: Color(0xFFF2DEDD),
+                                      label: Text(
+                                        'Default',
+                                        style: TextStyle(
+                                          color: Color(0xFF8B261D),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            PopupMenuButton<String>(
+                              icon: const Icon(
+                                Icons.more_vert,
+                                color: Color(0xFF8B261D),
+                              ),
+                              onSelected: (value) async {
+                                if (value == 'edit') {
+                                  final updated = await showSavedAddressForm(
+                                    context,
+                                    existing: address,
+                                  );
+                                  if (!context.mounted) return;
+                                  if (updated != null) {
+                                    await _saveAddress(context, updated);
+                                  }
+                                } else if (value == 'delete') {
+                                  await _confirmDelete(context, address);
+                                } else if (value == 'default') {
+                                  await repository.saveAddress(
+                                    userId,
+                                    address.copyWith(isDefault: true),
+                                  );
+                                }
+                              },
+                              itemBuilder: (_) => [
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Text('Edit'),
+                                ),
+                                if (!address.isDefault)
+                                  const PopupMenuItem(
+                                    value: 'default',
+                                    child: Text('Make default'),
+                                  ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text('Delete'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Text(
+                          address.recipientName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF8B261D),
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          address.formatted,
+                          style: const TextStyle(
+                            height: 1.4,
+                            color: AppColors.mutedText,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          address.phone,
+                          style: const TextStyle(color: AppColors.mutedText),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          backgroundColor: const Color(0xFF8B261D),
+          foregroundColor: Colors.white,
+          onPressed: () async {
+            final address = await showSavedAddressForm(context);
+            if (!context.mounted) return;
+            if (address != null) {
+              await _saveAddress(context, address);
+            }
+          },
+          icon: const Icon(Icons.add),
+          label: const Text('Add address'),
+        ),
       ),
     );
   }
@@ -185,7 +232,11 @@ class SavedAddressesPage extends StatelessWidget {
         await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('Delete address?'),
+            backgroundColor: const Color(0xFFFAF6EE),
+            title: const Text(
+              'Delete address?',
+              style: TextStyle(color: Color(0xFF8B261D)),
+            ),
             content: Text('Remove your ${address.label} address?'),
             actions: [
               TextButton(
@@ -194,6 +245,9 @@ class SavedAddressesPage extends StatelessWidget {
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF8B261D),
+                ),
                 child: const Text('Delete'),
               ),
             ],
@@ -275,7 +329,11 @@ class _AddressFormState extends State<_AddressForm> {
           children: [
             Text(
               widget.address == null ? 'Add address' : 'Edit address',
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF8B261D),
+              ),
             ),
             const SizedBox(height: 18),
             _field(_label, 'Label (Home, Work)'),
@@ -296,12 +354,22 @@ class _AddressFormState extends State<_AddressForm> {
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Make this my default address'),
+              activeColor: const Color(0xFF8B261D),
+              title: const Text(
+                'Make this my default address',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
               value: _isDefault,
               onChanged: (value) => setState(() => _isDefault = value),
             ),
             const SizedBox(height: 10),
-            FilledButton(onPressed: _submit, child: const Text('Save address')),
+            FilledButton(
+              onPressed: _submit,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF8B261D),
+              ),
+              child: const Text('Save address'),
+            ),
           ],
         ),
       ),
@@ -313,15 +381,18 @@ class _AddressFormState extends State<_AddressForm> {
     String label, {
     TextInputType? keyboardType,
   }) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(labelText: label),
-      validator: (value) =>
-          value == null || value.trim().isEmpty ? 'Required' : null,
-    ),
-  );
+        padding: const EdgeInsets.only(bottom: 12),
+        child: TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: InputDecoration(
+            labelText: label,
+            labelStyle: const TextStyle(color: Color(0xFF8B261D)),
+          ),
+          validator: (value) =>
+              value == null || value.trim().isEmpty ? 'Required' : null,
+        ),
+      );
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
