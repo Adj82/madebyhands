@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/buyer/domain/entities/buyer_product_notification.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
@@ -341,60 +342,70 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                       .length,
                   onNotificationsTap: _openNotifications,
                 ),
-                SearchTab(
-                  userId: _currentUser.uid,
-                  onProductTap: _openProduct,
-                  onCreatorTap: _openCreator,
+                SafeArea(
+                  child: SearchTab(
+                    userId: _currentUser.uid,
+                    onProductTap: _openProduct,
+                    onCreatorTap: _openCreator,
+                  ),
                 ),
-                SavedTab(
-                  userId: _currentUser.uid,
-                  onProductTap: _openProduct,
-                  onBrowse: () => _navigationCubit.changePage(1),
+                SafeArea(
+                  child: SavedTab(
+                    userId: _currentUser.uid,
+                    onProductTap: _openProduct,
+                    onBrowse: () => _navigationCubit.changePage(1),
+                  ),
                 ),
-                CartTab(
-                  onBrowse: () => _navigationCubit.changePage(1),
-                  onCheckout: _openCheckout,
+                SafeArea(
+                  child: CartTab(
+                    onBrowse: () => _navigationCubit.changePage(1),
+                    onCheckout: _openCheckout,
+                  ),
                 ),
-                ProfileTab(
-                  user: _currentUser,
-                  onAccount: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => BuyerAccountPage(
-                        user: _currentUser,
-                        repository: serviceLocator(),
-                        onProfileUpdated: (user) {
-                          if (mounted) setState(() => _currentUser = user);
-                        },
+                SafeArea(
+                  child: ProfileTab(
+                    user: _currentUser,
+                    onAccount: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => BuyerAccountPage(
+                          user: _currentUser,
+                          repository: serviceLocator(),
+                          onProfileUpdated: (user) {
+                            if (mounted) setState(() => _currentUser = user);
+                          },
+                        ),
                       ),
                     ),
-                  ),
-                  onOrders: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => OrderHistoryPage(
-                        userId: _currentUser.uid,
-                        repository: context.read<BuyerBloc>().repository,
+                    onOrders: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => OrderHistoryPage(
+                          userId: _currentUser.uid,
+                          repository: context.read<BuyerBloc>().repository,
+                        ),
                       ),
                     ),
-                  ),
-                  onAddresses: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => SavedAddressesPage(
-                        userId: _currentUser.uid,
-                        repository: context.read<BuyerBloc>().repository,
+                    onAddresses: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => SavedAddressesPage(
+                          userId: _currentUser.uid,
+                          repository: context.read<BuyerBloc>().repository,
+                        ),
                       ),
                     ),
-                  ),
-                  onSupport: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => SupportCenterPage(
-                        user: _currentUser,
-                        repository: serviceLocator(),
+                    onSupport: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => SupportCenterPage(
+                          user: _currentUser,
+                          repository: serviceLocator(),
+                        ),
                       ),
                     ),
+                    onLogout: widget.onLogout,
                   ),
-                  onLogout: widget.onLogout,
                 ),
               ];
+
+              final safeIndex = selectedIndex.clamp(0, pages.length - 1);
 
               final cartCount = buyerState.cartQuantities.values.fold(
                 0,
@@ -402,46 +413,91 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
               );
 
               return Scaffold(
-                body: SafeArea(
-                  child: IndexedStack(index: selectedIndex, children: pages),
-                ),
-                bottomNavigationBar: NavigationBar(
-                  selectedIndex: selectedIndex,
-                  onDestinationSelected: _navigationCubit.changePage,
-                  destinations: [
-                    const NavigationDestination(
-                      icon: Icon(Icons.home_outlined),
-                      selectedIcon: Icon(Icons.home),
-                      label: 'Home',
+                backgroundColor: const Color(0xFFFAF6EE),
+                body: IndexedStack(index: safeIndex, children: pages),
+                bottomNavigationBar: Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFAF6EE),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
                     ),
-                    const NavigationDestination(
-                      icon: Icon(Icons.search),
-                      label: 'Shop',
+                  ),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(20),
                     ),
-                    const NavigationDestination(
-                      icon: Icon(Icons.favorite_border),
-                      selectedIcon: Icon(Icons.favorite),
-                      label: 'Saved',
-                    ),
-                    NavigationDestination(
-                      icon: Badge(
-                        isLabelVisible: cartCount > 0,
-                        label: Text('$cartCount'),
-                        child: const Icon(Icons.shopping_bag_outlined),
+                    child: NavigationBarTheme(
+                      data: NavigationBarThemeData(
+                        height: 78,
+                        backgroundColor: const Color(0xFFFAF6EE),
+                        indicatorColor: const Color(0xFFF2DEDD),
+                        iconTheme: WidgetStateProperty.resolveWith((states) {
+                          return IconThemeData(
+                            color: states.contains(WidgetState.selected)
+                                ? const Color(0xFF8B261D)
+                                : const Color(
+                                    0xFF8B261D,
+                                  ).withValues(alpha: 0.55),
+                          );
+                        }),
+                        labelTextStyle: WidgetStateProperty.resolveWith((
+                          states,
+                        ) {
+                          return GoogleFonts.montserrat(
+                            fontSize: 11.5,
+                            fontWeight: states.contains(WidgetState.selected)
+                                ? FontWeight.bold
+                                : FontWeight.w600,
+                            color: states.contains(WidgetState.selected)
+                                ? const Color(0xFF8B261D)
+                                : const Color(
+                                    0xFF8B261D,
+                                  ).withValues(alpha: 0.6),
+                          );
+                        }),
                       ),
-                      selectedIcon: Badge(
-                        isLabelVisible: cartCount > 0,
-                        label: Text('$cartCount'),
-                        child: const Icon(Icons.shopping_bag),
+                      child: NavigationBar(
+                        height: 78,
+                        selectedIndex: safeIndex,
+                        onDestinationSelected: _navigationCubit.changePage,
+                        destinations: [
+                          const NavigationDestination(
+                            icon: Icon(Icons.home_outlined),
+                            selectedIcon: Icon(Icons.home),
+                            label: 'Home',
+                          ),
+                          const NavigationDestination(
+                            icon: Icon(Icons.search),
+                            selectedIcon: Icon(Icons.search),
+                            label: 'Shop',
+                          ),
+                          const NavigationDestination(
+                            icon: Icon(Icons.favorite_border),
+                            selectedIcon: Icon(Icons.favorite),
+                            label: 'Wishlist',
+                          ),
+                          NavigationDestination(
+                            icon: Badge(
+                              isLabelVisible: cartCount > 0,
+                              label: Text('$cartCount'),
+                              child: const Icon(Icons.shopping_bag_outlined),
+                            ),
+                            selectedIcon: Badge(
+                              isLabelVisible: cartCount > 0,
+                              label: Text('$cartCount'),
+                              child: const Icon(Icons.shopping_bag),
+                            ),
+                            label: 'Cart',
+                          ),
+                          const NavigationDestination(
+                            icon: Icon(Icons.person_outline),
+                            selectedIcon: Icon(Icons.person),
+                            label: 'Account',
+                          ),
+                        ],
                       ),
-                      label: 'Cart',
                     ),
-                    const NavigationDestination(
-                      icon: Icon(Icons.person_outline),
-                      selectedIcon: Icon(Icons.person),
-                      label: 'Profile',
-                    ),
-                  ],
+                  ),
                 ),
               );
             },
