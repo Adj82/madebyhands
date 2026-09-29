@@ -92,20 +92,29 @@ class OrderManagementView extends StatelessWidget {
               return tB.compareTo(tA);
             });
 
-            // Filter orders across 3 segregated tabs
+            // 1. Pending Tab: Newly placed orders + Shipped orders awaiting delivery confirmation
             final pendingOrders = allOrders.where((o) {
               final status = (o['status'] as String? ?? 'Placed').trim();
-              return status == 'Placed' || status == 'Pending';
+              return status == 'Placed' ||
+                  status == 'Pending' ||
+                  status == 'Shipped' ||
+                  status == 'In-transit' ||
+                  status == 'Out for Delivery';
             }).toList();
 
+            // 2. Active Tab: Orders accepted by seller & in processing
             final activeOrders = allOrders.where((o) {
               final status = (o['status'] as String? ?? '').trim();
-              return ['Accepted', 'Shipped', 'In-transit', 'Out for Delivery', 'Processing'].contains(status);
+              return status == 'Accepted' || status == 'Processing' || status == 'Confirmed';
             }).toList();
 
+            // 3. Completed Tab: Delivered or finished orders
             final completedOrders = allOrders.where((o) {
               final status = (o['status'] as String? ?? '').trim();
-              return ['Delivered', 'Completed', 'Rejected', 'Cancelled'].contains(status);
+              return status == 'Delivered' ||
+                  status == 'Completed' ||
+                  status == 'Rejected' ||
+                  status == 'Cancelled';
             }).toList();
 
             return TabBarView(
@@ -166,6 +175,7 @@ class _OrderTileCard extends StatelessWidget {
     final status = (order['status'] as String? ?? 'Placed').trim();
     final total = (order['totalAmount'] as num?)?.toDouble() ??
         (order['total'] as num?)?.toDouble() ??
+        (order['buyerPayableAmount'] as num?)?.toDouble() ??
         0.0;
     final sellerName = order['sellerName'] as String? ??
         order['creatorName'] as String? ??
@@ -266,7 +276,7 @@ class _OrderTileCard extends StatelessWidget {
           subtitle: Padding(
             padding: const EdgeInsets.only(top: 6.0),
             child: Text(
-              '₹${total.toStringAsFixed(0)} · $sellerName${createdAt != null ? " · ${DateFormat('dd MMM yyyy').format(createdAt)}" : ""}',
+              '₹${total.toStringAsFixed(0)} · $sellerName${createdAt != null ? " · ${DateFormat('dd MMM yyyy, hh:mm a').format(createdAt)}" : ""}',
               style: const TextStyle(
                 fontSize: 13,
                 color: AppColors.mutedText,
@@ -276,14 +286,32 @@ class _OrderTileCard extends StatelessWidget {
           children: [
             const Divider(height: 1, color: AppColors.outline),
             const SizedBox(height: 12),
-            _infoLine('Buyer', '$buyerName ($buyerPhone)'),
+            _infoLine('Buyer Name', buyerName),
             const SizedBox(height: 4),
-            _infoLine('Creator', sellerName),
+            _infoLine('Buyer Phone', buyerPhone),
+            if (buyerEmail.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              _infoLine('Buyer Email', buyerEmail),
+            ],
             const SizedBox(height: 4),
-            _infoLine('Address', address),
+            _infoLine('Delivery Address', address),
             const SizedBox(height: 12),
             const Divider(height: 1, color: AppColors.outline),
             const SizedBox(height: 12),
+            _infoLine('Seller Name', sellerName),
+            if (sellerPhone.isNotEmpty && sellerPhone != 'N/A') ...[
+              const SizedBox(height: 4),
+              _infoLine('Seller Phone', sellerPhone),
+            ],
+            if (sellerEmail.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              _infoLine('Seller Email', sellerEmail),
+            ],
+            const SizedBox(height: 12),
+            const Divider(height: 1, color: AppColors.outline),
+            const SizedBox(height: 12),
+            const Text('Order Items:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary)),
+            const SizedBox(height: 6),
             ...items.map((item) {
               final name = item['name'] as String? ?? 'Item';
               final quantity = (item['quantity'] as num?)?.toInt() ?? 1;
@@ -291,26 +319,35 @@ class _OrderTileCard extends StatelessWidget {
               final itemTotal = quantity * unitPrice;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  '• $name x $quantity — ₹${itemTotal.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.text,
-                  ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '• $name (x$quantity)',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.text),
+                      ),
+                    ),
+                    Text(
+                      '₹${itemTotal.toStringAsFixed(0)}',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.text),
+                    ),
+                  ],
                 ),
               );
             }),
             const SizedBox(height: 12),
             const Divider(height: 1, color: AppColors.outline),
             const SizedBox(height: 12),
-            _infoLine('Platform fee', '₹${platformFee.toStringAsFixed(0)}'),
+            _infoLine('Order Total', '₹${total.toStringAsFixed(0)}'),
             const SizedBox(height: 4),
-            _infoLine('Creator payout', '₹${creatorPayout.toStringAsFixed(0)}'),
+            _infoLine('Platform Fee', '₹${platformFee.toStringAsFixed(0)}'),
             const SizedBox(height: 4),
-            _infoLine('Payment', paymentStatus),
+            _infoLine('Creator Payout', '₹${creatorPayout.toStringAsFixed(0)}'),
             const SizedBox(height: 4),
-            _infoLine('Payout', payoutStatus),
+            _infoLine('Payment Status', paymentStatus.toUpperCase()),
+            const SizedBox(height: 4),
+            _infoLine('Payout Status', payoutStatus.toUpperCase()),
             if (consignmentNumber.isNotEmpty) ...[
               const SizedBox(height: 4),
               _infoLine('Tracking #', consignmentNumber),
@@ -321,39 +358,42 @@ class _OrderTileCard extends StatelessWidget {
             ],
             const SizedBox(height: 16),
             Row(
-              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                OutlinedButton.icon(
-                  onPressed: () => _showContactModal(
-                    context,
-                    title: 'Contact Buyer',
-                    name: buyerName,
-                    phone: buyerPhone,
-                    email: buyerEmail,
-                    role: 'Buyer',
-                  ),
-                  icon: const Icon(Icons.person_outline, size: 18),
-                  label: const Text('Contact Buyer'),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.outline),
-                    foregroundColor: AppColors.text,
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showContactModal(
+                      context,
+                      title: 'Contact Buyer',
+                      name: buyerName,
+                      phone: buyerPhone,
+                      email: buyerEmail,
+                      role: 'Buyer',
+                    ),
+                    icon: const Icon(Icons.person, size: 18),
+                    label: const Text('Contact Buyer'),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.outline),
+                      foregroundColor: AppColors.text,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
-                OutlinedButton.icon(
-                  onPressed: () => _showContactModal(
-                    context,
-                    title: 'Contact Seller',
-                    name: sellerName,
-                    phone: sellerPhone,
-                    email: sellerEmail,
-                    role: 'Creator / Seller',
-                  ),
-                  icon: const Icon(Icons.storefront_outlined, size: 18),
-                  label: const Text('Contact Seller'),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.outline),
-                    foregroundColor: AppColors.text,
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showContactModal(
+                      context,
+                      title: 'Contact Seller',
+                      name: sellerName,
+                      phone: sellerPhone,
+                      email: sellerEmail,
+                      role: 'Creator / Seller',
+                    ),
+                    icon: const Icon(Icons.storefront, size: 18),
+                    label: const Text('Contact Seller'),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.outline),
+                      foregroundColor: AppColors.text,
+                    ),
                   ),
                 ),
               ],
@@ -371,7 +411,7 @@ class _OrderTileCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 110,
+            width: 120,
             child: Text(
               '$label:',
               style: const TextStyle(
@@ -403,6 +443,8 @@ class _OrderTileCard extends StatelessWidget {
     required String email,
     required String role,
   }) {
+    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.background,
@@ -448,27 +490,26 @@ class _OrderTileCard extends StatelessWidget {
                       backgroundColor: AppColors.primary,
                       child: Icon(Icons.person, color: Colors.white),
                     ),
-                    title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     subtitle: Text(role, style: const TextStyle(color: AppColors.mutedText, fontSize: 12)),
                   ),
                   const Divider(),
-                  if (phone.isNotEmpty && phone != 'N/A')
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.phone_outlined, color: AppColors.primary),
-                      title: Text(phone),
-                      subtitle: const Text('Phone Number'),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.copy_rounded, size: 20),
-                        tooltip: 'Copy Phone Number',
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: phone));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Copied $phone to clipboard')),
-                          );
-                        },
-                      ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.phone_outlined, color: AppColors.primary),
+                    title: Text(phone.isNotEmpty ? phone : 'Phone unavailable'),
+                    subtitle: const Text('Phone Number'),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.copy_rounded, size: 20),
+                      tooltip: 'Copy Phone Number',
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: phone));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Copied $phone to clipboard')),
+                        );
+                      },
                     ),
+                  ),
                   if (email.isNotEmpty)
                     ListTile(
                       contentPadding: EdgeInsets.zero,
@@ -492,23 +533,23 @@ class _OrderTileCard extends StatelessWidget {
             const SizedBox(height: 20),
             Row(
               children: [
-                if (phone.isNotEmpty && phone != 'N/A')
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () {
-                        Navigator.pop(modalContext);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Calling $name ($phone)...')),
-                        );
-                      },
-                      icon: const Icon(Icons.call),
-                      label: const Text('Call Now'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                      ),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: phone));
+                      Navigator.pop(modalContext);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Copied $name\'s phone number ($phone) to clipboard.')),
+                      );
+                    },
+                    icon: const Icon(Icons.phone_in_talk),
+                    label: Text(cleanPhone.isNotEmpty ? 'Call $cleanPhone' : 'Call Number'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
                     ),
                   ),
-                if (phone.isNotEmpty && phone != 'N/A') const SizedBox(width: 12),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () {
@@ -519,7 +560,7 @@ class _OrderTileCard extends StatelessWidget {
                       );
                     },
                     icon: const Icon(Icons.copy),
-                    label: const Text('Copy Contact Info'),
+                    label: const Text('Copy Info'),
                   ),
                 ),
               ],
@@ -572,7 +613,7 @@ class _StatusBadge extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
-        status,
+        status.toUpperCase(),
         style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
       ),
     );

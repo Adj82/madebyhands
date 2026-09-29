@@ -44,7 +44,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   static const String _razorpayKeyId = String.fromEnvironment(
     'RAZORPAY_KEY_ID',
-    defaultValue: 'rzp_test_TeNxd2gWeMmJRp',
+    defaultValue: 'rzp_test_ThYi51dfwooow6',
   );
 
   int get _subtotal => widget.products.fold(0, (sum, product) {

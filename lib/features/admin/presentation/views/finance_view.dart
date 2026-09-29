@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
@@ -80,13 +81,14 @@ class FinanceView extends StatelessWidget {
           final data = doc.data();
           final total = (data['totalAmount'] as num?)?.toDouble() ??
               (data['total'] as num?)?.toDouble() ??
+              (data['buyerPayableAmount'] as num?)?.toDouble() ??
               0.0;
           final platformFee = data['platformFee'] != null
               ? (data['platformFee'] as num).toDouble()
               : (total > 999 ? (50.0 + (total * 0.05)) : 50.0);
           final payoutAmount = data['payoutAmount'] != null
               ? (data['payoutAmount'] as num).toDouble()
-              : (total - platformFee);
+              : (data['creatorNetAmount'] as num?)?.toDouble() ?? (total - platformFee);
 
           totalPlatformRevenue += platformFee;
 
@@ -97,6 +99,7 @@ class FinanceView extends StatelessWidget {
             pendingPayoutOrders.add({
               'docId': doc.id,
               'orderId': doc.id.length > 6 ? doc.id.substring(doc.id.length - 6).toUpperCase() : doc.id.toUpperCase(),
+              'creatorId': data['creatorId'] as String? ?? data['sellerId'] as String? ?? '',
               'sellerName': data['sellerName'] as String? ?? data['creatorName'] as String? ?? 'Artisan',
               'payoutAmount': payoutAmount,
               'status': data['status'] ?? 'Placed',
@@ -170,6 +173,7 @@ class FinanceView extends StatelessWidget {
                               final payout = pendingPayoutOrders[index];
                               final docId = payout['docId'] as String;
                               final orderId = payout['orderId'] as String;
+                              final creatorId = payout['creatorId'] as String;
                               final sellerName = payout['sellerName'] as String;
                               final amount = payout['payoutAmount'] as double;
                               final createdAt = payout['createdAt'] as DateTime;
@@ -204,24 +208,17 @@ class FinanceView extends StatelessWidget {
                                             '₹${amount.toStringAsFixed(0)}',
                                             style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.primary),
                                           ),
-                                          const SizedBox(height: 4),
+                                          const SizedBox(height: 6),
                                           FilledButton.icon(
-                                            onPressed: () async {
-                                              final messenger = ScaffoldMessenger.of(context);
-                                              final messageText = 'Payout of ₹${amount.toStringAsFixed(0)} released to $sellerName.';
-                                              try {
-                                                await FirebaseFirestore.instance
-                                                    .collection('orders')
-                                                    .doc(docId)
-                                                    .update({'payoutStatus': 'released'});
-                                                messenger.showSnackBar(
-                                                  SnackBar(content: Text(messageText)),
-                                                );
-                                              } catch (e) {
-                                                // ignore
-                                              }
-                                            },
-                                            icon: const Icon(Icons.check, size: 14),
+                                            onPressed: () => _showPayoutReleaseModal(
+                                              context,
+                                              docId: docId,
+                                              orderId: orderId,
+                                              creatorId: creatorId,
+                                              sellerName: sellerName,
+                                              amount: amount,
+                                            ),
+                                            icon: const Icon(Icons.account_balance_wallet, size: 14),
                                             label: const Text('Release Payout', style: TextStyle(fontSize: 11)),
                                             style: FilledButton.styleFrom(
                                               backgroundColor: AppColors.primary,
@@ -245,6 +242,200 @@ class FinanceView extends StatelessWidget {
           },
         );
       },
+    );
+  }
+
+  void _showPayoutReleaseModal(
+    BuildContext context, {
+    required String docId,
+    required String orderId,
+    required String creatorId,
+    required String sellerName,
+    required double amount,
+  }) async {
+    String upiId = '';
+    String phone = 'N/A';
+
+    try {
+      if (creatorId.isNotEmpty) {
+        final profileDoc = await FirebaseFirestore.instance
+            .collection('creator_profiles')
+            .doc(creatorId)
+            .get();
+        if (profileDoc.exists && profileDoc.data() != null) {
+          final pData = profileDoc.data()!;
+          upiId = pData['upiId'] as String? ?? pData['payoutUpi'] as String? ?? '';
+          phone = pData['phone'] as String? ?? '';
+        }
+
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(creatorId)
+            .get();
+        if (userDoc.exists && userDoc.data() != null) {
+          final uData = userDoc.data()!;
+          if (phone.isEmpty || phone == 'N/A') {
+            phone = uData['phone'] as String? ?? '';
+          }
+        }
+      }
+    } catch (_) {}
+
+    if (upiId.isEmpty) {
+      final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+      upiId = cleanPhone.length == 10 ? '$cleanPhone@upi' : '${sellerName.toLowerCase().replaceAll(' ', '')}@upi';
+    }
+
+    if (!context.mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (modalContext) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          24,
+          24,
+          24,
+          MediaQuery.of(modalContext).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Release Seller Payout',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(modalContext),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.outline),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const CircleAvatar(
+                      backgroundColor: AppColors.primary,
+                      child: Icon(Icons.storefront, color: Colors.white),
+                    ),
+                    title: Text(sellerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    subtitle: Text('Order #$orderId · Creator Payout', style: const TextStyle(color: AppColors.mutedText, fontSize: 12)),
+                    trailing: Text(
+                      '₹${amount.toStringAsFixed(0)}',
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: AppColors.primary),
+                    ),
+                  ),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  const Text('Seller UPI ID / Payment Address:', style: TextStyle(fontSize: 12, color: AppColors.mutedText)),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.account_balance_wallet, color: Colors.green, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            upiId,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.green),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.copy_rounded, size: 20, color: Colors.green),
+                          tooltip: 'Copy UPI ID',
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: upiId));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Copied UPI ID ($upiId) to clipboard')),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (phone.isNotEmpty && phone != 'N/A') ...[
+                    const SizedBox(height: 8),
+                    Text('Seller Phone: $phone', style: const TextStyle(fontSize: 12, color: AppColors.mutedText)),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: upiId));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Copied UPI ID ($upiId)')),
+                      );
+                    },
+                    icon: const Icon(Icons.copy),
+                    label: const Text('Copy UPI'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      Navigator.pop(modalContext);
+                      try {
+                        await FirebaseFirestore.instance
+                            .collection('orders')
+                            .doc(docId)
+                            .update({
+                              'payoutStatus': 'paid',
+                              'payoutReleasedAt': FieldValue.serverTimestamp(),
+                            });
+                        messenger.showSnackBar(
+                          SnackBar(content: Text('Payout of ₹${amount.toStringAsFixed(0)} marked as released to $sellerName.')),
+                        );
+                      } catch (e) {
+                        messenger.showSnackBar(
+                          SnackBar(content: Text('Could not update payout status: $e')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.check_circle),
+                    label: const Text('Confirm Released'),
+                    style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

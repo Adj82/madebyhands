@@ -12,9 +12,9 @@ class ApiConfigPage extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         children: [
           const _ConfigHeader(title: 'Razorpay Payment Gateway'),
-          const _ConfigDetail(label: 'Key ID', value: 'rzp_test_TeNxd2gWeMmJRp'),
-          const _ConfigDetail(label: 'Key Secret', value: 'sidiuYNmi9trVNkkQOzvrDq9'),
-          const _ConfigDetail(label: 'Environment', value: 'Test / Live Sandbox'),
+          const _ConfigDetail(label: 'Key ID', value: 'rzp_test_ThYi51dfwooow6'),
+          const _ConfigDetail(label: 'Key Secret', value: '7IZI4o8q5fuwxIK9XOHMS8MO'),
+          const _ConfigDetail(label: 'Environment', value: 'Active Test / Live Sandbox'),
           const SizedBox(height: 30),
           const _ConfigHeader(title: 'Firebase Project Settings'),
           const _ConfigDetail(label: 'Project ID', value: 'madebyhands-77f87'),
