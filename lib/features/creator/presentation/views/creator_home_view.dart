@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
@@ -313,26 +314,55 @@ class _CreatorHomeViewState extends State<CreatorHomeView> {
   }
 
   Widget _buildPerformanceSummary() {
-    return Row(
-      children: [
-        Expanded(
-          child: _SummaryCard(
-            label: 'Total Sales',
-            value: '₹0',
-            icon: Icons.payments_outlined,
-            color: Colors.blue,
-          ),
-        ),
-        const SizedBox(width: 15),
-        Expanded(
-          child: _SummaryCard(
-            label: 'Active Orders',
-            value: '0',
-            icon: Icons.shopping_bag_outlined,
-            color: Colors.orange,
-          ),
-        ),
-      ],
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('orders')
+          .where('creatorId', isEqualTo: widget.profile.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        double totalSales = 0.0;
+        int activeOrdersCount = 0;
+
+        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+          for (final doc in snapshot.data!.docs) {
+            final data = doc.data();
+            final status = (data['status'] as String? ?? '').trim();
+            final netAmount = (data['creatorNetAmount'] as num?)?.toDouble() ??
+                (data['subtotal'] as num?)?.toDouble() ??
+                0.0;
+
+            if (status != 'Rejected' && status != 'Cancelled') {
+              totalSales += netAmount;
+            }
+
+            if (['Placed', 'Pending', 'Accepted', 'Confirmed', 'Processing', 'Shipped', 'In-transit', 'Out for Delivery'].contains(status)) {
+              activeOrdersCount++;
+            }
+          }
+        }
+
+        return Row(
+          children: [
+            Expanded(
+              child: _SummaryCard(
+                label: 'Total Sales',
+                value: '₹${totalSales.toStringAsFixed(0)}',
+                icon: Icons.payments_outlined,
+                color: Colors.blue,
+              ),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: _SummaryCard(
+                label: 'Active Orders',
+                value: '$activeOrdersCount',
+                icon: Icons.shopping_bag_outlined,
+                color: Colors.orange,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
