@@ -4,15 +4,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
-
-import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 
 class CreatorOnboardingPage extends StatefulWidget {
   final UserEntity user;
-  const CreatorOnboardingPage({super.key, required this.user});
+  final CreatorProfile? existingProfile;
+
+  const CreatorOnboardingPage({
+    super.key,
+    required this.user,
+    this.existingProfile,
+  });
 
   @override
   State<CreatorOnboardingPage> createState() => _CreatorOnboardingPageState();
@@ -29,6 +35,7 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
 
   File? _profileImage;
   final List<File> _portfolioImages = [];
+  final List<String> _existingPortfolioUrls = [];
   final List<String> _socialLinks = [];
   bool _isRefreshing = false;
 
@@ -50,7 +57,17 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
   @override
   void initState() {
     super.initState();
-    _nameController.text = widget.user.name;
+    final p = widget.existingProfile;
+    _nameController.text = p?.name ?? widget.user.name;
+    _bioController.text = p?.bio ?? '';
+    _categoryController.text = p?.category ?? '';
+    _locationController.text = p?.location ?? '';
+    _storyController.text = p?.story ?? '';
+
+    if (p != null) {
+      _socialLinks.addAll(p.socialLinks);
+      _existingPortfolioUrls.addAll(p.portfolio);
+    }
   }
 
   @override
@@ -81,9 +98,9 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
   }
 
   void _addSocialLink() {
-    if (_socialController.text.isNotEmpty) {
+    if (_socialController.text.trim().isNotEmpty) {
       setState(() {
-        _socialLinks.add(_socialController.text);
+        _socialLinks.add(_socialController.text.trim());
         _socialController.clear();
       });
     }
@@ -94,26 +111,33 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
       context.read<CreatorBloc>().add(
             CreatorSubmitOnboarding(
               uid: widget.user.uid,
-              name: _nameController.text,
+              name: _nameController.text.trim(),
               profileImageFile: _profileImage,
-              bio: _bioController.text,
-              category: _categoryController.text,
-              location: _locationController.text,
+              bio: _bioController.text.trim(),
+              category: _categoryController.text.trim(),
+              location: _locationController.text.trim(),
               socialLinks: _socialLinks,
               portfolioImageFiles: _portfolioImages,
-              story: _storyController.text,
+              story: _storyController.text.trim(),
+              existingProfileImageUrl: widget.existingProfile?.profileImage,
+              existingPortfolioUrls: _existingPortfolioUrls,
             ),
           );
     }
   }
 
   ImageProvider? _getProfileImageProvider() {
-    if (_profileImage == null) return null;
-    if (kIsWeb) {
-      return NetworkImage(_profileImage!.path);
-    } else {
-      return FileImage(_profileImage!);
+    if (_profileImage != null) {
+      if (kIsWeb) {
+        return NetworkImage(_profileImage!.path);
+      } else {
+        return FileImage(_profileImage!);
+      }
     }
+    if (widget.existingProfile != null && widget.existingProfile!.profileImage.isNotEmpty) {
+      return NetworkImage(widget.existingProfile!.profileImage);
+    }
+    return null;
   }
 
   Widget _buildFileImageWidget(File file, {required double width, required double height}) {
@@ -138,20 +162,38 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isEditMode = widget.existingProfile != null;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Creator Onboarding', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(
+          isEditMode ? 'Edit Creator Profile' : 'Creator Onboarding',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         actions: [
-          IconButton(
-            onPressed: () => context.read<AuthBloc>().add(AuthLogoutRequested()),
-            icon: const Icon(Icons.logout),
-          ),
+          if (!isEditMode)
+            IconButton(
+              onPressed: () => context.read<AuthBloc>().add(AuthLogoutRequested()),
+              icon: const Icon(Icons.logout),
+            ),
         ],
       ),
       body: BlocConsumer<CreatorBloc, CreatorState>(
         listener: (context, state) {
           if (state is CreatorOnboardingSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile created successfully!')));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  isEditMode
+                      ? 'Profile updated successfully!'
+                      : 'Profile created successfully!',
+                ),
+              ),
+            );
+            context.read<CreatorBloc>().add(CreatorCheckProfileExists(widget.user.uid));
+            if (isEditMode) {
+              Navigator.pop(context);
+            }
           } else if (state is CreatorFailure) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.message)));
           }
@@ -174,7 +216,7 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _OnboardingHeader(),
+                    _OnboardingHeader(isEditMode: isEditMode),
                     const SizedBox(height: 30),
                     _buildProfileImagePicker(),
                     const SizedBox(height: 30),
@@ -184,7 +226,10 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
                     const SizedBox(height: 30),
                     _buildPortfolioSection(),
                     const SizedBox(height: 50),
-                    FilledButton(onPressed: _submit, child: const Text('Launch My Studio')),
+                    FilledButton(
+                      onPressed: _submit,
+                      child: Text(isEditMode ? 'Save Profile Changes' : 'Launch My Studio'),
+                    ),
                     const SizedBox(height: 30),
                   ],
                 ),
@@ -197,9 +242,17 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
   }
 
   Widget _buildProfileImagePicker() {
+    final hasImage = _profileImage != null ||
+        (widget.existingProfile != null && widget.existingProfile!.profileImage.isNotEmpty);
+
     return Column(
       children: [
-        const Center(child: Text('Profile Picture (Optional)', style: TextStyle(color: AppColors.mutedText, fontSize: 12))),
+        const Center(
+          child: Text(
+            'Profile Picture',
+            style: TextStyle(color: AppColors.mutedText, fontSize: 12),
+          ),
+        ),
         const SizedBox(height: 10),
         Center(
           child: Stack(
@@ -208,7 +261,7 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
                 radius: 60,
                 backgroundColor: AppColors.outline,
                 backgroundImage: _getProfileImageProvider(),
-                child: _profileImage == null ? const Icon(Icons.person, size: 60, color: Colors.white) : null,
+                child: !hasImage ? const Icon(Icons.person, size: 60, color: Colors.white) : null,
               ),
               Positioned(
                 bottom: 0,
@@ -235,24 +288,27 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
         TextFormField(
           controller: _nameController,
           decoration: const InputDecoration(labelText: 'Artisan/Studio Name *', prefixIcon: Icon(Icons.storefront)),
-          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
         ),
         const SizedBox(height: 20),
         BlocBuilder<AdminBloc, AdminState>(
           builder: (context, state) {
             final categories = state.categories;
+            final currentVal = _categoryController.text.trim();
+
             return DropdownButtonFormField<String>(
-              initialValue: categories.contains(_categoryController.text) ? _categoryController.text : null,
+              initialValue: categories.contains(currentVal) ? currentVal : null,
               decoration: const InputDecoration(
-                  labelText: 'Primary Craft Category *',
-                  prefixIcon: Icon(Icons.category_outlined)),
+                labelText: 'Primary Craft Category *',
+                prefixIcon: Icon(Icons.category_outlined),
+              ),
               items: categories
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                   .toList(),
               onChanged: (val) {
                 if (val != null) setState(() => _categoryController.text = val);
               },
-              validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+              validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
             );
           },
         ),
@@ -260,21 +316,21 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
         TextFormField(
           controller: _locationController,
           decoration: const InputDecoration(labelText: 'Location *', hintText: 'City, Country', prefixIcon: Icon(Icons.location_on_outlined)),
-          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
         ),
         const SizedBox(height: 20),
         TextFormField(
           controller: _bioController,
           decoration: const InputDecoration(labelText: 'Short Bio *', alignLabelWithHint: true),
           maxLines: 3,
-          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
         ),
         const SizedBox(height: 20),
         TextFormField(
           controller: _storyController,
           decoration: const InputDecoration(labelText: 'Your Creator Story *', hintText: 'Tell us your inspiration...', alignLabelWithHint: true),
           maxLines: 5,
-          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
         ),
       ],
     );
@@ -327,7 +383,12 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
             scrollDirection: Axis.horizontal,
             children: [
               _buildAddPortfolioButton(),
-              ..._portfolioImages.asMap().entries.map((e) => _buildPortfolioItem(e.key, e.value)),
+              ..._existingPortfolioUrls.asMap().entries.map(
+                    (e) => _buildExistingPortfolioItem(e.key, e.value),
+                  ),
+              ..._portfolioImages.asMap().entries.map(
+                    (e) => _buildPortfolioItem(e.key, e.value),
+                  ),
             ],
           ),
         ),
@@ -348,6 +409,37 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
         ),
         child: const Icon(Icons.add_a_photo_outlined, color: AppColors.mutedText),
       ),
+    );
+  }
+
+  Widget _buildExistingPortfolioItem(int index, String url) {
+    return Stack(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 12.0),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(15),
+            child: Image.network(
+              url,
+              width: 120,
+              height: 120,
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+        Positioned(
+          top: 5,
+          right: 5,
+          child: GestureDetector(
+            onTap: () => setState(() => _existingPortfolioUrls.removeAt(index)),
+            child: const CircleAvatar(
+              radius: 12,
+              backgroundColor: Colors.red,
+              child: Icon(Icons.close, size: 16, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -379,16 +471,26 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
 }
 
 class _OnboardingHeader extends StatelessWidget {
-  const _OnboardingHeader();
+  final bool isEditMode;
+
+  const _OnboardingHeader({this.isEditMode = false});
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Complete your Artisan Profile', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary)),
-        SizedBox(height: 8),
-        Text('Tell the world about your craft and story.', style: TextStyle(fontSize: 14, color: AppColors.mutedText)),
+        Text(
+          isEditMode ? 'Update Your Studio Profile' : 'Complete your Artisan Profile',
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          isEditMode
+              ? 'Keep your craft story, links, and portfolio up to date.'
+              : 'Tell the world about your craft and story.',
+          style: const TextStyle(fontSize: 14, color: AppColors.mutedText),
+        ),
       ],
     );
   }

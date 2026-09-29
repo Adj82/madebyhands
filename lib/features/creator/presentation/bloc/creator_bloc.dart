@@ -65,6 +65,8 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
       socialLinks: event.socialLinks,
       portfolioImageFiles: event.portfolioImageFiles,
       story: event.story,
+      existingProfileImageUrl: event.existingProfileImageUrl,
+      existingPortfolioUrls: event.existingPortfolioUrls,
     );
 
     res.fold(

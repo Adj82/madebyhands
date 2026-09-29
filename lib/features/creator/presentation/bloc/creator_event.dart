@@ -18,6 +18,8 @@ final class CreatorSubmitOnboarding extends CreatorEvent {
   final List<String> socialLinks;
   final List<File> portfolioImageFiles;
   final String story;
+  final String? existingProfileImageUrl;
+  final List<String>? existingPortfolioUrls;
 
   CreatorSubmitOnboarding({
     required this.uid,
@@ -29,6 +31,8 @@ final class CreatorSubmitOnboarding extends CreatorEvent {
     required this.socialLinks,
     required this.portfolioImageFiles,
     required this.story,
+    this.existingProfileImageUrl,
+    this.existingPortfolioUrls,
   });
 }
 
