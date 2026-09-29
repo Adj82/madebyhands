@@ -1,6 +1,6 @@
 import 'package:madebyhands/features/support/domain/entities/support_ticket.dart';
 
-abstract interface class SupportRepository {
+abstract class SupportRepository {
   Stream<List<SupportTicket>> watchUserTickets(String userId);
   Stream<List<SupportTicket>> watchAllTickets();
   Stream<List<SupportMessage>> watchMessages(String ticketId);
@@ -21,4 +21,23 @@ abstract interface class SupportRepository {
   });
 
   Future<void> resolveTicket(String ticketId);
+
+  Future<String> createAccountDeletionRequest({
+    required String userId,
+    required String userName,
+    required String reason,
+  });
+
+  Future<void> approveAccountDeletion({
+    required String ticketId,
+    required String creatorUid,
+  });
+
+  Future<void> rejectAccountDeletion({
+    required String ticketId,
+    required String creatorUid,
+    required String rejectionReason,
+  });
+
+  Stream<SupportTicket?> watchLatestDeletionRequest(String userId);
 }

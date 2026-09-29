@@ -22,13 +22,29 @@ class FirestoreSupportRepository implements SupportRepository {
     final tickets = snapshot.docs.map((document) {
       final data = document.data();
       final createdAt = _date(data['createdAt']);
+      final status = data['status'] as String? ?? 'open';
+      final subject = data['subject'] as String? ?? 'Support request';
+      final type = data['type'] as String? ??
+          (subject == 'Account Deletion Request'
+              ? 'account_deletion'
+              : 'general');
+      final requestStatus = data['requestStatus'] as String? ??
+          (type == 'account_deletion'
+              ? (status == 'resolved' ? 'Approved' : 'Pending')
+              : 'none');
+      final reason =
+          data['reason'] as String? ?? data['lastMessage'] as String? ?? '';
+
       return SupportTicket(
         id: document.id,
         userId: data['userId'] as String? ?? '',
         userRole: data['userRole'] as String? ?? 'buyer',
         userName: data['userName'] as String? ?? 'User',
-        subject: data['subject'] as String? ?? 'Support request',
-        status: data['status'] as String? ?? 'open',
+        subject: subject,
+        status: status,
+        requestStatus: requestStatus,
+        reason: reason,
+        type: type,
         lastMessage: data['lastMessage'] as String? ?? '',
         createdAt: createdAt,
         updatedAt: _date(data['updatedAt'], fallback: createdAt),
@@ -117,6 +133,172 @@ class FirestoreSupportRepository implements SupportRepository {
       firestore.collection('support_tickets').doc(ticketId).update({
         'status': 'resolved',
         'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+  @override
+  Future<String> createAccountDeletionRequest({
+    required String userId,
+    required String userName,
+    required String reason,
+  }) async {
+    final existingQuery = await firestore
+        .collection('support_tickets')
+        .where('userId', isEqualTo: userId)
+        .where('type', isEqualTo: 'account_deletion')
+        .get();
+
+    for (final doc in existingQuery.docs) {
+      final data = doc.data();
+      final reqStatus = data['requestStatus'] as String? ?? 'Pending';
+      final status = data['status'] as String? ?? 'open';
+      if (reqStatus == 'Pending' && status == 'open') {
+        throw Exception(
+          'You already have an active pending account deletion request.',
+        );
+      }
+    }
+
+    final ticket = firestore.collection('support_tickets').doc();
+    final firstMessage = ticket.collection('messages').doc();
+    final batch = firestore.batch();
+
+    final messageText = 'Account Deletion Request Reason: $reason';
+
+    batch.set(ticket, {
+      'userId': userId,
+      'userRole': 'creator',
+      'userName': userName,
+      'subject': 'Account Deletion Request',
+      'type': 'account_deletion',
+      'status': 'open',
+      'requestStatus': 'Pending',
+      'reason': reason,
+      'lastMessage': messageText,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    batch.set(firstMessage, {
+      'senderId': userId,
+      'senderRole': 'creator',
+      'message': messageText,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+    return ticket.id;
+  }
+
+  @override
+  Future<void> approveAccountDeletion({
+    required String ticketId,
+    required String creatorUid,
+  }) async {
+    final batch = firestore.batch();
+
+    final ticketRef = firestore.collection('support_tickets').doc(ticketId);
+    batch.update(ticketRef, {
+      'status': 'resolved',
+      'requestStatus': 'Approved',
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    final msgRef = ticketRef.collection('messages').doc();
+    batch.set(msgRef, {
+      'senderId': 'admin',
+      'senderRole': 'admin',
+      'message':
+          'Account deletion request APPROVED. Creator profile and products deactivated.',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    final profileRef =
+        firestore.collection('creator_profiles').doc(creatorUid);
+    batch.set(profileRef, {
+      'verificationStatus': 'Deactivated',
+      'isActive': false,
+    }, SetOptions(merge: true));
+
+    final userRef = firestore.collection('users').doc(creatorUid);
+    batch.set(userRef, {
+      'isDeactivated': true,
+      'role': 'deactivated',
+      'isVerified': false,
+    }, SetOptions(merge: true));
+
+    final productsSnap = await firestore
+        .collection('products')
+        .where('creatorUid', isEqualTo: creatorUid)
+        .get();
+
+    for (final doc in productsSnap.docs) {
+      batch.update(doc.reference, {
+        'isActive': false,
+        'status': 'Deactivated',
+      });
+    }
+
+    final notifRef = firestore.collection('notifications').doc();
+    batch.set(notifRef, {
+      'creatorUid': creatorUid,
+      'title': 'Account Deletion Approved',
+      'message':
+          'Your request for account deletion has been approved by Admin. Your account and listings have been deactivated.',
+      'type': 'account',
+      'createdAt': FieldValue.serverTimestamp(),
+      'isRead': false,
+    });
+
+    await batch.commit();
+  }
+
+  @override
+  Future<void> rejectAccountDeletion({
+    required String ticketId,
+    required String creatorUid,
+    required String rejectionReason,
+  }) async {
+    final batch = firestore.batch();
+
+    final ticketRef = firestore.collection('support_tickets').doc(ticketId);
+    batch.update(ticketRef, {
+      'status': 'resolved',
+      'requestStatus': 'Rejected',
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    final msgRef = ticketRef.collection('messages').doc();
+    batch.set(msgRef, {
+      'senderId': 'admin',
+      'senderRole': 'admin',
+      'message': 'Account deletion request REJECTED. Reason: $rejectionReason',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    final notifRef = firestore.collection('notifications').doc();
+    batch.set(notifRef, {
+      'creatorUid': creatorUid,
+      'title': 'Account Deletion Request Rejected',
+      'message':
+          'Your account deletion request was rejected by Admin. Reason: $rejectionReason',
+      'type': 'account',
+      'createdAt': FieldValue.serverTimestamp(),
+      'isRead': false,
+    });
+
+    await batch.commit();
+  }
+
+  @override
+  Stream<SupportTicket?> watchLatestDeletionRequest(String userId) => firestore
+      .collection('support_tickets')
+      .where('userId', isEqualTo: userId)
+      .where('type', isEqualTo: 'account_deletion')
+      .snapshots()
+      .map((snapshot) {
+        if (snapshot.docs.isEmpty) return null;
+        final tickets = _tickets(snapshot);
+        return tickets.first;
       });
 
   static DateTime _date(Object? value, {DateTime? fallback}) =>
