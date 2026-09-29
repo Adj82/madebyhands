@@ -50,198 +50,396 @@ class FinanceView extends StatelessWidget {
       );
     }
 
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('orders').snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: const TabBar(
+          tabs: [
+            Tab(text: 'Pending Payouts'),
+            Tab(text: 'Payout History'),
+          ],
+          labelColor: AppColors.primary,
+          unselectedLabelColor: AppColors.mutedText,
+          indicatorColor: AppColors.primary,
+        ),
+        body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance.collection('orders').snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                      const SizedBox(height: 12),
+                      Text('Error loading financial data: ${snapshot.error}', style: const TextStyle(color: Colors.redAccent)),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+            }
+
+            double totalPlatformRevenue = 0.0;
+            double totalSettledPayouts = 0.0;
+            List<Map<String, dynamic>> pendingPayoutOrders = [];
+            List<Map<String, dynamic>> releasedPayoutOrders = [];
+
+            final docs = snapshot.data?.docs ?? [];
+            for (var doc in docs) {
+              final data = doc.data();
+              final total = (data['totalAmount'] as num?)?.toDouble() ??
+                  (data['total'] as num?)?.toDouble() ??
+                  (data['buyerPayableAmount'] as num?)?.toDouble() ??
+                  0.0;
+              final platformFee = data['platformFee'] != null
+                  ? (data['platformFee'] as num).toDouble()
+                  : (total > 999 ? (50.0 + (total * 0.05)) : 50.0);
+              final payoutAmount = data['payoutAmount'] != null
+                  ? (data['payoutAmount'] as num).toDouble()
+                  : (data['creatorNetAmount'] as num?)?.toDouble() ?? (total - platformFee);
+
+              totalPlatformRevenue += platformFee;
+
+              final payoutStatus = (data['payoutStatus'] as String? ?? 'pending').toLowerCase();
+              final status = (data['status'] as String? ?? 'Placed').toLowerCase();
+
+              final orderItem = {
+                'docId': doc.id,
+                'orderId': doc.id.length > 6 ? doc.id.substring(doc.id.length - 6).toUpperCase() : doc.id.toUpperCase(),
+                'creatorId': data['creatorId'] as String? ?? data['sellerId'] as String? ?? '',
+                'sellerName': data['sellerName'] as String? ?? data['creatorName'] as String? ?? 'Artisan',
+                'payoutAmount': payoutAmount,
+                'status': data['status'] ?? 'Placed',
+                'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+                'releasedAt': (data['payoutReleasedAt'] as Timestamp?)?.toDate() ??
+                    (data['paidAt'] as Timestamp?)?.toDate() ??
+                    (data['updatedAt'] as Timestamp?)?.toDate() ??
+                    DateTime.now(),
+              };
+
+              if ((payoutStatus == 'paid' || payoutStatus == 'released') && status != 'rejected' && status != 'cancelled') {
+                totalSettledPayouts += payoutAmount;
+                releasedPayoutOrders.add(orderItem);
+              } else if (payoutStatus == 'pending' && status != 'rejected' && status != 'cancelled') {
+                pendingPayoutOrders.add(orderItem);
+              }
+            }
+
+            // Sort history by released date descending
+            releasedPayoutOrders.sort((a, b) {
+              final tA = a['releasedAt'] as DateTime;
+              final tB = b['releasedAt'] as DateTime;
+              return tB.compareTo(tA);
+            });
+
+            return BlocBuilder<AdminBloc, AdminState>(
+              builder: (context, adminState) {
+                return TabBarView(
+                  children: [
+                    _buildPendingPayoutsList(
+                      context,
+                      adminState: adminState,
+                      totalPlatformRevenue: totalPlatformRevenue,
+                      pendingPayoutOrders: pendingPayoutOrders,
+                    ),
+                    _buildPayoutHistoryList(
+                      context,
+                      totalSettledPayouts: totalSettledPayouts,
+                      releasedPayoutOrders: releasedPayoutOrders,
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPendingPayoutsList(
+    BuildContext context, {
+    required AdminState adminState,
+    required double totalPlatformRevenue,
+    required List<Map<String, dynamic>> pendingPayoutOrders,
+  }) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<AdminBloc>().add(AdminLoadDataRequested());
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Financial Overview', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(24),
+              width: double.infinity,
+              decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(24)),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
-                  const SizedBox(height: 12),
-                  Text('Error loading financial data: ${snapshot.error}', style: const TextStyle(color: Colors.redAccent)),
+                  const Text('Realized Platform Revenue', style: TextStyle(color: Colors.white70)),
+                  Text(
+                    '₹${totalPlatformRevenue.toStringAsFixed(2)}',
+                    style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      SmallStat(label: 'Flat Fee', value: '₹${adminState.flatFee.toStringAsFixed(0)}'),
+                      const SizedBox(width: 32),
+                      SmallStat(label: 'Commission', value: '${adminState.percentFee.toStringAsFixed(0)}%'),
+                    ],
+                  )
                 ],
               ),
             ),
-          );
-        }
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: AppColors.primary));
-        }
-
-        double totalPlatformRevenue = 0.0;
-        List<Map<String, dynamic>> pendingPayoutOrders = [];
-
-        final docs = snapshot.data?.docs ?? [];
-        for (var doc in docs) {
-          final data = doc.data();
-          final total = (data['totalAmount'] as num?)?.toDouble() ??
-              (data['total'] as num?)?.toDouble() ??
-              (data['buyerPayableAmount'] as num?)?.toDouble() ??
-              0.0;
-          final platformFee = data['platformFee'] != null
-              ? (data['platformFee'] as num).toDouble()
-              : (total > 999 ? (50.0 + (total * 0.05)) : 50.0);
-          final payoutAmount = data['payoutAmount'] != null
-              ? (data['payoutAmount'] as num).toDouble()
-              : (data['creatorNetAmount'] as num?)?.toDouble() ?? (total - platformFee);
-
-          totalPlatformRevenue += platformFee;
-
-          final payoutStatus = (data['payoutStatus'] as String? ?? 'pending').toLowerCase();
-          final status = (data['status'] as String? ?? 'Placed').toLowerCase();
-
-          if (payoutStatus == 'pending' && status != 'rejected' && status != 'cancelled') {
-            pendingPayoutOrders.add({
-              'docId': doc.id,
-              'orderId': doc.id.length > 6 ? doc.id.substring(doc.id.length - 6).toUpperCase() : doc.id.toUpperCase(),
-              'creatorId': data['creatorId'] as String? ?? data['sellerId'] as String? ?? '',
-              'sellerName': data['sellerName'] as String? ?? data['creatorName'] as String? ?? 'Artisan',
-              'payoutAmount': payoutAmount,
-              'status': data['status'] ?? 'Placed',
-              'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-            });
-          }
-        }
-
-        return BlocBuilder<AdminBloc, AdminState>(
-          builder: (context, adminState) {
-            return RefreshIndicator(
-              onRefresh: () async {
-                context.read<AdminBloc>().add(AdminLoadDataRequested());
-              },
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Financial Summary', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.all(25),
-                      width: double.infinity,
-                      decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(25)),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Realized Platform Revenue', style: TextStyle(color: Colors.white70)),
-                          Text(
-                            '₹${totalPlatformRevenue.toStringAsFixed(2)}',
-                            style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900),
-                          ),
-                          const SizedBox(height: 20),
-                          Row(
-                            children: [
-                              SmallStat(label: 'Flat Fee', value: '₹${adminState.flatFee.toStringAsFixed(0)}'),
-                              const SizedBox(width: 40),
-                              SmallStat(label: 'Comm.', value: '${adminState.percentFee.toStringAsFixed(0)}%'),
-                            ],
-                          )
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Pending Creator Payouts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                        Text('${pendingPayoutOrders.length} pending', style: const TextStyle(color: AppColors.mutedText, fontSize: 12)),
-                      ],
-                    ),
-                    const SizedBox(height: 15),
-                    pendingPayoutOrders.isEmpty
-                        ? Container(
-                            padding: const EdgeInsets.all(24),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: AppColors.outline),
-                            ),
-                            child: const Text('All creator payouts are fully settled!', style: TextStyle(color: AppColors.mutedText)),
-                          )
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: pendingPayoutOrders.length,
-                            itemBuilder: (context, index) {
-                              final payout = pendingPayoutOrders[index];
-                              final docId = payout['docId'] as String;
-                              final orderId = payout['orderId'] as String;
-                              final creatorId = payout['creatorId'] as String;
-                              final sellerName = payout['sellerName'] as String;
-                              final amount = payout['payoutAmount'] as double;
-                              final createdAt = payout['createdAt'] as DateTime;
-
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              sellerName,
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              'Order #$orderId · ${DateFormat('dd MMM yyyy, hh:mm a').format(createdAt)}',
-                                              style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        children: [
-                                          Text(
-                                            '₹${amount.toStringAsFixed(0)}',
-                                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.primary),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          FilledButton.icon(
-                                            onPressed: () => _showPayoutReleaseModal(
-                                              context,
-                                              docId: docId,
-                                              orderId: orderId,
-                                              creatorId: creatorId,
-                                              sellerName: sellerName,
-                                              amount: amount,
-                                            ),
-                                            icon: const Icon(Icons.account_balance_wallet, size: 14),
-                                            label: const Text('Release Payout', style: TextStyle(fontSize: 11)),
-                                            style: FilledButton.styleFrom(
-                                              backgroundColor: AppColors.primary,
-                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                              minimumSize: Size.zero,
-                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                  ],
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Pending Creator Payouts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${pendingPayoutOrders.length} pending',
+                    style: const TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
                 ),
-              ),
-            );
-          },
-        );
+              ],
+            ),
+            const SizedBox(height: 12),
+            pendingPayoutOrders.isEmpty
+                ? Container(
+                    padding: const EdgeInsets.all(24),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.outline),
+                    ),
+                    child: const Text('All creator payouts are fully settled!', style: TextStyle(color: AppColors.mutedText)),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: pendingPayoutOrders.length,
+                    itemBuilder: (context, index) {
+                      final payout = pendingPayoutOrders[index];
+                      final docId = payout['docId'] as String;
+                      final orderId = payout['orderId'] as String;
+                      final creatorId = payout['creatorId'] as String;
+                      final sellerName = payout['sellerName'] as String;
+                      final amount = payout['payoutAmount'] as double;
+                      final createdAt = payout['createdAt'] as DateTime;
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      sellerName,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Order #$orderId · ${DateFormat('dd MMM yyyy, hh:mm a').format(createdAt)}',
+                                      style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '₹${amount.toStringAsFixed(0)}',
+                                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.primary),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  FilledButton.icon(
+                                    onPressed: () => _showPayoutReleaseModal(
+                                      context,
+                                      docId: docId,
+                                      orderId: orderId,
+                                      creatorId: creatorId,
+                                      sellerName: sellerName,
+                                      amount: amount,
+                                    ),
+                                    icon: const Icon(Icons.account_balance_wallet, size: 14),
+                                    label: const Text('Release Payout', style: TextStyle(fontSize: 11)),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPayoutHistoryList(
+    BuildContext context, {
+    required double totalSettledPayouts,
+    required List<Map<String, dynamic>> releasedPayoutOrders,
+  }) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<AdminBloc>().add(AdminLoadDataRequested());
       },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Settlement History', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(20),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.green.shade800,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Total Settled Creator Payouts', style: TextStyle(color: Colors.white70)),
+                  Text(
+                    '₹${totalSettledPayouts.toStringAsFixed(2)}',
+                    style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${releasedPayoutOrders.length} creator payout(s) completed',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.between,
+              children: [
+                const Text('Settled Transactions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text('${releasedPayoutOrders.length} records', style: const TextStyle(color: AppColors.mutedText, fontSize: 12)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            releasedPayoutOrders.isEmpty
+                ? Container(
+                    padding: const EdgeInsets.all(24),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.outline),
+                    ),
+                    child: const Text('No historical payout releases yet.', style: TextStyle(color: AppColors.mutedText)),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: releasedPayoutOrders.length,
+                    itemBuilder: (context, index) {
+                      final payout = releasedPayoutOrders[index];
+                      final orderId = payout['orderId'] as String;
+                      final sellerName = payout['sellerName'] as String;
+                      final amount = payout['payoutAmount'] as double;
+                      final releasedAt = payout['releasedAt'] as DateTime;
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: Colors.green.withValues(alpha: 0.15),
+                                child: const Icon(Icons.check_circle, color: Colors.green, size: 22),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      sellerName,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Order #$orderId · Released: ${DateFormat('dd MMM yyyy, hh:mm a').format(releasedAt)}',
+                                      style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '₹${amount.toStringAsFixed(0)}',
+                                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.green),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text(
+                                      'SETTLED',
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -316,37 +316,50 @@ class AdminManagementPage extends StatelessWidget {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Grant Admin / Manager Access'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Enter the email address of a registered user to grant administrative access.',
-                style: TextStyle(fontSize: 12, color: AppColors.mutedText),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: 'User Email Address',
-                  hintText: 'user@example.com',
-                  prefixIcon: Icon(Icons.email_outlined),
+          title: const Text('Grant Admin Access'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Enter the email address of a registered user to grant administrative access.',
+                  style: TextStyle(fontSize: 12, color: AppColors.mutedText),
                 ),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: selectedRole,
-                decoration: const InputDecoration(labelText: 'Role Designation'),
-                items: const [
-                  DropdownMenuItem(value: 'manager', child: Text('Manager (Operational Access)')),
-                  DropdownMenuItem(value: 'super_admin', child: Text('Super Admin (Full Control)')),
-                ],
-                onChanged: (val) {
-                  if (val != null) setDialogState(() => selectedRole = val);
-                },
-              ),
-            ],
+                const SizedBox(height: 14),
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'User Email Address',
+                    hintText: 'user@example.com',
+                    prefixIcon: Icon(Icons.email_outlined),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: selectedRole,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Role Designation',
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'manager',
+                      child: Text('Manager (Operational)', overflow: TextOverflow.ellipsis),
+                    ),
+                    DropdownMenuItem(
+                      value: 'super_admin',
+                      child: Text('Super Admin (Full Access)', overflow: TextOverflow.ellipsis),
+                    ),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setDialogState(() => selectedRole = val);
+                  },
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
