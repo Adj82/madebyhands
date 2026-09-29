@@ -19,30 +19,54 @@ class BuyerEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 68, color: AppColors.primary),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 68, color: const Color(0xFF8B261D)),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF8B261D),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.mutedText, height: 1.4),
+              ),
+              if (actionLabel != null) ...[
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: onAction,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF8B261D),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 28,
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    actionLabel!,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.mutedText, height: 1.4),
-          ),
-          if (actionLabel != null) ...[
-            const SizedBox(height: 20),
-            FilledButton.tonal(onPressed: onAction, child: Text(actionLabel!)),
-          ],
-        ],
-      ),
-    ),
-  );
+        ),
+      );
 }
