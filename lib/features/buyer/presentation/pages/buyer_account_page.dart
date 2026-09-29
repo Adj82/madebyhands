@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/auth/domain/repositories/auth_repository.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 
 class BuyerAccountPage extends StatefulWidget {
   final UserEntity user;
@@ -51,22 +52,15 @@ class _BuyerAccountPageState extends State<BuyerAccountPage> {
     });
   }
 
-  Future<void> _resetPassword() async {
-    setState(() => _busy = true);
-    final result = await widget.repository.sendPasswordReset(widget.user.email);
-    if (!mounted) return;
-    setState(() => _busy = false);
-    result.fold(
-      (failure) => _message(failure.message),
-      (_) => _message('Password reset email sent to ${widget.user.email}.'),
-    );
-  }
-
   Future<void> _requestDeletion() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Request account deletion?'),
+        backgroundColor: const Color(0xFFFAF6EE),
+        title: const Text(
+          'Request account deletion?',
+          style: TextStyle(color: Color(0xFF8B261D)),
+        ),
         content: const Text(
           'A support request will be created for the admin. Your account will remain accessible until the request is processed.',
         ),
@@ -77,6 +71,9 @@ class _BuyerAccountPageState extends State<BuyerAccountPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF8B261D),
+            ),
             child: const Text('Submit request'),
           ),
         ],
@@ -97,85 +94,134 @@ class _BuyerAccountPageState extends State<BuyerAccountPage> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Account settings')),
-    body: AbsorbPointer(
-      absorbing: _busy,
-      child: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            TextFormField(
-              controller: _name,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                prefixIcon: Icon(Icons.person_outline),
-              ),
-              validator: (value) => value == null || value.trim().length < 2
-                  ? 'Enter your name.'
-                  : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _phone,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Phone number',
-                prefixIcon: Icon(Icons.phone_outlined),
-              ),
-              validator: (value) {
-                final digits = value?.replaceAll(RegExp(r'\D'), '') ?? '';
-                return digits.length < 10
-                    ? 'Enter a valid phone number.'
-                    : null;
-              },
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              initialValue: widget.user.email,
-              enabled: false,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                prefixIcon: Icon(Icons.email_outlined),
+  Widget build(BuildContext context) => BuyerBackground(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            title: const Text(
+              'Account settings',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF8B261D),
               ),
             ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: _save,
-              icon: _busy
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.save_outlined),
-              label: const Text('Save profile'),
-            ),
-            const SizedBox(height: 28),
-            const Divider(),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.password_outlined),
-              title: const Text('Password recovery'),
-              subtitle: const Text(
-                'For password-based accounts. Google accounts are managed by Google.',
+            iconTheme: const IconThemeData(color: Color(0xFF8B261D)),
+          ),
+          body: AbsorbPointer(
+            absorbing: _busy,
+            child: Form(
+              key: _formKey,
+              child: ListView(
+                padding: const EdgeInsets.all(20),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFF8B261D).withValues(alpha: 0.6),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          controller: _name,
+                          decoration: const InputDecoration(
+                            labelText: 'Name',
+                            prefixIcon: Icon(
+                              Icons.person_outline,
+                              color: Color(0xFF8B261D),
+                            ),
+                          ),
+                          validator: (value) =>
+                              value == null || value.trim().length < 2
+                                  ? 'Enter your name.'
+                                  : null,
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: _phone,
+                          keyboardType: TextInputType.phone,
+                          decoration: const InputDecoration(
+                            labelText: 'Phone number',
+                            prefixIcon: Icon(
+                              Icons.phone_outlined,
+                              color: Color(0xFF8B261D),
+                            ),
+                          ),
+                          validator: (value) {
+                            final digits =
+                                value?.replaceAll(RegExp(r'\D'), '') ?? '';
+                            return digits.length < 10
+                                ? 'Enter a valid phone number.'
+                                : null;
+                          },
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          initialValue: widget.user.email,
+                          enabled: false,
+                          decoration: const InputDecoration(
+                            labelText: 'Email',
+                            prefixIcon: Icon(
+                              Icons.email_outlined,
+                              color: Color(0xFF8B261D),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        FilledButton.icon(
+                          onPressed: _save,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF8B261D),
+                          ),
+                          icon: _busy
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.save_outlined),
+                          label: const Text('Save profile'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.red.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: ListTile(
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 16),
+                      leading:
+                          const Icon(Icons.delete_outline, color: Colors.red),
+                      title: const Text(
+                        'Request account deletion',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle:
+                          const Text('Creates a request for the admin team.'),
+                      onTap: _requestDeletion,
+                    ),
+                  ),
+                ],
               ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: _resetPassword,
             ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: const Text(
-                'Request account deletion',
-                style: TextStyle(color: Colors.red),
-              ),
-              subtitle: const Text('Creates a request for the admin team.'),
-              onTap: _requestDeletion,
-            ),
-          ],
+          ),
         ),
-      ),
-    ),
-  );
+      );
 }

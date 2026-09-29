@@ -3,6 +3,7 @@ import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product_review.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 
 class ProductDetailsPage extends StatefulWidget {
   final Product product;
@@ -108,260 +109,337 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     final product = widget.product;
     final customizationSelection = _customizationSelection;
     final unitPrice = customizationSelection.unitPriceFor(product);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Product details'),
-        actions: [
-          IconButton(
-            tooltip: 'Open cart',
-            onPressed: widget.onOpenCart,
-            icon: Badge(
-              isLabelVisible: widget.cartCount > 0,
-              label: Text('${widget.cartCount}'),
-              child: const Icon(Icons.shopping_bag_outlined),
+
+    return BuyerBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text(
+            'Product details',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF8B261D),
             ),
           ),
-          IconButton(
-            tooltip: _isSaved ? 'Remove from saved' : 'Save item',
-            onPressed: () {
-              widget.onSave();
-              setState(() => _isSaved = !_isSaved);
-            },
-            icon: Icon(_isSaved ? Icons.favorite : Icons.favorite_border),
-            color: _isSaved ? Colors.redAccent : null,
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
-        children: [
-          AspectRatio(
-            aspectRatio: 1.15,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: product.color,
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: Icon(
-                product.icon,
-                size: 112,
-                color: AppColors.text.withValues(alpha: 0.62),
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            product.category.toUpperCase(),
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.1,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            product.name,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 10),
-          InkWell(
-            onTap: widget.onCreatorTap,
-            borderRadius: BorderRadius.circular(10),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  const Icon(Icons.star_rounded, color: Color(0xFFE0A72F)),
-                  Expanded(
-                    child: Text(
-                      '${product.rating}  ·  Made by ${product.artisan}',
-                      style: const TextStyle(color: AppColors.mutedText),
-                    ),
-                  ),
-                  if (widget.onCreatorTap != null)
-                    const Icon(Icons.chevron_right, size: 20),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 22),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '₹$unitPrice',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
+          iconTheme: const IconThemeData(color: Color(0xFF8B261D)),
+          actions: [
+            IconButton(
+              tooltip: 'Open cart',
+              onPressed: widget.onOpenCart,
+              icon: Badge(
+                isLabelVisible: widget.cartCount > 0,
+                label: Text('${widget.cartCount}'),
+                child: const Icon(
+                  Icons.shopping_bag_outlined,
+                  color: Color(0xFF8B261D),
                 ),
               ),
-              if (customizationSelection.additionalPrice > 0) ...[
-                const SizedBox(width: 8),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Text(
-                    'includes ₹${customizationSelection.additionalPrice} customization',
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
+            ),
+            IconButton(
+              tooltip: _isSaved ? 'Remove from saved' : 'Save item',
+              onPressed: () {
+                widget.onSave();
+                setState(() => _isSaved = !_isSaved);
+              },
+              icon: Icon(_isSaved ? Icons.favorite : Icons.favorite_border),
+              color: const Color(0xFF8B261D),
+            ),
+          ],
+        ),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+          children: [
+            AspectRatio(
+              aspectRatio: 1.15,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: product.color,
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: Icon(
+                  product.icon,
+                  size: 112,
+                  color: AppColors.text.withValues(alpha: 0.62),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              product.category.toUpperCase(),
+              style: const TextStyle(
+                color: Color(0xFF8B261D),
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              product.name,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF2C1810),
+                  ),
+            ),
+            const SizedBox(height: 10),
+            InkWell(
+              onTap: widget.onCreatorTap,
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.star_rounded, color: Color(0xFFE0A72F)),
+                    Expanded(
+                      child: Text(
+                        '${product.rating}  ·  Made by ${product.artisan}',
+                        style: const TextStyle(color: AppColors.mutedText),
+                      ),
+                    ),
+                    if (widget.onCreatorTap != null)
+                      const Icon(
+                        Icons.chevron_right,
+                        size: 20,
+                        color: Color(0xFF8B261D),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 22),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '₹$unitPrice',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFF8B261D),
+                      ),
+                ),
+                if (customizationSelection.additionalPrice > 0) ...[
+                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 3),
+                    child: Text(
+                      'includes ₹${customizationSelection.additionalPrice} customization',
+                      style: const TextStyle(
+                        color: Color(0xFF8B261D),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 22),
+            const Text(
+              'About this piece',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF8B261D),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              product.description,
+              style: const TextStyle(
+                fontSize: 16,
+                height: 1.55,
+                color: AppColors.mutedText,
+              ),
+            ),
+            if (product.materials.isNotEmpty ||
+                product.dimensions.isNotEmpty ||
+                product.shippingInfo.isNotEmpty) ...[
+              const SizedBox(height: 22),
+              const Text(
+                'Product information',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF8B261D),
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (product.materials.isNotEmpty)
+                _DetailLine(
+                  icon: Icons.texture,
+                  text: 'Materials: ${product.materials}',
+                ),
+              if (product.dimensions.isNotEmpty)
+                _DetailLine(
+                  icon: Icons.straighten,
+                  text: 'Dimensions: ${product.dimensions}',
+                ),
+              if (product.shippingInfo.isNotEmpty)
+                _DetailLine(
+                  icon: Icons.local_shipping_outlined,
+                  text: product.shippingInfo,
+                ),
+            ],
+            if (product.isCustomizable &&
+                (product.predefinedCustomizations.isNotEmpty ||
+                    product.customizations.isNotEmpty)) ...[
+              const SizedBox(height: 24),
+              _ProductCustomizationSection(
+                product: product,
+                values: _customizationValues,
+                onChanged: _updateCustomization,
+              ),
+            ],
+            const SizedBox(height: 22),
+            const _DetailLine(
+              icon: Icons.handyman_outlined,
+              text: 'Handmade in India',
+            ),
+            const _DetailLine(
+              icon: Icons.inventory_2_outlined,
+              text: 'Plastic-conscious packaging',
+            ),
+            const _DetailLine(
+              icon: Icons.local_shipping_outlined,
+              text: 'Estimated delivery in 4–7 days',
+            ),
+            const SizedBox(height: 20),
+            _ProductReviewsSection(
+              product: product,
+              buyerId: widget.buyerId,
+              buyerName: widget.buyerName,
+              repository: widget.buyerRepository,
+              eligibility: _reviewEligibility,
+            ),
+          ],
+        ),
+        bottomNavigationBar: Container(
+          color: const Color(0xFFFAF6EE),
+          padding: const EdgeInsets.all(16),
+          child: SafeArea(
+            top: false,
+            child: Row(
+              children: [
+                Expanded(
+                  child: !product.isAvailable || product.stock <= 0
+                      ? OutlinedButton.icon(
+                          onPressed: null,
+                          icon:
+                              const Icon(Icons.remove_shopping_cart_outlined),
+                          label: const Text('Out of stock'),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(
+                              color: Color(0xFF8B261D),
+                              width: 1.2,
+                            ),
+                            foregroundColor: const Color(0xFF8B261D),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                        )
+                      : widget.cartQuantity == 0
+                      ? OutlinedButton.icon(
+                          onPressed: () {
+                            widget.onCartQuantityChanged(1);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('${product.name} added to cart'),
+                              ),
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(
+                              color: Color(0xFF8B261D),
+                              width: 1.5,
+                            ),
+                            foregroundColor: const Color(0xFF8B261D),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          icon: const Icon(
+                            Icons.add_shopping_cart,
+                            color: Color(0xFF8B261D),
+                          ),
+                          label: const Text(
+                            'Add to cart',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF8B261D),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFAF6EE),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(0xFF8B261D),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              IconButton(
+                                tooltip: 'Decrease quantity',
+                                onPressed: () => widget.onCartQuantityChanged(
+                                  widget.cartQuantity - 1,
+                                ),
+                                icon: const Icon(Icons.remove),
+                                color: const Color(0xFF8B261D),
+                              ),
+                              Text(
+                                '${widget.cartQuantity}',
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF8B261D),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Increase quantity',
+                                onPressed:
+                                    widget.cartQuantity >= product.stock
+                                        ? null
+                                        : () => widget.onCartQuantityChanged(
+                                            widget.cartQuantity + 1,
+                                          ),
+                                icon: const Icon(Icons.add),
+                                color: const Color(0xFF8B261D),
+                              ),
+                            ],
+                          ),
+                        ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: !product.isAvailable || product.stock <= 0
+                        ? null
+                        : () => widget.onBuyNow(customizationSelection),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF8B261D),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: const Icon(Icons.bolt),
+                    label: Text(
+                      'Buy now  ·  ₹${unitPrice * (widget.cartQuantity == 0 ? 1 : widget.cartQuantity)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
               ],
-            ],
-          ),
-          const SizedBox(height: 22),
-          const Text(
-            'About this piece',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            product.description,
-            style: const TextStyle(
-              fontSize: 16,
-              height: 1.55,
-              color: AppColors.mutedText,
             ),
           ),
-          if (product.materials.isNotEmpty ||
-              product.dimensions.isNotEmpty ||
-              product.shippingInfo.isNotEmpty) ...[
-            const SizedBox(height: 22),
-            const Text(
-              'Product information',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 8),
-            if (product.materials.isNotEmpty)
-              _DetailLine(
-                icon: Icons.texture,
-                text: 'Materials: ${product.materials}',
-              ),
-            if (product.dimensions.isNotEmpty)
-              _DetailLine(
-                icon: Icons.straighten,
-                text: 'Dimensions: ${product.dimensions}',
-              ),
-            if (product.shippingInfo.isNotEmpty)
-              _DetailLine(
-                icon: Icons.local_shipping_outlined,
-                text: product.shippingInfo,
-              ),
-          ],
-          if (product.isCustomizable &&
-              (product.predefinedCustomizations.isNotEmpty ||
-                  product.customizations.isNotEmpty)) ...[
-            const SizedBox(height: 24),
-            _ProductCustomizationSection(
-              product: product,
-              values: _customizationValues,
-              onChanged: _updateCustomization,
-            ),
-          ],
-          const SizedBox(height: 22),
-          const _DetailLine(
-            icon: Icons.handyman_outlined,
-            text: 'Handmade in India',
-          ),
-          const _DetailLine(
-            icon: Icons.inventory_2_outlined,
-            text: 'Plastic-conscious packaging',
-          ),
-          const _DetailLine(
-            icon: Icons.local_shipping_outlined,
-            text: 'Estimated delivery in 4–7 days',
-          ),
-          const SizedBox(height: 20),
-          _ProductReviewsSection(
-            product: product,
-            buyerId: widget.buyerId,
-            buyerName: widget.buyerName,
-            repository: widget.buyerRepository,
-            eligibility: _reviewEligibility,
-          ),
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Expanded(
-              child: !product.isAvailable || product.stock <= 0
-                  ? OutlinedButton.icon(
-                      onPressed: null,
-                      icon: Icon(Icons.remove_shopping_cart_outlined),
-                      label: Text('Out of stock'),
-                    )
-                  : widget.cartQuantity == 0
-                  ? OutlinedButton.icon(
-                      onPressed: () {
-                        widget.onCartQuantityChanged(1);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('${product.name} added to cart'),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.add_shopping_cart),
-                      label: const Text('Add to cart'),
-                    )
-                  : Container(
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: AppColors.primary,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          IconButton(
-                            tooltip: 'Decrease quantity',
-                            onPressed: () => widget.onCartQuantityChanged(
-                              widget.cartQuantity - 1,
-                            ),
-                            icon: const Icon(Icons.remove),
-                            color: AppColors.primary,
-                          ),
-                          Text(
-                            '${widget.cartQuantity}',
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Increase quantity',
-                            onPressed: widget.cartQuantity >= product.stock
-                                ? null
-                                : () => widget.onCartQuantityChanged(
-                                    widget.cartQuantity + 1,
-                                  ),
-                            icon: const Icon(Icons.add),
-                            color: AppColors.primary,
-                          ),
-                        ],
-                      ),
-                    ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: !product.isAvailable || product.stock <= 0
-                    ? null
-                    : () => widget.onBuyNow(customizationSelection),
-                icon: const Icon(Icons.bolt),
-                label: Text(
-                  'Buy now  ·  ₹${unitPrice * (widget.cartQuantity == 0 ? 1 : widget.cartQuantity)}',
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -381,76 +459,84 @@ class _ProductCustomizationSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: AppColors.outline),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Row(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: const Color(0xFF8B261D).withValues(alpha: 0.8),
+            width: 1.0,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.tune_rounded, color: AppColors.primary),
-            SizedBox(width: 10),
-            Text(
-              'Customize this product',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            const Row(
+              children: [
+                Icon(Icons.tune_rounded, color: Color(0xFF8B261D)),
+                SizedBox(width: 10),
+                Text(
+                  'Customize this product',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF8B261D),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Selections are optional and will be shared with the creator.',
+              style: TextStyle(color: AppColors.mutedText),
+            ),
+            if (product.predefinedCustomizations.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              ...product.predefinedCustomizations.map(
+                (name) => Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: TextFormField(
+                    key: ValueKey('predefined-${product.id}-$name'),
+                    initialValue: values[name]?.firstOrNull ?? '',
+                    onChanged: (value) => onChanged(name, [value]),
+                    decoration: InputDecoration(
+                      labelText: name,
+                      hintText: _hintFor(name),
+                      prefixIcon: Icon(_iconFor(name), color: const Color(0xFF8B261D)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            ...product.customizations.map(
+              (customization) => _CustomizationChoice(
+                customization: customization,
+                selectedValues: values[customization.name] ?? const [],
+                onChanged: (selection) =>
+                    onChanged(customization.name, selection),
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 6),
-        const Text(
-          'Selections are optional and will be shared with the creator.',
-          style: TextStyle(color: AppColors.mutedText),
-        ),
-        if (product.predefinedCustomizations.isNotEmpty) ...[
-          const SizedBox(height: 18),
-          ...product.predefinedCustomizations.map(
-            (name) => Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: TextFormField(
-                key: ValueKey('predefined-${product.id}-$name'),
-                initialValue: values[name]?.firstOrNull ?? '',
-                onChanged: (value) => onChanged(name, [value]),
-                decoration: InputDecoration(
-                  labelText: name,
-                  hintText: _hintFor(name),
-                  prefixIcon: Icon(_iconFor(name)),
-                ),
-              ),
-            ),
-          ),
-        ],
-        ...product.customizations.map(
-          (customization) => _CustomizationChoice(
-            customization: customization,
-            selectedValues: values[customization.name] ?? const [],
-            onChanged: (selection) => onChanged(customization.name, selection),
-          ),
-        ),
-      ],
-    ),
-  );
+      );
 
   static String _hintFor(String name) => switch (name.toLowerCase()) {
-    'name/text' => 'Enter the name or text you want',
-    'color' => 'Enter your preferred colour',
-    'size' => 'Enter your preferred size',
-    'design' => 'Describe your preferred design',
-    'material' => 'Enter your preferred material',
-    _ => 'Enter your preference',
-  };
+        'name/text' => 'Enter the name or text you want',
+        'color' => 'Enter your preferred colour',
+        'size' => 'Enter your preferred size',
+        'design' => 'Describe your preferred design',
+        'material' => 'Enter your preferred material',
+        _ => 'Enter your preference',
+      };
 
   static IconData _iconFor(String name) => switch (name.toLowerCase()) {
-    'name/text' => Icons.edit_note,
-    'color' => Icons.palette_outlined,
-    'size' => Icons.aspect_ratio,
-    'design' => Icons.brush_outlined,
-    'material' => Icons.texture,
-    _ => Icons.tune,
-  };
+        'name/text' => Icons.edit_note,
+        'color' => Icons.palette_outlined,
+        'size' => Icons.aspect_ratio,
+        'design' => Icons.brush_outlined,
+        'material' => Icons.texture,
+        _ => Icons.tune,
+      };
 }
 
 class _CustomizationChoice extends StatelessWidget {
@@ -466,99 +552,105 @@ class _CustomizationChoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 14),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+        padding: const EdgeInsets.only(top: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Text(
-                customization.name,
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
-            if (customization.additionalPrice > 0)
-              Text(
-                '+₹${customization.additionalPrice}',
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w800,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    customization.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF8B261D),
+                    ),
+                  ),
                 ),
+                if (customization.additionalPrice > 0)
+                  Text(
+                    '+₹${customization.additionalPrice}',
+                    style: const TextStyle(
+                      color: Color(0xFF8B261D),
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+              ],
+            ),
+            if (customization.description.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                customization.description,
+                style: const TextStyle(color: AppColors.mutedText),
               ),
-          ],
-        ),
-        if (customization.description.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Text(
-            customization.description,
-            style: const TextStyle(color: AppColors.mutedText),
-          ),
-        ],
-        if (customization.images.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 72,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: customization.images.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (context, index) => ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.network(
-                  customization.images[index],
-                  width: 72,
-                  height: 72,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
-                    width: 72,
-                    color: AppColors.background,
-                    child: const Icon(Icons.broken_image_outlined),
+            ],
+            if (customization.images.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 72,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: customization.images.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) => ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      customization.images[index],
+                      width: 72,
+                      height: 72,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Container(
+                        width: 72,
+                        color: AppColors.background,
+                        child: const Icon(Icons.broken_image_outlined),
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-        ],
-        const SizedBox(height: 10),
-        if (customization.options.isEmpty)
-          TextFormField(
-            key: ValueKey('custom-${customization.name}'),
-            initialValue: selectedValues.firstOrNull ?? '',
-            onChanged: (value) => onChanged([value]),
-            decoration: InputDecoration(
-              hintText: 'Enter your ${customization.name.toLowerCase()}',
-            ),
-          )
-        else
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: customization.options.map((option) {
-              final selected = selectedValues.contains(option);
-              return customization.isMultipleSelection
-                  ? FilterChip(
-                      label: Text(option),
-                      selected: selected,
-                      onSelected: (isSelected) {
-                        final updated = List<String>.from(selectedValues);
-                        isSelected
-                            ? updated.add(option)
-                            : updated.remove(option);
-                        onChanged(updated);
-                      },
-                    )
-                  : ChoiceChip(
-                      label: Text(option),
-                      selected: selected,
-                      onSelected: (isSelected) =>
-                          onChanged(isSelected ? [option] : []),
-                    );
-            }).toList(),
-          ),
-      ],
-    ),
-  );
+            ],
+            const SizedBox(height: 10),
+            if (customization.options.isEmpty)
+              TextFormField(
+                key: ValueKey('custom-${customization.name}'),
+                initialValue: selectedValues.firstOrNull ?? '',
+                onChanged: (value) => onChanged([value]),
+                decoration: InputDecoration(
+                  hintText: 'Enter your ${customization.name.toLowerCase()}',
+                ),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: customization.options.map((option) {
+                  final selected = selectedValues.contains(option);
+                  return customization.isMultipleSelection
+                      ? FilterChip(
+                          label: Text(option),
+                          selected: selected,
+                          selectedColor: const Color(0xFFF2DEDD),
+                          checkmarkColor: const Color(0xFF8B261D),
+                          onSelected: (isSelected) {
+                            final updated = List<String>.from(selectedValues);
+                            isSelected
+                                ? updated.add(option)
+                                : updated.remove(option);
+                            onChanged(updated);
+                          },
+                        )
+                      : ChoiceChip(
+                          label: Text(option),
+                          selected: selected,
+                          selectedColor: const Color(0xFFF2DEDD),
+                          onSelected: (isSelected) =>
+                              onChanged(isSelected ? [option] : []),
+                        );
+                }).toList(),
+              ),
+          ],
+        ),
+      );
 }
 
 class _ProductReviewsSection extends StatelessWidget {
@@ -595,7 +687,11 @@ class _ProductReviewsSection extends StatelessWidget {
                 const Expanded(
                   child: Text(
                     'Reviews & ratings',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF8B261D),
+                    ),
                   ),
                 ),
                 const Icon(Icons.star_rounded, color: Color(0xFFE0A72F)),
@@ -616,7 +712,7 @@ class _ProductReviewsSection extends StatelessWidget {
               builder: (context, eligibilitySnapshot) {
                 if (eligibilitySnapshot.connectionState ==
                     ConnectionState.waiting) {
-                  return const LinearProgressIndicator();
+                  return const LinearProgressIndicator(color: Color(0xFF8B261D));
                 }
                 final result = eligibilitySnapshot.data;
                 if (result?.canReview == true) {
@@ -625,9 +721,26 @@ class _ProductReviewsSection extends StatelessWidget {
                       context,
                       existing: ownReview.isEmpty ? null : ownReview.first,
                     ),
-                    icon: const Icon(Icons.rate_review_outlined),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(
+                        color: Color(0xFF8B261D),
+                        width: 1.2,
+                      ),
+                      foregroundColor: const Color(0xFF8B261D),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    icon: const Icon(
+                      Icons.rate_review_outlined,
+                      color: Color(0xFF8B261D),
+                    ),
                     label: Text(
                       ownReview.isEmpty ? 'Write a review' : 'Edit your review',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF8B261D),
+                      ),
                     ),
                   );
                 }
@@ -682,6 +795,7 @@ class _ProductReviewsSection extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      backgroundColor: const Color(0xFFFAF6EE),
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) => Padding(
           padding: EdgeInsets.fromLTRB(
@@ -697,15 +811,16 @@ class _ProductReviewsSection extends StatelessWidget {
               children: [
                 Text(
                   existing == null ? 'Write a review' : 'Edit your review',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFF8B261D),
+                      ),
                 ),
                 const SizedBox(height: 6),
                 const Text(
                   'Verified purchase',
                   style: TextStyle(
-                    color: AppColors.primary,
+                    color: Color(0xFF8B261D),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -792,6 +907,9 @@ class _ProductReviewsSection extends StatelessWidget {
                               );
                             }
                           },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF8B261D),
+                    ),
                     child: Text(isSaving ? 'Saving…' : 'Submit review'),
                   ),
                 ),
@@ -816,59 +934,64 @@ class _ReviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: AppColors.outline),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                review.buyerName,
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
-            ...List.generate(
-              5,
-              (index) => Icon(
-                index < review.rating
-                    ? Icons.star_rounded
-                    : Icons.star_border_rounded,
-                size: 17,
-                color: const Color(0xFFE0A72F),
-              ),
-            ),
-          ],
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: const Color(0xFF8B261D).withValues(alpha: 0.3),
+          ),
         ),
-        if (review.verifiedPurchase) ...[
-          const SizedBox(height: 4),
-          const Row(
-            children: [
-              Icon(Icons.verified, size: 16, color: AppColors.primary),
-              SizedBox(width: 5),
-              Text(
-                'Verified purchase',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    review.buyerName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF8B261D),
+                    ),
+                  ),
                 ),
+                ...List.generate(
+                  5,
+                  (index) => Icon(
+                    index < review.rating
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
+                    size: 17,
+                    color: const Color(0xFFE0A72F),
+                  ),
+                ),
+              ],
+            ),
+            if (review.verifiedPurchase) ...[
+              const SizedBox(height: 4),
+              const Row(
+                children: [
+                  Icon(Icons.verified, size: 16, color: Color(0xFF8B261D)),
+                  SizedBox(width: 5),
+                  Text(
+                    'Verified purchase',
+                    style: TextStyle(
+                      color: Color(0xFF8B261D),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
             ],
-          ),
-        ],
-        const SizedBox(height: 10),
-        Text(review.comment, style: const TextStyle(height: 1.4)),
-      ],
-    ),
-  );
+            const SizedBox(height: 10),
+            Text(review.comment, style: const TextStyle(height: 1.4)),
+          ],
+        ),
+      );
 }
 
 class _DetailLine extends StatelessWidget {
@@ -879,13 +1002,21 @@ class _DetailLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Row(
-      children: [
-        Icon(icon, size: 21, color: AppColors.primary),
-        const SizedBox(width: 12),
-        Text(text),
-      ],
-    ),
-  );
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          children: [
+            Icon(icon, size: 21, color: const Color(0xFF8B261D)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(
+                  color: AppColors.text,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
 }

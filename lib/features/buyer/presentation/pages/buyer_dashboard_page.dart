@@ -360,6 +360,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                   child: CartTab(
                     onBrowse: () => _navigationCubit.changePage(1),
                     onCheckout: _openCheckout,
+                    onProductTap: _openProduct,
                   ),
                 ),
                 SafeArea(
