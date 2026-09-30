@@ -9,6 +9,7 @@ import 'package:madebyhands/features/buyer/domain/entities/product_review.dart';
 import 'package:madebyhands/features/buyer/domain/entities/public_creator.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
+import 'package:madebyhands/features/orders/domain/entities/marketplace_order.dart';
 import 'package:madebyhands/features/orders/domain/order_status.dart';
 
 class FirestoreBuyerRepository implements BuyerRepository {
@@ -22,10 +23,23 @@ class FirestoreBuyerRepository implements BuyerRepository {
       .snapshots()
       .map(
         (snapshot) => snapshot.docs
-            .where((doc) => doc.data()['isActive'] != false)
+            // `priceCart` in server/checkout.js rejects anything that is not
+            // explicitly `isActive == true`, so listing the looser
+            // `isActive != false` would let buyers cart products that the
+            // payment API then refuses to price.
+            .where((doc) => doc.data()['isActive'] == true)
             .map((doc) => _productFromDocument(doc))
             .toList(),
       );
+
+  @override
+  Future<PlatformFeeSettings> getPlatformFeeSettings() async {
+    final snapshot = await firestore
+        .collection('settings')
+        .doc('platform_economics')
+        .get();
+    return PlatformFeeSettings.fromMap(snapshot.data());
+  }
 
   @override
   Stream<List<PublicCreator>> watchPublicCreators() => firestore
@@ -463,11 +477,15 @@ class FirestoreBuyerRepository implements BuyerRepository {
         (data['iconCodePoint'] as num?)?.toInt() ?? visual.$2,
         fontFamily: 'MaterialIcons',
       ),
-      creatorUid: data['creatorUid'] as String? ?? '',
+      // Products exist with either spelling; server/checkout.js and
+      // firestore.rules both accept creatorUid or creatorId. Without this
+      // fallback the creator would be blank, which collapses the per-creator
+      // flat fee and fails order placement.
+      creatorUid: _creatorUid(data),
       images: List<String>.from(data['images'] as List? ?? const []),
       stock: (data['stock'] as num?)?.round() ?? 0,
       isAvailable:
-          data['isActive'] != false &&
+          data['isActive'] == true &&
           ((data['stock'] as num?)?.round() ?? 0) > 0,
       materials: data['materials'] as String? ?? '',
       dimensions: data['dimensions'] as String? ?? '',
@@ -531,6 +549,12 @@ class FirestoreBuyerRepository implements BuyerRepository {
       lastLocation: data['lastLocation'] as String?,
       trackingUpdatedAt: _timestamp(data['trackingUpdatedAt']),
     );
+  }
+
+  String _creatorUid(Map<String, dynamic> data) {
+    final uid = data['creatorUid'] as String? ?? '';
+    if (uid.isNotEmpty) return uid;
+    return data['creatorId'] as String? ?? '';
   }
 
   DateTime? _timestamp(Object? value) => value is Timestamp

@@ -1,5 +1,13 @@
 const MAX_CART_LINES = 50;
 
+/** Returns the first argument that is a non-empty, trimmed string, else ''. */
+function firstNonEmptyString(...values) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return '';
+}
+
 async function priceCart(admin, rawItems) {
   if (!Array.isArray(rawItems) || rawItems.length === 0 || rawItems.length > MAX_CART_LINES) {
     throw new Error('Cart must contain between 1 and 50 products');
@@ -34,9 +42,14 @@ async function priceCart(admin, rawItems) {
     const product = snapshot.data() || {};
     const stock = Number.isSafeInteger(product.stock) ? product.stock : Math.floor(Number(product.stock) || 0);
     const basePrice = Math.round(Number(product.price));
-    const creatorId = typeof product.creatorUid === 'string' ? product.creatorUid : product.creatorId;
+    // Either spelling may be present, and an empty string must fall through
+    // rather than being accepted as a creator id.
+    const creatorId = firstNonEmptyString(product.creatorUid, product.creatorId);
+    // The buyer catalogue reads the display name from any of these fields, so
+    // requiring only creatorName here would reject products buyers can see.
+    const creatorName = firstNonEmptyString(product.creatorName, product.sellerName, product.artisan);
     if (product.isActive !== true || stock < item.quantity || !Number.isSafeInteger(basePrice) || basePrice < 1 ||
-        typeof creatorId !== 'string' || !creatorId || typeof product.creatorName !== 'string' || !product.creatorName) {
+        !creatorId || !creatorName) {
       throw new Error('A product is unavailable or has incomplete seller details');
     }
 
@@ -53,7 +66,7 @@ async function priceCart(admin, rawItems) {
     }
     item.product = product;
     item.creatorId = creatorId;
-    item.creatorName = product.creatorName;
+    item.creatorName = creatorName;
     item.name = String(product.name || 'Handmade product');
     item.baseUnitPrice = basePrice;
     item.customizationPrice = customizationPrice;

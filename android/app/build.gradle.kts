@@ -38,6 +38,9 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // Keep rules only; without these R8 strips the Razorpay SDK and
+            // Checkout never opens in a release build.
+            proguardFiles("proguard-rules.pro")
         }
     }
 }

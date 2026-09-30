@@ -7,6 +7,7 @@ import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/saved_addresses_page.dart';
+import 'package:madebyhands/features/orders/domain/entities/marketplace_order.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 class CheckoutPage extends StatefulWidget {
@@ -36,6 +37,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   bool _isPlacing = false;
   bool _handlingPaymentCallback = false;
   late RazorpayService _razorpayService;
+  PlatformFeeSettings _feeSettings = const PlatformFeeSettings();
   SavedAddress? _pendingAddress;
   String? _pendingRazorpayOrderId;
   SavedAddress? _newAddressAwaitingSelection;
@@ -50,14 +52,26 @@ class _CheckoutPageState extends State<CheckoutPage> {
             (widget.quantities[product.id] ?? 0),
   );
 
-  int get _platformFee =>
-      50 * widget.products.map((product) => product.creatorUid).toSet().length;
+  /// Distinct creators, counted the way `api/create-order.js` groups priced
+  /// items so the fee preview matches the amount Razorpay will charge.
+  int get _creatorCount => widget.products
+      .map((product) => product.creatorUid)
+      .where((creatorUid) => creatorUid.isNotEmpty)
+      .toSet()
+      .length;
+
+  int get _platformFee => _feeSettings.flatFeePerCreator * _creatorCount;
 
   int get _total => _subtotal + _platformFee;
+
+  /// What Razorpay actually captured, in rupees. Only set once the server has
+  /// priced the cart, so the confirmation never quotes a client-side estimate.
+  int? _chargedTotal;
 
   @override
   void initState() {
     super.initState();
+    _loadFeeSettings();
     _razorpayService = RazorpayService();
     _razorpayService.init(
       onSuccess: _handlePaymentSuccess,
@@ -66,6 +80,19 @@ class _CheckoutPageState extends State<CheckoutPage> {
       onWebPaymentSuccess: _handleWebPaymentSuccess,
       onWebPaymentFailure: _handleWebPaymentFailure,
     );
+  }
+
+  /// The admin panel can change the flat fee at any time, so the preview is
+  /// read from Firestore rather than assumed. The default stays in place if
+  /// the read fails; the server total is authoritative either way.
+  Future<void> _loadFeeSettings() async {
+    try {
+      final settings = await widget.buyerRepository.getPlatformFeeSettings();
+      if (!mounted) return;
+      setState(() => _feeSettings = settings);
+    } catch (_) {
+      // Keep the default preview; create-order still prices the cart.
+    }
   }
 
   @override
@@ -392,6 +419,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
         throw Exception('Failed to obtain order_id from Razorpay');
       }
 
+      // The server re-prices the cart, so trust its total over the preview.
+      final serverAmount = orderData['amount'] as num?;
+      if (serverAmount != null) {
+        _chargedTotal = (serverAmount / 100).round();
+      }
+
       // Step 2: Open Standard Razorpay Checkout Modal
       _razorpayService.openCheckout(
         orderId: _pendingRazorpayOrderId ?? '',
@@ -581,7 +614,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             ],
           ),
           content: Text(
-            'Payment of ₹$_total confirmed by Razorpay (Payment ID: $paymentId). Your order is now with the creator.',
+            'Payment of ₹${_chargedTotal ?? _total} confirmed by Razorpay (Payment ID: $paymentId). Your order is now with the creator.',
           ),
           actions: [
             FilledButton(
