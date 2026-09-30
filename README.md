@@ -19,6 +19,23 @@ flutter test
 flutter run
 ```
 
+## Razorpay server configuration
+
+The app never stores the Razorpay secret. Configure `RAZORPAY_KEY_ID`,
+`RAZORPAY_KEY_SECRET`, `FIREBASE_SERVICE_ACCOUNT_JSON`, and
+`PAYMENT_ALLOWED_ORIGINS` as server environment variables for the API deployment.
+`PAYMENT_API_BASE_URL` must point to that deployment when building Android or iOS;
+the web build uses its current origin. Use Razorpay test credentials until test
+checkout and payment verification have been exercised end to end.
+
+The API prices cart items from Firestore, creates Razorpay orders, verifies
+captured payments, reserves stock, and writes paid orders idempotently through
+Firebase Admin. Deploy `firestore.rules` with the API; client writes to paid
+orders and payment receipts are denied. Razorpay Web Checkout is loaded from
+`web/index.html`, while Android and iOS use the Razorpay Flutter SDK. Razorpay's
+Flutter SDK wraps its native Android and iOS SDKs; the web client uses Standard
+Checkout JavaScript.
+
 Daily team changes and integration notes are recorded in `docs/daily-log.md`.
 
 ## Getting Started

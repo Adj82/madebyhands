@@ -3,5 +3,9 @@
   "version": "1.0.0",
   "scripts": {
     "build": "bash vercel-build.sh"
+  },
+  "dependencies": {
+    "razorpay": "^2.9.5",
+    "firebase-admin": "^13.5.0"
   }
 }

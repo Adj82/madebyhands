@@ -178,9 +178,27 @@ class _SearchTabState extends State<SearchTab> {
                 product.category.toLowerCase().contains(normalizedQuery);
             return matchesCategory && matchesQuery;
           }).toList();
+          final normalizedQuery = _query.trim().toLowerCase();
+          final creators = normalizedQuery.isEmpty
+              ? <PublicCreator>[]
+              : state.creators.where((creator) {
+                  if (!creator.isVerified) return false;
+                  return creator.displayName.toLowerCase().contains(
+                        normalizedQuery,
+                      ) ||
+                      creator.name.toLowerCase().contains(normalizedQuery) ||
+                      creator.category.toLowerCase().contains(
+                        normalizedQuery,
+                      ) ||
+                      creator.location.toLowerCase().contains(
+                        normalizedQuery,
+                      ) ||
+                      creator.bio.toLowerCase().contains(normalizedQuery);
+                }).toList();
 
           return CustomScrollView(
             key: const PageStorageKey('buyer-search'),
+            cacheExtent: 2400,
             slivers: [
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
@@ -188,7 +206,8 @@ class _SearchTabState extends State<SearchTab> {
                   children: [
                     Text(
                       'Explore handmade',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
                             fontWeight: FontWeight.w800,
                             color: const Color(0xFF8B261D),
                           ),
@@ -208,7 +227,9 @@ class _SearchTabState extends State<SearchTab> {
                         ),
                         hintText: 'Search products, crafts or artisans',
                         filled: true,
-                        fillColor: const Color(0xFFFAF6EE).withValues(alpha: 0.9),
+                        fillColor: const Color(
+                          0xFFFAF6EE,
+                        ).withValues(alpha: 0.9),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -238,7 +259,8 @@ class _SearchTabState extends State<SearchTab> {
                         if (_selectedCategories.isNotEmpty) ...[
                           const SizedBox(width: 10),
                           TextButton(
-                            onPressed: () => setState(_selectedCategories.clear),
+                            onPressed: () =>
+                                setState(_selectedCategories.clear),
                             child: const Text(
                               'Clear',
                               style: TextStyle(color: Color(0xFF8B261D)),
@@ -256,11 +278,11 @@ class _SearchTabState extends State<SearchTab> {
                           itemCount: _selectedCategories.length,
                           separatorBuilder: (_, _) => const SizedBox(width: 8),
                           itemBuilder: (context, index) {
-                            final category =
-                                _selectedCategories.elementAt(index);
+                            final category = _selectedCategories.elementAt(
+                              index,
+                            );
                             return InputChip(
-                              backgroundColor:
-                                  const Color(0xFFF2DEDD),
+                              backgroundColor: const Color(0xFFF2DEDD),
                               label: Text(
                                 category,
                                 style: const TextStyle(
@@ -278,67 +300,105 @@ class _SearchTabState extends State<SearchTab> {
                       ),
                     ],
                     const SizedBox(height: 18),
-                    Card(
-                      elevation: 1,
-                      color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: const BorderSide(
-                          color: Color(0xFF8B261D),
-                          width: 1.2,
-                        ),
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        leading: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: const BoxDecoration(
+                    if (_query.trim().isEmpty)
+                      Card(
+                        elevation: 1,
+                        color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: const BorderSide(
                             color: Color(0xFF8B261D),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.storefront,
-                            color: Colors.white,
-                            size: 22,
+                            width: 1.2,
                           ),
                         ),
-                        title: const Text(
-                          'Explore Storefronts by Creators',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            color: Color(0xFF8B261D),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
                           ),
-                        ),
-                        subtitle: const Text(
-                          'Discover verified artisans & full studio collections',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.mutedText,
-                          ),
-                        ),
-                        trailing: const Icon(
-                          Icons.arrow_forward_ios,
-                          size: 16,
-                          color: Color(0xFF8B261D),
-                        ),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ExploreStorefrontsPage(
-                                userId: widget.userId,
-                                onProductTap: widget.onProductTap,
-                              ),
+                          leading: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF8B261D),
+                              shape: BoxShape.circle,
                             ),
-                          );
-                        },
+                            child: const Icon(
+                              Icons.storefront,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                          ),
+                          title: const Text(
+                            'Explore Storefronts by Creators',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: Color(0xFF8B261D),
+                            ),
+                          ),
+                          subtitle: const Text(
+                            'Discover verified artisans & full studio collections',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.mutedText,
+                            ),
+                          ),
+                          trailing: const Icon(
+                            Icons.arrow_forward_ios,
+                            size: 16,
+                            color: Color(0xFF8B261D),
+                          ),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ExploreStorefrontsPage(
+                                  userId: widget.userId,
+                                  onProductTap: widget.onProductTap,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 20),
+                    if (_query.trim().isEmpty) const SizedBox(height: 20),
+                    if (creators.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Creators',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF8B261D),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...creators.map(
+                        (creator) => Card(
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundImage: creator.profileImage.isNotEmpty
+                                  ? NetworkImage(creator.profileImage)
+                                  : null,
+                              child: creator.profileImage.isEmpty
+                                  ? const Icon(Icons.storefront)
+                                  : null,
+                            ),
+                            title: Text(creator.displayName),
+                            subtitle: Text(
+                              [creator.category, creator.location]
+                                  .where((value) => value.trim().isNotEmpty)
+                                  .join(' · '),
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: widget.onCreatorTap == null
+                                ? null
+                                : () => widget.onCreatorTap!(creator),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     Text(
                       '${products.length} pieces',
                       style: const TextStyle(
@@ -350,7 +410,7 @@ class _SearchTabState extends State<SearchTab> {
                   ],
                 ),
               ),
-              if (products.isEmpty)
+              if (products.isEmpty && creators.isEmpty)
                 const SliverFillRemaining(
                   hasScrollBody: false,
                   child: BuyerEmptyState(
@@ -365,27 +425,27 @@ class _SearchTabState extends State<SearchTab> {
                   sliver: SliverGrid(
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 0.67,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      childCount: products.length,
-                      (context, index) {
-                        final product = products[index];
-                        return ProductCard(
-                          product: product,
-                          isSaved: state.favoriteIds.contains(product.id),
-                          onTap: () => widget.onProductTap(product),
-                          onSave: () => context.read<BuyerBloc>().add(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 0.67,
+                        ),
+                    delegate: SliverChildListDelegate(
+                      products
+                          .map(
+                            (product) => ProductCard(
+                              product: product,
+                              isSaved: state.favoriteIds.contains(product.id),
+                              onTap: () => widget.onProductTap(product),
+                              onSave: () => context.read<BuyerBloc>().add(
                                 BuyerToggleFavorite(
                                   userId: widget.userId,
                                   product: product,
                                 ),
                               ),
-                        );
-                      },
+                            ),
+                          )
+                          .toList(growable: false),
                     ),
                   ),
                 ),

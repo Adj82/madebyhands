@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:madebyhands/core/services/razorpay_service.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
@@ -6,8 +7,6 @@ import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/saved_addresses_page.dart';
-import 'package:madebyhands/features/orders/domain/entities/marketplace_order.dart';
-import 'package:madebyhands/features/orders/domain/repositories/order_repository.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 class CheckoutPage extends StatefulWidget {
@@ -16,7 +15,6 @@ class CheckoutPage extends StatefulWidget {
   final Map<String, int> quantities;
   final Map<String, ProductCustomizationSelection> customizations;
   final BuyerRepository buyerRepository;
-  final OrderRepository orderRepository;
   final VoidCallback onOrderPlaced;
 
   const CheckoutPage({
@@ -24,9 +22,8 @@ class CheckoutPage extends StatefulWidget {
     required this.user,
     required this.products,
     required this.quantities,
-    required this.customizations,
+    this.customizations = const {},
     required this.buyerRepository,
-    required this.orderRepository,
     required this.onOrderPlaced,
   });
 
@@ -37,24 +34,26 @@ class CheckoutPage extends StatefulWidget {
 class _CheckoutPageState extends State<CheckoutPage> {
   String? _selectedAddressId;
   bool _isPlacing = false;
-  String _paymentMethod = 'razorpay'; // 'razorpay' or 'skip'
+  bool _handlingPaymentCallback = false;
   late RazorpayService _razorpayService;
   SavedAddress? _pendingAddress;
+  String? _pendingRazorpayOrderId;
   SavedAddress? _newAddressAwaitingSelection;
 
-  static const String _razorpayKeyId = String.fromEnvironment(
-    'RAZORPAY_KEY_ID',
-    defaultValue: 'rzp_test_ThYi51dfwooow6',
+  int get _subtotal => widget.products.fold(
+    0,
+    (sum, product) =>
+        sum +
+        (widget.customizations[product.id] ??
+                    const ProductCustomizationSelection())
+                .unitPriceFor(product) *
+            (widget.quantities[product.id] ?? 0),
   );
 
-  int get _subtotal => widget.products.fold(0, (sum, product) {
-    final customization =
-        widget.customizations[product.id] ??
-        const ProductCustomizationSelection();
-    return sum +
-        customization.unitPriceFor(product) *
-            (widget.quantities[product.id] ?? 0);
-  });
+  int get _platformFee =>
+      50 * widget.products.map((product) => product.creatorUid).toSet().length;
+
+  int get _total => _subtotal + _platformFee;
 
   @override
   void initState() {
@@ -64,6 +63,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
       onSuccess: _handlePaymentSuccess,
       onError: _handlePaymentError,
       onExternalWallet: _handleExternalWallet,
+      onWebPaymentSuccess: _handleWebPaymentSuccess,
+      onWebPaymentFailure: _handleWebPaymentFailure,
     );
   }
 
@@ -73,23 +74,70 @@ class _CheckoutPageState extends State<CheckoutPage> {
     super.dispose();
   }
 
-  void _handlePaymentSuccess(PaymentSuccessResponse response) {
-    if (_pendingAddress != null) {
-      _executeOrderPlacement(
-        _pendingAddress!,
-        paymentStatus: 'paid',
-        paymentId: response.paymentId,
+  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    _confirmPayment(response.paymentId, response.orderId, response.signature);
+  }
+
+  void _handleWebPaymentSuccess(
+    String? paymentId,
+    String? orderId,
+    String? signature,
+  ) {
+    _confirmPayment(paymentId, orderId, signature);
+  }
+
+  void _confirmPayment(
+    String? paymentId,
+    String? responseOrderId,
+    String? signature,
+  ) async {
+    if (_handlingPaymentCallback) return;
+    _handlingPaymentCallback = true;
+    final orderId = responseOrderId ?? _pendingRazorpayOrderId ?? '';
+
+    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken(true);
+    if (idToken == null) {
+      _handlingPaymentCallback = false;
+      if (!mounted) return;
+      setState(() => _isPlacing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Payment may have completed. Sign in again and contact support before retrying.',
+          ),
+        ),
       );
+      return;
     }
+    if (!mounted) return;
+    final address = _pendingAddress;
+    if (address == null) {
+      _handlingPaymentCallback = false;
+      setState(() => _isPlacing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Checkout address was lost. Please retry.'),
+        ),
+      );
+      return;
+    }
+    _executeOrderPlacement(
+      address,
+      paymentId: paymentId,
+      paymentSignature: signature,
+      razorpayOrderId: orderId,
+      idToken: idToken,
+    );
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
-    setState(() => _isPlacing = false);
     if (!mounted) return;
+    _handlingPaymentCallback = false;
+    setState(() => _isPlacing = false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Payment failed: ${response.message} (Code: ${response.code})',
+          'Payment cancelled or failed: ${response.message} (Code: ${response.code})',
         ),
         backgroundColor: Colors.redAccent,
       ),
@@ -99,32 +147,39 @@ class _CheckoutPageState extends State<CheckoutPage> {
   void _handleExternalWallet(ExternalWalletResponse response) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Selected wallet: ${response.walletName}')),
+      SnackBar(
+        content: Text('External Wallet selected: ${response.walletName}'),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Confirm order')),
+      appBar: AppBar(title: const Text('Confirm Order')),
       body: StreamBuilder<List<SavedAddress>>(
         stream: widget.buyerRepository.watchAddresses(widget.user.uid),
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Text('Could not load saved addresses: ${snapshot.error}'),
+            );
+          }
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
           final addresses = snapshot.data!;
           final awaitingAddress = _newAddressAwaitingSelection;
           if (awaitingAddress != null) {
-            final savedAddress = addresses.where(
+            final matches = addresses.where(
               (address) =>
                   address.recipientName == awaitingAddress.recipientName &&
                   address.phone == awaitingAddress.phone &&
                   address.addressLine == awaitingAddress.addressLine &&
                   address.postalCode == awaitingAddress.postalCode,
             );
-            if (savedAddress.isNotEmpty) {
-              _selectedAddressId = savedAddress.first.id;
+            if (matches.isNotEmpty) {
+              _selectedAddressId = matches.first.id;
               _newAddressAwaitingSelection = null;
             }
           }
@@ -149,7 +204,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 children: [
                   const Expanded(
                     child: Text(
-                      'Delivery address',
+                      'Delivery Address',
                       style: TextStyle(
                         fontSize: 19,
                         fontWeight: FontWeight.bold,
@@ -170,12 +225,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     padding: const EdgeInsets.all(18),
                     child: Column(
                       children: [
-                        const Text(
-                          'Add a delivery address before placing your order.',
-                        ),
+                        const Text('Add a delivery address before paying.'),
                         const SizedBox(height: 12),
                         OutlinedButton.icon(
-                          onPressed: _addNewAddress,
+                          onPressed: _isPlacing ? null : _addNewAddress,
                           icon: const Icon(Icons.add),
                           label: const Text('Add new address'),
                         ),
@@ -200,14 +253,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       ),
                       title: Row(
                         children: [
-                          Expanded(
-                            child: Text(
-                              address.label,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
+                          Expanded(child: Text(address.label)),
                           if (_selectedAddressId == address.id)
                             const Chip(label: Text('Selected')),
                         ],
@@ -220,64 +266,22 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 ),
               const SizedBox(height: 24),
               const Text(
-                'Payment Method',
+                'Secure payment',
                 style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
-              Card(
-                child: Column(
-                  children: [
-                    RadioListTile<String>(
-                      value: 'razorpay',
-                      groupValue: _paymentMethod,
-                      activeColor: AppColors.primary,
-                      title: const Row(
-                        children: [
-                          Icon(Icons.payment, color: AppColors.primary),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'Razorpay Online Gateway',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      subtitle: const Text(
-                        'UPI (GPay, Paytm, PhonePe), Cards, NetBanking',
-                      ),
-                      onChanged: (val) => setState(() => _paymentMethod = val!),
-                    ),
-                    const Divider(height: 1),
-                    RadioListTile<String>(
-                      value: 'skip',
-                      groupValue: _paymentMethod,
-                      activeColor: AppColors.primary,
-                      title: const Row(
-                        children: [
-                          Icon(Icons.money_off, color: Colors.grey),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'Test Mode / Skip Payment',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      subtitle: const Text(
-                        'Instantly place order without online payment',
-                      ),
-                      onChanged: (val) => setState(() => _paymentMethod = val!),
-                    ),
-                  ],
+              const Card(
+                child: ListTile(
+                  leading: Icon(Icons.lock_outline, color: AppColors.primary),
+                  title: Text('Razorpay Checkout'),
+                  subtitle: Text(
+                    'Pay by UPI, card, or net banking. Card details are handled by Razorpay.',
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
               const Text(
-                'Order summary',
+                'Order Summary',
                 style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
@@ -290,19 +294,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     key: ValueKey('checkout-product-${product.id}'),
                     onTap: () =>
                         _showProductInformation(product, customization),
-                    leading: Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: product.color,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                    leading: CircleAvatar(
+                      backgroundColor: product.color,
                       child: Icon(product.icon, color: AppColors.text),
                     ),
-                    title: Text(
-                      product.name,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
+                    title: Text(product.name),
                     subtitle: Text(
                       [
                         'By ${product.artisan}',
@@ -312,16 +308,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
                         'Tap to view product information',
                       ].join('\n'),
                     ),
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '${widget.quantities[product.id]} × ₹${customization.unitPriceFor(product)}',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        const Icon(Icons.chevron_right),
-                      ],
+                    trailing: Text(
+                      '${widget.quantities[product.id]} × ₹${customization.unitPriceFor(product)}',
                     ),
                   ),
                 );
@@ -329,12 +317,22 @@ class _CheckoutPageState extends State<CheckoutPage> {
               const Divider(),
               ListTile(
                 contentPadding: EdgeInsets.zero,
+                title: const Text('Items subtotal'),
+                trailing: Text('₹$_subtotal'),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Platform fee'),
+                trailing: Text('₹$_platformFee'),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
                 title: const Text(
-                  'Order total',
+                  'Total payable',
                   style: TextStyle(fontSize: 16),
                 ),
                 trailing: Text(
-                  '₹$_subtotal',
+                  '₹$_total',
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -344,7 +342,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
               ),
               const SizedBox(height: 20),
               FilledButton.icon(
-                onPressed: selected == null || _isPlacing
+                onPressed:
+                    selected == null || _isPlacing || _handlingPaymentCallback
                     ? null
                     : () => _initiateCheckout(selected),
                 icon: _isPlacing
@@ -355,16 +354,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
                           color: Colors.white,
                         ),
                       )
-                    : Icon(
-                        _paymentMethod == 'razorpay'
-                            ? Icons.lock_clock_outlined
-                            : Icons.check_circle_outline,
-                      ),
-                label: Text(
-                  _paymentMethod == 'razorpay'
-                      ? 'Pay with Razorpay  ·  ₹$_subtotal'
-                      : 'Place order (Test Mode)',
-                ),
+                    : const Icon(Icons.lock_outline),
+                label: Text('Pay with Razorpay  ·  ₹$_total'),
               ),
             ],
           );
@@ -373,9 +364,60 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
+  void _initiateCheckout(SavedAddress address) async {
+    _pendingAddress = address;
+    setState(() => _isPlacing = true);
+    try {
+      final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+      if (idToken == null) {
+        throw StateError('Please sign in again before paying.');
+      }
+      // Step 1: Create Order via Backend Endpoint or REST API
+      final orderData = await _razorpayService.createOrder(
+        items: widget.products.map((product) {
+          final customization =
+              widget.customizations[product.id] ??
+              const ProductCustomizationSelection();
+          return {
+            'productId': product.id,
+            'quantity': widget.quantities[product.id] ?? 0,
+            'customizations': customization.values,
+          };
+        }).toList(),
+        idToken: idToken,
+      );
+      _pendingRazorpayOrderId = orderData['order_id'] as String?;
+
+      if (_pendingRazorpayOrderId == null || _pendingRazorpayOrderId!.isEmpty) {
+        throw Exception('Failed to obtain order_id from Razorpay');
+      }
+
+      // Step 2: Open Standard Razorpay Checkout Modal
+      _razorpayService.openCheckout(
+        orderId: _pendingRazorpayOrderId ?? '',
+        keyId: orderData['key_id'] as String?,
+        amountInRupees: (orderData['amount'] as num).toDouble() / 100,
+        orderDescription: 'MADEBYHANDS Order Payment',
+        name: widget.user.name,
+        phone: address.phone.isNotEmpty ? address.phone : widget.user.phone,
+        email: widget.user.email,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _handlingPaymentCallback = false;
+      setState(() => _isPlacing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not initiate Razorpay checkout: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
   Future<void> _addNewAddress() async {
     final address = await showSavedAddressForm(context);
-    if (address == null) return;
+    if (address == null || !mounted) return;
     try {
       _newAddressAwaitingSelection = address;
       await widget.buyerRepository.saveAddress(widget.user.uid, address);
@@ -421,40 +463,19 @@ class _CheckoutPageState extends State<CheckoutPage> {
             ),
           ),
           const SizedBox(height: 18),
-          Text(
-            product.category.toUpperCase(),
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.8,
-            ),
-          ),
+          Text(product.category.toUpperCase()),
           const SizedBox(height: 6),
-          Text(
-            product.name,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
-          ),
+          Text(product.name, style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 6),
-          Text(
-            'Made by ${product.artisan}',
-            style: const TextStyle(color: AppColors.mutedText),
-          ),
+          Text('Made by ${product.artisan}'),
           const SizedBox(height: 14),
-          Text(product.description, style: const TextStyle(height: 1.5)),
+          Text(product.description),
           const SizedBox(height: 18),
           if (!customization.isEmpty) ...[
-            const Text(
-              'Your customization',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-            ),
+            const Text('Your customization'),
             const SizedBox(height: 8),
             ...customization.values.entries.map(
-              (entry) => Padding(
-                padding: const EdgeInsets.only(bottom: 5),
-                child: Text('• ${entry.key}: ${entry.value.join(', ')}'),
-              ),
+              (entry) => Text('${entry.key}: ${entry.value.join(', ')}'),
             ),
             const SizedBox(height: 12),
           ],
@@ -497,66 +518,54 @@ class _CheckoutPageState extends State<CheckoutPage> {
         ),
       );
 
-  void _initiateCheckout(SavedAddress address) {
-    _pendingAddress = address;
-    if (_paymentMethod == 'razorpay') {
-      setState(() => _isPlacing = true);
-      try {
-        _razorpayService.openCheckout(
-          keyId: _razorpayKeyId,
-          amountInRupees: _subtotal.toDouble(),
-          orderDescription: 'MADEBYHANDS Order Payment',
-          name: widget.user.name,
-          phone: address.phone.isNotEmpty ? address.phone : widget.user.phone,
-          email: widget.user.email,
-        );
-      } catch (e) {
-        setState(() => _isPlacing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open Razorpay checkout: $e')),
-        );
-      }
-    } else {
-      _executeOrderPlacement(address, paymentStatus: 'skipped');
-    }
+  void _handleWebPaymentFailure(String error) {
+    if (!mounted) return;
+    setState(() => _isPlacing = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Payment cancelled or failed: $error')),
+    );
   }
 
   Future<void> _executeOrderPlacement(
     SavedAddress address, {
-    required String paymentStatus,
     String? paymentId,
+    String? paymentSignature,
+    String? razorpayOrderId,
+    String? idToken,
   }) async {
     setState(() => _isPlacing = true);
     try {
-      await widget.orderRepository.placeOrders(
-        buyerId: widget.user.uid,
-        buyerName: widget.user.name,
+      if (paymentId == null ||
+          paymentSignature == null ||
+          razorpayOrderId == null ||
+          idToken == null) {
+        throw StateError('Payment confirmation details are missing.');
+      }
+      await _razorpayService.finalizePaidOrder(
+        razorpayOrderId: razorpayOrderId,
+        razorpayPaymentId: paymentId,
+        razorpaySignature: paymentSignature,
+        idToken: idToken,
         buyerPhone: address.phone.isNotEmpty
             ? address.phone
             : widget.user.phone,
-        address: CheckoutAddress(
-          recipientName: address.recipientName,
-          phone: address.phone,
-          addressLine: address.addressLine,
-          city: address.city,
-          state: address.state,
-          postalCode: address.postalCode,
-        ),
+        address: {
+          'recipientName': address.recipientName,
+          'phone': address.phone,
+          'addressLine': address.addressLine,
+          'city': address.city,
+          'state': address.state,
+          'postalCode': address.postalCode,
+        },
         items: widget.products.map((product) {
           final customization =
               widget.customizations[product.id] ??
               const ProductCustomizationSelection();
-          return CheckoutOrderItem(
-            productId: product.id,
-            name: product.name,
-            creatorId: product.creatorUid,
-            creatorName: product.artisan,
-            quantity: widget.quantities[product.id]!,
-            unitPrice: customization.unitPriceFor(product),
-            baseUnitPrice: product.price,
-            customizationPrice: customization.additionalPrice,
-            customizations: customization.values,
-          );
+          return {
+            'productId': product.id,
+            'quantity': widget.quantities[product.id] ?? 0,
+            'customizations': customization.values,
+          };
         }).toList(),
       );
       widget.onOrderPlaced();
@@ -572,9 +581,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             ],
           ),
           content: Text(
-            paymentStatus == 'paid'
-                ? 'Payment of ₹$_subtotal confirmed via Razorpay (Payment ID: ${paymentId ?? "N/A"}). Your order is now being processed by the creator.'
-                : 'Your order is now placed in test mode and visible to the creator and admin.',
+            'Payment of ₹$_total confirmed by Razorpay (Payment ID: $paymentId). Your order is now with the creator.',
           ),
           actions: [
             FilledButton(
@@ -588,10 +595,17 @@ class _CheckoutPageState extends State<CheckoutPage> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not place order: $error')),
+          SnackBar(
+            content: Text(
+              error is StateError
+                  ? error.message.toString()
+                  : 'Order confirmation failed. Check My Orders or contact support before trying again.',
+            ),
+          ),
         );
       }
     } finally {
+      _handlingPaymentCallback = false;
       if (mounted) setState(() => _isPlacing = false);
     }
   }

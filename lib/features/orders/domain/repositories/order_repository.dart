@@ -11,6 +11,8 @@ abstract interface class OrderRepository {
     required String buyerPhone,
     required CheckoutAddress address,
     required List<CheckoutOrderItem> items,
+    required String paymentStatus,
+    String? paymentId,
   });
 
   Future<void> updateOrderStatus(

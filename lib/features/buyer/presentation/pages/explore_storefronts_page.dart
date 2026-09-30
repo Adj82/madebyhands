@@ -133,10 +133,7 @@ class _StorefrontCard extends StatelessWidget {
   final PublicCreator creator;
   final VoidCallback onTap;
 
-  const _StorefrontCard({
-    required this.creator,
-    required this.onTap,
-  });
+  const _StorefrontCard({required this.creator, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -145,171 +142,162 @@ class _StorefrontCard extends StatelessWidget {
       color: const Color(0xFFFAF6EE).withValues(alpha: 0.92),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(
-          color: Color(0xFF8B261D),
-          width: 0.8,
-        ),
+        side: const BorderSide(color: Color(0xFF8B261D), width: 0.8),
       ),
-      child: InkWell(
+      child: ListTile(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: const Color(0xFFF2DEDD),
-                    backgroundImage: creator.profileImage.isNotEmpty
-                        ? NetworkImage(creator.profileImage)
-                        : null,
-                    child: creator.profileImage.isEmpty
-                        ? const Icon(
-                            Icons.storefront,
-                            size: 26,
-                            color: Color(0xFF8B261D),
-                          )
-                        : null,
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
+        contentPadding: const EdgeInsets.all(16),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: const Color(0xFFF2DEDD),
+                  backgroundImage: creator.profileImage.isNotEmpty
+                      ? NetworkImage(creator.profileImage)
+                      : null,
+                  child: creator.profileImage.isEmpty
+                      ? const Icon(
+                          Icons.storefront,
+                          size: 26,
+                          color: Color(0xFF8B261D),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              creator.displayName,
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF8B261D),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (creator.isVerified) ...[
+                            const SizedBox(width: 5),
+                            const Icon(
+                              Icons.verified,
+                              color: Color(0xFF8B261D),
+                              size: 18,
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (creator.name.isNotEmpty &&
+                          creator.name != creator.displayName) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'By ${creator.name}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.mutedText,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          if (creator.category.isNotEmpty) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF2DEDD),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
                               child: Text(
-                                creator.displayName,
+                                creator.category,
                                 style: const TextStyle(
-                                  fontSize: 17,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                   color: Color(0xFF8B261D),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          if (creator.location.isNotEmpty)
+                            Expanded(
+                              child: Text(
+                                creator.location,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.mutedText,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            if (creator.isVerified) ...[
-                              const SizedBox(width: 5),
-                              const Icon(
-                                Icons.verified,
-                                color: Color(0xFF8B261D),
-                                size: 18,
-                              ),
-                            ],
-                          ],
-                        ),
-                        if (creator.name.isNotEmpty &&
-                            creator.name != creator.displayName) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            'By ${creator.name}',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: AppColors.mutedText,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
                         ],
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            if (creator.category.isNotEmpty) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF2DEDD),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  creator.category,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF8B261D),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                            ],
-                            if (creator.location.isNotEmpty)
-                              Expanded(
-                                child: Text(
-                                  creator.location,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.mutedText,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(
-                    Icons.chevron_right,
-                    color: Color(0xFF8B261D),
-                  ),
-                ],
-              ),
-              if (creator.bio.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
-                  creator.bio,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    height: 1.35,
-                    color: AppColors.text,
+                      ),
+                    ],
                   ),
                 ),
+                const Icon(Icons.chevron_right, color: Color(0xFF8B261D)),
               ],
-              if (creator.portfolio.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 64,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: creator.portfolio.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      return ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.network(
-                          creator.portfolio[index],
+            ),
+            if (creator.bio.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                creator.bio,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  color: AppColors.text,
+                ),
+              ),
+            ],
+            if (creator.portfolio.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 64,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: creator.portfolio.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(
+                        creator.portfolio[index],
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
                           width: 64,
                           height: 64,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            width: 64,
-                            height: 64,
-                            color: AppColors.outline,
-                            child: const Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 18,
-                              color: AppColors.mutedText,
-                            ),
+                          color: AppColors.outline,
+                          child: const Icon(
+                            Icons.image_not_supported_outlined,
+                            size: 18,
+                            color: AppColors.mutedText,
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
-              ],
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );

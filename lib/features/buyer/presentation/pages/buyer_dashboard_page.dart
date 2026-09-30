@@ -257,7 +257,6 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
             state.cartCustomizations,
           ),
           buyerRepository: buyerBloc.repository,
-          orderRepository: serviceLocator(),
           onOrderPlaced: () {
             for (final product in products) {
               buyerBloc.add(BuyerUpdateCartQuantity(product, 0));
@@ -283,7 +282,6 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
           quantities: {product.id: quantity},
           customizations: {product.id: customization},
           buyerRepository: buyerBloc.repository,
-          orderRepository: serviceLocator(),
           onOrderPlaced: () {
             if (buyerBloc.state.cartQuantities.containsKey(product.id)) {
               buyerBloc.add(BuyerUpdateCartQuantity(product, 0));

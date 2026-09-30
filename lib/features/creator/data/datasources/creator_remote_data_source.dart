@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:madebyhands/features/creator/data/models/creator_notification_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_order_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_product_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_profile_model.dart';
@@ -84,7 +85,20 @@ abstract interface class CreatorRemoteDataSource {
     String status, {
     String? rejectionReason,
     String? consignmentNumber,
+    String? carrierName,
   });
+
+  /// Fetches all notifications belonging to a specific creator.
+  Future<List<CreatorNotificationModel>> getCreatorNotifications(String creatorUid);
+
+  /// Marks a specific notification as read.
+  Future<void> markNotificationAsRead(String notificationId);
+
+  /// Marks all notifications for a creator as read.
+  Future<void> markAllNotificationsAsRead(String creatorUid);
+
+  /// Deletes a list of notifications.
+  Future<void> deleteNotifications(List<String> notificationIds);
 }
 
 class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
@@ -394,6 +408,7 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
     String status, {
     String? rejectionReason,
     String? consignmentNumber,
+    String? carrierName,
   }) async {
     try {
       final updateData = <String, dynamic>{
@@ -406,10 +421,75 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
       if (consignmentNumber != null) {
         updateData['consignmentNumber'] = consignmentNumber;
       }
+      if (carrierName != null && carrierName.trim().isNotEmpty) {
+        updateData['carrierName'] = carrierName.trim();
+      }
       if (status == 'Rejected' || status == 'Cancelled') {
         updateData['payoutStatus'] = 'cancelled';
       }
       await firestore.collection('orders').doc(orderId).update(updateData);
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<List<CreatorNotificationModel>> getCreatorNotifications(
+    String creatorUid,
+  ) async {
+    try {
+      final snapshot = await firestore
+          .collection('notifications')
+          .where('creatorUid', isEqualTo: creatorUid)
+          .get();
+      final notifications = snapshot.docs
+          .map((doc) => CreatorNotificationModel.fromJson(doc.data(), doc.id))
+          .toList();
+      notifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return notifications;
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<void> markNotificationAsRead(String notificationId) async {
+    try {
+      await firestore
+          .collection('notifications')
+          .doc(notificationId)
+          .update({'isRead': true});
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<void> markAllNotificationsAsRead(String creatorUid) async {
+    try {
+      final snapshot = await firestore
+          .collection('notifications')
+          .where('creatorUid', isEqualTo: creatorUid)
+          .where('isRead', isEqualTo: false)
+          .get();
+      final batch = firestore.batch();
+      for (final doc in snapshot.docs) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+      await batch.commit();
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<void> deleteNotifications(List<String> notificationIds) async {
+    try {
+      final batch = firestore.batch();
+      for (final id in notificationIds) {
+        batch.delete(firestore.collection('notifications').doc(id));
+      }
+      await batch.commit();
     } catch (e) {
       throw Exception(e.toString());
     }

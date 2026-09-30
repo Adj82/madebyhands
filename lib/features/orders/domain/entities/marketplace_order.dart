@@ -145,18 +145,18 @@ class PlatformFeeCalculator {
     required double flatFee,
     required double percentFee,
   }) {
-    final normalizedFlatFee = flatFee.round().clamp(0, subtotal);
+    final normalizedFlatFee = flatFee.round().clamp(0, 100000000);
     final appliedRate = subtotal > 999
         ? percentFee.clamp(0, 100).toDouble()
         : 0.0;
     final commission = (subtotal * appliedRate / 100).round();
-    final totalFee = (normalizedFlatFee + commission).clamp(0, subtotal);
+    final totalFee = normalizedFlatFee + commission;
     return PlatformFeeBreakdown(
       flatFee: normalizedFlatFee,
       commissionRate: appliedRate,
       commissionAmount: commission,
       totalFee: totalFee,
-      creatorNetAmount: subtotal - totalFee,
+      creatorNetAmount: subtotal - commission,
     );
   }
 }

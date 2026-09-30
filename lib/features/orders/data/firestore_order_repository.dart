@@ -44,7 +44,12 @@ class FirestoreOrderRepository implements OrderRepository {
     required String buyerPhone,
     required CheckoutAddress address,
     required List<CheckoutOrderItem> items,
+    required String paymentStatus,
+    String? paymentId,
   }) async {
+    if (paymentStatus != 'paid' && paymentStatus != 'skipped') {
+      throw StateError('Unsupported checkout payment status.');
+    }
     if (items.isEmpty) throw StateError('The cart is empty.');
     if (items.any((item) => item.creatorId.isEmpty)) {
       throw StateError('A product is missing its creator information.');
@@ -160,7 +165,8 @@ class FirestoreOrderRepository implements OrderRepository {
           'platformFee': fee.totalFee,
           'creatorNetAmount': fee.creatorNetAmount,
           'status': 'Placed',
-          'paymentStatus': 'skipped',
+          'paymentStatus': paymentStatus,
+          if (paymentId != null) 'paymentId': paymentId,
           'payoutStatus': 'pending',
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),

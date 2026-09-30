@@ -26,7 +26,8 @@ Required fields:
 - `flatFee`, `commissionRate`, `commissionAmount`, `platformFee`
 - `creatorNetAmount`
 - `status`: `Placed`, `Accepted`, `Rejected`, `Shipped`, `Delivered`, `Completed`, or `Cancelled`
-- `paymentStatus`: currently `skipped`
+- `paymentStatus`: `paid` for Razorpay orders
+- `paymentId`: captured Razorpay payment ID
 - `payoutStatus`: `pending`, `paid`, or `cancelled`
 - `createdAt`, `updatedAt`, and `isSample`
 
@@ -34,11 +35,12 @@ Fee calculation is snapshotted when the order is placed:
 
 ```text
 commission = subtotal > 999 ? subtotal × percentFee : 0
+buyer pays subtotal + flatFee
 platformFee = flatFee + commission
-creatorNetAmount = subtotal - platformFee
+creatorNetAmount = subtotal - commission
 ```
 
-The fee is capped at the subtotal, so creator payout cannot become negative. Admin Finance derives platform balance and pending creator payouts directly from these order records.
+The buyer pays the flat fee in addition to the item subtotal. The percentage commission is deducted from the creator's subtotal, so creator payout cannot become negative. Admin Finance derives platform balance and pending creator payouts directly from these order records.
 
 ## Support tickets
 
@@ -56,4 +58,4 @@ The admin Orders panel exposes an action only in debug builds. It creates determ
 
 ## Deployment note
 
-The repository includes `firestore.rules`, but code changes do not deploy those rules. Deployment must be reviewed and run separately. For a production payment system, trusted financial calculations should be moved from the client into a Cloud Function or another trusted backend.
+Paid orders are created by the authenticated Razorpay API through Firebase Admin. Clients cannot write payment intents, receipts, or paid orders. Deploy the matching `firestore.rules` before enabling live checkout; code changes do not deploy rules automatically.

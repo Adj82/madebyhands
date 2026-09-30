@@ -15,8 +15,6 @@ import 'package:madebyhands/features/buyer/presentation/pages/buyer_dashboard_pa
 import 'package:madebyhands/features/buyer/presentation/pages/buyer_account_page.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/checkout_page.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/product_details_page.dart';
-import 'package:madebyhands/features/orders/domain/entities/marketplace_order.dart';
-import 'package:madebyhands/features/orders/domain/repositories/order_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -282,7 +280,6 @@ void main() {
           quantities: {product.id: 1},
           customizations: const {},
           buyerRepository: MockBuyerRepository(),
-          orderRepository: _FakeOrderRepository(),
           onOrderPlaced: () {},
         ),
       ),
@@ -583,40 +580,4 @@ class _FakeAccountAuthRepository implements AuthRepository {
 
   @override
   Future<Either<Failure, void>> signOut() async => right(null);
-}
-
-class _FakeOrderRepository implements OrderRepository {
-  @override
-  Future<List<String>> placeOrders({
-    required String buyerId,
-    required String buyerName,
-    required String buyerPhone,
-    required CheckoutAddress address,
-    required List<CheckoutOrderItem> items,
-  }) async => ['order-1'];
-
-  @override
-  Future<void> releasePayout(String orderId) async {}
-
-  @override
-  Future<int> seedSampleOrders() async => 0;
-
-  @override
-  Future<void> updateOrderStatus(
-    String orderId,
-    String status, {
-    String? rejectionReason,
-    String? consignmentNumber,
-  }) async {}
-
-  @override
-  Stream<List<MarketplaceOrder>> watchAllOrders() => const Stream.empty();
-
-  @override
-  Stream<List<MarketplaceOrder>> watchBuyerOrders(String buyerId) =>
-      const Stream.empty();
-
-  @override
-  Stream<List<MarketplaceOrder>> watchCreatorOrders(String creatorId) =>
-      const Stream.empty();
 }
