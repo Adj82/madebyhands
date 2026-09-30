@@ -28,6 +28,12 @@ The app never stores the Razorpay secret. Configure `RAZORPAY_KEY_ID`,
 the web build uses its current origin. Use Razorpay test credentials until test
 checkout and payment verification have been exercised end to end.
 
+For the current Firebase app, the service account in
+`FIREBASE_SERVICE_ACCOUNT_JSON` must belong to project `madebyhands-77f87`, and
+`PAYMENT_ALLOWED_ORIGINS` must include `https://madebyhands.vercel.app`. Use the
+Razorpay API Key ID and Key Secret from Account & Settings → API Keys; the
+`razorpay.me/@madebyhands` payment handle is not an API credential.
+
 The API prices cart items from Firestore, creates Razorpay orders, verifies
 captured payments, reserves stock, and writes paid orders idempotently through
 Firebase Admin. Deploy `firestore.rules` with the API; client writes to paid

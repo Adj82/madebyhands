@@ -13,11 +13,12 @@ class RazorpayService {
   final Dio _dio;
   static const String _apiBaseUrl = String.fromEnvironment(
     'PAYMENT_API_BASE_URL',
+    defaultValue: 'https://madebyhands.vercel.app',
   );
   static final BaseOptions _defaultOptions = BaseOptions(
     baseUrl: _apiBaseUrl.isNotEmpty
         ? _apiBaseUrl
-        : (kIsWeb ? Uri.base.origin : ''),
+        : (kIsWeb ? Uri.base.origin : 'https://madebyhands.vercel.app'),
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 20),
   );
@@ -50,14 +51,28 @@ class RazorpayService {
   }) async {
     if (items.isEmpty) throw StateError('The cart is empty.');
 
-    if (_dio.options.baseUrl.isEmpty) {
-      throw StateError('Configure PAYMENT_API_BASE_URL for this platform.');
+    late final Response<dynamic> response;
+    try {
+      response = await _dio.post(
+        '/api/create-order',
+        data: {'items': items, 'currency': currency},
+        options: Options(headers: {'Authorization': 'Bearer $idToken'}),
+      );
+    } on DioException catch (error) {
+      final body = error.response?.data;
+      final serverMessage = body is Map ? body['error']?.toString() : null;
+      if (serverMessage != null && serverMessage.trim().isNotEmpty) {
+        throw StateError(serverMessage.trim());
+      }
+      if (error.response == null) {
+        throw StateError(
+          'Could not reach the payment server. Check your connection and try again.',
+        );
+      }
+      throw StateError(
+        'Payment server returned HTTP ${error.response?.statusCode}. Try again or contact support.',
+      );
     }
-    final response = await _dio.post(
-      '/api/create-order',
-      data: {'items': items, 'currency': currency},
-      options: Options(headers: {'Authorization': 'Bearer $idToken'}),
-    );
     if (response.statusCode != 200 || response.data == null) {
       throw StateError('Payment server did not create an order.');
     }
@@ -137,7 +152,6 @@ class RazorpayService {
       return false;
     }
 
-    if (_dio.options.baseUrl.isEmpty) return false;
     try {
       final response = await _dio.post(
         '/api/verify-payment',

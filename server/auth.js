@@ -16,11 +16,22 @@ async function requireUser(req, res) {
     res.status(401).json({ error: 'Authentication required' });
     return null;
   }
+  let firebaseAdmin;
   try {
-    const decoded = await getFirebaseAdmin().auth().verifyIdToken(match[1]);
+    firebaseAdmin = getFirebaseAdmin();
+  } catch (error) {
+    console.error('Firebase Admin configuration error:', error.message || error);
+    res.status(503).json({ error: 'Firebase authentication is not configured on the payment server' });
+    return null;
+  }
+  try {
+    const decoded = await firebaseAdmin.auth().verifyIdToken(match[1]);
     return decoded;
-  } catch (_) {
-    res.status(401).json({ error: 'Authentication failed' });
+  } catch (error) {
+    console.error('Firebase ID token verification failed:', error.message || error);
+    res.status(401).json({
+      error: 'Firebase ID token could not be verified. Confirm the app and payment API use the same Firebase project.',
+    });
     return null;
   }
 }

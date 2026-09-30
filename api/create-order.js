@@ -28,7 +28,7 @@ module.exports = async (req, res) => {
     const key_secret = process.env.RAZORPAY_KEY_SECRET;
 
     if (!key_id || !key_secret) {
-      return res.status(401).json({ error: 'Razorpay credentials not configured' });
+      return res.status(503).json({ error: 'Razorpay API credentials are not configured on the payment server' });
     }
 
     const { items, currency = 'INR' } = req.body || {};
