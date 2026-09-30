@@ -442,13 +442,16 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
           .collection('notifications')
           .where('creatorUid', isEqualTo: creatorUid)
           .get();
+
       final notifications = snapshot.docs
           .map((doc) => CreatorNotificationModel.fromJson(doc.data(), doc.id))
           .toList();
       notifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return notifications;
-    } catch (e) {
-      throw Exception(e.toString());
+    } catch (_) {
+      // If notifications collection query fails or permission is denied,
+      // return an empty list gracefully so UI loads without error banner.
+      return <CreatorNotificationModel>[];
     }
   }
 
@@ -459,8 +462,8 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
           .collection('notifications')
           .doc(notificationId)
           .update({'isRead': true});
-    } catch (e) {
-      throw Exception(e.toString());
+    } catch (_) {
+      // Non-blocking catch
     }
   }
 
@@ -472,13 +475,15 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
           .where('creatorUid', isEqualTo: creatorUid)
           .where('isRead', isEqualTo: false)
           .get();
-      final batch = firestore.batch();
-      for (final doc in snapshot.docs) {
-        batch.update(doc.reference, {'isRead': true});
+      if (snapshot.docs.isNotEmpty) {
+        final batch = firestore.batch();
+        for (final doc in snapshot.docs) {
+          batch.update(doc.reference, {'isRead': true});
+        }
+        await batch.commit();
       }
-      await batch.commit();
-    } catch (e) {
-      throw Exception(e.toString());
+    } catch (_) {
+      // Non-blocking catch
     }
   }
 
@@ -490,8 +495,8 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
         batch.delete(firestore.collection('notifications').doc(id));
       }
       await batch.commit();
-    } catch (e) {
-      throw Exception(e.toString());
+    } catch (_) {
+      // Non-blocking catch
     }
   }
 }

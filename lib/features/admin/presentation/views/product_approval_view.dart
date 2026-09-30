@@ -240,31 +240,46 @@ class ProductApprovalView extends StatelessWidget {
     String adminEmail,
   ) {
     final reasonController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
     final creatorBloc = context.read<CreatorBloc>();
 
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text('Reject "${product.name}"'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Please provide a reason for rejecting this product. The seller will see this feedback.',
-              style: TextStyle(fontSize: 12, color: AppColors.mutedText),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonController,
-              autofocus: true,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Rejection Reason *',
-                hintText: 'e.g. Image resolution too low, inaccurate description',
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Please provide a mandatory reason for rejecting this product. The seller will see this feedback in their dashboard.',
+                style: TextStyle(fontSize: 12, color: AppColors.mutedText),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: reasonController,
+                autofocus: true,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Rejection Reason *',
+                  hintText: 'e.g. Image resolution too low, inaccurate description',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (v) {
+                  final trimmed = v?.trim() ?? '';
+                  if (trimmed.isEmpty) {
+                    return 'Rejection reason is mandatory.';
+                  }
+                  if (trimmed.length < 3) {
+                    return 'Reason must be at least 3 characters long.';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -273,21 +288,24 @@ class ProductApprovalView extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () {
-              final reason = reasonController.text.trim();
-              if (reason.isEmpty) return;
+              if (formKey.currentState!.validate()) {
+                final reason = reasonController.text.trim();
+                Navigator.pop(dialogContext);
+                creatorBloc.add(CreatorUpdateProductStatus(
+                  productId: product.id,
+                  status: 'Rejected',
+                  approvedBy: adminName,
+                  approvedByEmail: adminEmail,
+                  rejectionReason: reason,
+                ));
 
-              Navigator.pop(dialogContext);
-              creatorBloc.add(CreatorUpdateProductStatus(
-                productId: product.id,
-                status: 'Rejected',
-                approvedBy: adminName,
-                approvedByEmail: adminEmail,
-                rejectionReason: reason,
-              ));
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Rejected "${product.name}" with reason.')),
-              );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Rejected "${product.name}" with reason.'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
             style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
             child: const Text('Confirm Rejection'),
