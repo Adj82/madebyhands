@@ -40,16 +40,17 @@ class VerificationView extends StatelessWidget {
             }
 
             final docs = snapshot.data?.docs ?? [];
-            final profiles = docs.map((doc) => CreatorProfileModel.fromJson(doc.data())).toList();
+            final profiles = docs.map((doc) => CreatorProfileModel.fromJson(doc.data(), doc.id)).toList();
 
             List<CreatorProfile> pending = [];
             List<CreatorProfile> approved = [];
             List<CreatorProfile> rejected = [];
 
             for (var p in profiles) {
-              if (p.verificationStatus == 'Verified') {
+              final status = p.verificationStatus.trim();
+              if (status == 'Verified') {
                 approved.add(p);
-              } else if (p.verificationStatus == 'Rejected' || p.verificationStatus == 'Unverified') {
+              } else if (status == 'Rejected') {
                 rejected.add(p);
               } else {
                 pending.add(p);

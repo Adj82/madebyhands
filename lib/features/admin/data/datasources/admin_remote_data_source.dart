@@ -95,7 +95,7 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
     try {
       final snapshot = await firestore.collection('creator_profiles').get();
       return snapshot.docs
-          .map((doc) => CreatorProfileModel.fromJson(doc.data()))
+          .map((doc) => CreatorProfileModel.fromJson(doc.data(), doc.id))
           .toList();
     } catch (e) {
       throw Exception(e.toString());
@@ -106,15 +106,26 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   Future<void> approveCreator(String uid) async {
     try {
       final batch = firestore.batch();
-      batch.update(firestore.collection('creator_profiles').doc(uid), {'verificationStatus': 'Verified'});
-      batch.update(firestore.collection('users').doc(uid), {'isVerified': true});
-      
+      batch.set(
+        firestore.collection('creator_profiles').doc(uid),
+        {'verificationStatus': 'Verified', 'uid': uid},
+        SetOptions(merge: true),
+      );
+      batch.set(
+        firestore.collection('users').doc(uid),
+        {'isVerified': true},
+        SetOptions(merge: true),
+      );
+
       // Also activate products
-      final products = await firestore.collection('products').where('creatorUid', isEqualTo: uid).get();
+      final products = await firestore
+          .collection('products')
+          .where('creatorUid', isEqualTo: uid)
+          .get();
       for (var doc in products.docs) {
         batch.update(doc.reference, {'isActive': true});
       }
-      
+
       await batch.commit();
     } catch (e) {
       throw Exception(e.toString());
@@ -124,8 +135,18 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   @override
   Future<void> rejectCreator(String uid) async {
     try {
-      await firestore.collection('creator_profiles').doc(uid).update({'verificationStatus': 'Rejected'});
-      await firestore.collection('users').doc(uid).update({'isVerified': false});
+      final batch = firestore.batch();
+      batch.set(
+        firestore.collection('creator_profiles').doc(uid),
+        {'verificationStatus': 'Rejected', 'uid': uid},
+        SetOptions(merge: true),
+      );
+      batch.set(
+        firestore.collection('users').doc(uid),
+        {'isVerified': false},
+        SetOptions(merge: true),
+      );
+      await batch.commit();
     } catch (e) {
       throw Exception(e.toString());
     }

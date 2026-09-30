@@ -375,7 +375,7 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Showcase Portfolio (Optional)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
+        const Text('Showcase Portfolio (Recommended: 16:9)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
         const SizedBox(height: 10),
         SizedBox(
           height: 120,
