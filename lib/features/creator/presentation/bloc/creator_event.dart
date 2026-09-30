@@ -226,3 +226,13 @@ final class CreatorDeleteNotifications extends CreatorEvent {
     required this.uid,
   });
 }
+
+final class CreatorFetchBankAccount extends CreatorEvent {
+  final String uid;
+  CreatorFetchBankAccount(this.uid);
+}
+
+final class CreatorSaveBankAccount extends CreatorEvent {
+  final CreatorBankAccount bankDetail;
+  CreatorSaveBankAccount(this.bankDetail);
+}
