@@ -189,7 +189,12 @@ module.exports = async (req, res) => {
       const receipt = await admin.firestore().collection('paymentReceipts').doc(paymentId).get().catch(() => null);
       if (receipt?.exists) return res.status(200).json({ success: true, order_ids: receipt.data().orderIds });
       try {
-        const razorpay = new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET });
+        // Trim to match create-order; a stray newline in the env var would
+        // otherwise fail the refund after the payment was already captured.
+        const razorpay = new Razorpay({
+          key_id: (process.env.RAZORPAY_KEY_ID || '').trim(),
+          key_secret: (process.env.RAZORPAY_KEY_SECRET || '').trim(),
+        });
         await razorpay.payments.refund(paymentId, { amount: capture.payment.amount });
         return res.status(409).json({ success: false, refunded: true, error: 'Inventory changed during checkout. The payment has been refunded.' });
       } catch (refundError) {

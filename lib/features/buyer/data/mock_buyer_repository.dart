@@ -8,6 +8,7 @@ import 'package:madebyhands/features/buyer/domain/entities/product_review.dart';
 import 'package:madebyhands/features/buyer/domain/entities/public_creator.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
+import 'package:madebyhands/features/orders/domain/entities/marketplace_order.dart';
 import 'package:madebyhands/features/orders/domain/order_status.dart';
 
 class MockBuyerRepository implements BuyerRepository {
@@ -77,6 +78,10 @@ class MockBuyerRepository implements BuyerRepository {
 
   @override
   Stream<List<Product>> watchProducts() => Stream.value(mockProducts);
+
+  @override
+  Future<PlatformFeeSettings> getPlatformFeeSettings() async =>
+      const PlatformFeeSettings();
 
   @override
   Stream<List<PublicCreator>> watchPublicCreators() => Stream.value(const [

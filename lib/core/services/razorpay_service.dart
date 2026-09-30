@@ -1,8 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+// dart.library.js_interop is true for both dart2js and Wasm builds, while
+// dart.library.html is false under Wasm — which would silently select the
+// stub and make web checkout throw UnsupportedError.
 import 'razorpay_checkout_stub.dart'
-    if (dart.library.html) 'razorpay_checkout_web.dart';
+    if (dart.library.js_interop) 'razorpay_checkout_web.dart';
 
 class RazorpayService {
   Razorpay? _razorpay;
