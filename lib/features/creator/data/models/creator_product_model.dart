@@ -27,6 +27,7 @@ class CreatorProductModel extends CreatorProduct {
     super.editHistory,
     super.approvedBy,
     super.approvedByEmail,
+    super.rejectionReason,
   });
 
   Map<String, dynamic> toJson() {
@@ -56,6 +57,7 @@ class CreatorProductModel extends CreatorProduct {
       'editHistory': editHistory,
       'approvedBy': approvedBy,
       'approvedByEmail': approvedByEmail,
+      'rejectionReason': rejectionReason,
     };
   }
 
@@ -106,6 +108,7 @@ class CreatorProductModel extends CreatorProduct {
       editHistory: json['editHistory'] as Map<String, dynamic>?,
       approvedBy: json['approvedBy'] ?? '',
       approvedByEmail: json['approvedByEmail'] ?? '',
+      rejectionReason: json['rejectionReason'] ?? '',
     );
   }
 }

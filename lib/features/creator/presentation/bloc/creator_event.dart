@@ -166,12 +166,14 @@ final class CreatorUpdateProductStatus extends CreatorEvent {
   final String status;
   final String? approvedBy;
   final String? approvedByEmail;
+  final String? rejectionReason;
 
   CreatorUpdateProductStatus({
     required this.productId,
     required this.status,
     this.approvedBy,
     this.approvedByEmail,
+    this.rejectionReason,
   });
 }
 

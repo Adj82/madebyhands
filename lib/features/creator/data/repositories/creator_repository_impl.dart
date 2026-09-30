@@ -423,6 +423,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
     String status, {
     String? approvedBy,
     String? approvedByEmail,
+    String? rejectionReason,
   }) async {
     try {
       await remoteDataSource.updateProductStatus(
@@ -430,6 +431,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
         status,
         approvedBy: approvedBy,
         approvedByEmail: approvedByEmail,
+        rejectionReason: rejectionReason,
       );
       return right(null);
     } catch (e) {

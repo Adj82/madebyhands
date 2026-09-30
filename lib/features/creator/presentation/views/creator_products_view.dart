@@ -398,14 +398,42 @@ class _ProductListState extends State<_ProductList> {
                       color: AppColors.mutedText,
                     ),
                   ),
+                  if (product.status == 'Rejected' && product.rejectionReason.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline, size: 16, color: Colors.red),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Rejection Reason: ${product.rejectionReason}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.red.shade900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
-              trailing: product.status == 'Approved'
+              trailing: (product.status == 'Approved' || product.status == 'Rejected')
                   ? IconButton(
-                      icon: const Icon(
-                        Icons.edit_note,
-                        color: AppColors.primary,
+                      icon: Icon(
+                        product.status == 'Rejected' ? Icons.edit_outlined : Icons.edit_note,
+                        color: product.status == 'Rejected' ? Colors.redAccent : AppColors.primary,
                       ),
+                      tooltip: product.status == 'Rejected' ? 'Edit & Resubmit' : 'Edit Product',
                       onPressed: () {
                         Navigator.push(
                           context,
@@ -424,21 +452,15 @@ class _ProductListState extends State<_ProductList> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: product.status == 'Rejected'
-                            ? Colors.red.shade50
-                            : Colors.orange.shade50,
+                        color: Colors.orange.shade50,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        product.status == 'Pending Approval'
-                            ? 'Pending'
-                            : 'Rejected',
+                        'Pending',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: product.status == 'Rejected'
-                              ? Colors.red
-                              : Colors.orange.shade800,
+                          color: Colors.orange.shade800,
                         ),
                       ),
                     ),

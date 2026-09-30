@@ -269,6 +269,7 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
       event.status,
       approvedBy: event.approvedBy,
       approvedByEmail: event.approvedByEmail,
+      rejectionReason: event.rejectionReason,
     );
     res.fold((l) => emit(CreatorFailure(l.message)), (r) {
       add(CreatorFetchAdminAllProducts());

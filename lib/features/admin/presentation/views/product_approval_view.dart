@@ -154,20 +154,22 @@ class ProductApprovalView extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ],
+                              if (product.rejectionReason.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Reason: ${product.rejectionReason}',
+                                  style: const TextStyle(fontSize: 10, color: Colors.redAccent, fontWeight: FontWeight.w600),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                               const SizedBox(height: 8),
                               if (product.status == 'Pending Approval' || product.status == 'pending')
                                 Row(
                                   children: [
                                     Expanded(
                                       child: OutlinedButton(
-                                        onPressed: () {
-                                          context.read<CreatorBloc>().add(CreatorUpdateProductStatus(
-                                                productId: product.id,
-                                                status: 'Rejected',
-                                                approvedBy: adminName,
-                                                approvedByEmail: adminEmail,
-                                              ));
-                                        },
+                                        onPressed: () => _showRejectionDialog(context, product, adminName, adminEmail),
                                         style: OutlinedButton.styleFrom(
                                           padding: EdgeInsets.zero,
                                           foregroundColor: Colors.red,
@@ -228,6 +230,70 @@ class ProductApprovalView extends StatelessWidget {
                 );
               },
             ),
+    );
+  }
+
+  void _showRejectionDialog(
+    BuildContext context,
+    CreatorProduct product,
+    String adminName,
+    String adminEmail,
+  ) {
+    final reasonController = TextEditingController();
+    final creatorBloc = context.read<CreatorBloc>();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Reject "${product.name}"'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Please provide a reason for rejecting this product. The seller will see this feedback.',
+              style: TextStyle(fontSize: 12, color: AppColors.mutedText),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              autofocus: true,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Rejection Reason *',
+                hintText: 'e.g. Image resolution too low, inaccurate description',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final reason = reasonController.text.trim();
+              if (reason.isEmpty) return;
+
+              Navigator.pop(dialogContext);
+              creatorBloc.add(CreatorUpdateProductStatus(
+                productId: product.id,
+                status: 'Rejected',
+                approvedBy: adminName,
+                approvedByEmail: adminEmail,
+                rejectionReason: reason,
+              ));
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Rejected "${product.name}" with reason.')),
+              );
+            },
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Confirm Rejection'),
+          ),
+        ],
+      ),
     );
   }
 }

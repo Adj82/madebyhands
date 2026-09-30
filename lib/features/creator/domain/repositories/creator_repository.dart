@@ -93,6 +93,7 @@ abstract interface class CreatorRepository {
     String status, {
     String? approvedBy,
     String? approvedByEmail,
+    String? rejectionReason,
   });
 
   Future<Either<Failure, List<CreatorOrder>>> getCreatorOrders(String uid);

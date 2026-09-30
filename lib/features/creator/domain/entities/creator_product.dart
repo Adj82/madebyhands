@@ -23,6 +23,7 @@ class CreatorProduct {
   final Map<String, dynamic>? editHistory; // Stores previous values for comparison
   final String approvedBy;
   final String approvedByEmail;
+  final String rejectionReason;
 
   CreatorProduct({
     required this.id,
@@ -49,6 +50,7 @@ class CreatorProduct {
     this.editHistory,
     this.approvedBy = '',
     this.approvedByEmail = '',
+    this.rejectionReason = '',
   });
 }
 

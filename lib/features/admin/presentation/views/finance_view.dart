@@ -353,7 +353,7 @@ class FinanceView extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             Row(
-              mainAxisAlignment: MainAxisAlignment.between,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Settled Transactions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 Text('${releasedPayoutOrders.length} records', style: const TextStyle(color: AppColors.mutedText, fontSize: 12)),
