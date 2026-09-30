@@ -237,6 +237,7 @@ class FirestoreOrderRepository implements OrderRepository {
     String status, {
     String? rejectionReason,
     String? consignmentNumber,
+    String? carrierName,
   }) async {
     final orderRef = firestore.collection('orders').doc(orderId);
     final orderSnap = await orderRef.get();
@@ -351,6 +352,9 @@ class FirestoreOrderRepository implements OrderRepository {
         if (consignmentNumber != null && consignmentNumber.trim().isNotEmpty) {
           updateData['consignmentNumber'] = consignmentNumber.trim();
         }
+        if (carrierName != null && carrierName.trim().isNotEmpty) {
+          updateData['carrierName'] = carrierName.trim();
+        }
         transaction.update(orderRef, updateData);
       });
     } else {
@@ -360,6 +364,9 @@ class FirestoreOrderRepository implements OrderRepository {
       };
       if (consignmentNumber != null && consignmentNumber.trim().isNotEmpty) {
         updateData['consignmentNumber'] = consignmentNumber.trim();
+      }
+      if (carrierName != null && carrierName.trim().isNotEmpty) {
+        updateData['carrierName'] = carrierName.trim();
       }
       if (status == 'Delivered') {
         updateData['deliveredAt'] = FieldValue.serverTimestamp();

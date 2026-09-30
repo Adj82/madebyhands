@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:madebyhands/features/creator/data/models/creator_bank_account_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_notification_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_order_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_product_model.dart';
@@ -99,6 +100,12 @@ abstract interface class CreatorRemoteDataSource {
 
   /// Deletes a list of notifications.
   Future<void> deleteNotifications(List<String> notificationIds);
+
+  /// Fetches bank account details for a specific creator.
+  Future<CreatorBankAccountModel?> getCreatorBankAccount(String uid);
+
+  /// Saves or updates bank account details for a creator.
+  Future<void> saveCreatorBankAccount(CreatorBankAccountModel bankDetail);
 }
 
 class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
@@ -497,6 +504,38 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
       await batch.commit();
     } catch (_) {
       // Non-blocking catch
+    }
+  }
+
+  @override
+  Future<CreatorBankAccountModel?> getCreatorBankAccount(String uid) async {
+    try {
+      final doc =
+          await firestore.collection('creator_bank_accounts').doc(uid).get();
+      if (doc.exists && doc.data() != null) {
+        return CreatorBankAccountModel.fromJson(doc.data()!, uid);
+      }
+      return null;
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  @override
+  Future<void> saveCreatorBankAccount(
+    CreatorBankAccountModel bankDetail,
+  ) async {
+    try {
+      final docRef =
+          firestore.collection('creator_bank_accounts').doc(bankDetail.uid);
+      final docSnap = await docRef.get();
+      final data = bankDetail.toJson();
+      if (!docSnap.exists) {
+        data['createdAt'] = FieldValue.serverTimestamp();
+      }
+      await docRef.set(data, SetOptions(merge: true));
+    } catch (e) {
+      throw Exception(e.toString());
     }
   }
 }

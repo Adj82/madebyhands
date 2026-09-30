@@ -20,6 +20,7 @@ abstract interface class OrderRepository {
     String status, {
     String? rejectionReason,
     String? consignmentNumber,
+    String? carrierName,
   });
 
   Future<void> releasePayout(String orderId);

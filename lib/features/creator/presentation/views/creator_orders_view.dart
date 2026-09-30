@@ -776,115 +776,161 @@ class _OrderDetailSheet extends StatelessWidget {
     final confirmConsignmentController = TextEditingController(
       text: order.consignmentNumber ?? '',
     );
-    final carrierController = TextEditingController(
-      text: order.carrierName ?? '',
-    );
+    const List<String> courierOptions = [
+      'India Post (Speed Post)',
+      'XpressBees',
+      'Blue Dart',
+      'Delhivery',
+    ];
+    String? selectedCourier = courierOptions.contains(order.carrierName)
+        ? order.carrierName
+        : null;
+
     final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        scrollable: true,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Enter Dispatch Details'),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Please enter and confirm the consignment or reference number to move this order to In-Transit.',
-                  style: TextStyle(fontSize: 12, color: AppColors.mutedText),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: consignmentController,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Consignment / Reference Number *',
-                    hintText: 'e.g. SP123456789IN',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  validator: (v) {
-                    final trimmed = v?.trim() ?? '';
-                    if (trimmed.isEmpty) {
-                      return 'Consignment number is required.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 10),
-                TextFormField(
-                  controller: confirmConsignmentController,
-                  decoration: const InputDecoration(
-                    labelText: 'Confirm Consignment Number *',
-                    hintText: 'Re-enter consignment number',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  validator: (v) {
-                    final trimmed = v?.trim() ?? '';
-                    if (trimmed.isEmpty) {
-                      return 'Please confirm consignment number.';
-                    }
-                    if (trimmed != consignmentController.text.trim()) {
-                      return 'Consignment numbers do not match.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 10),
-                TextFormField(
-                  controller: carrierController,
-                  decoration: const InputDecoration(
-                    labelText: 'Carrier / Courier Name *',
-                    hintText: 'e.g. India Post, Blue Dart',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  validator: (value) {
-                    if ((value?.trim() ?? '').isEmpty) {
-                      return 'Carrier name is required.';
-                    }
-                    return null;
-                  },
-                ),
-              ],
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return AlertDialog(
+            scrollable: true,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                onStatusUpdateInitiated('In-Transit');
-                context.read<CreatorBloc>().add(
-                  CreatorUpdateOrderStatus(
-                    orderId: order.id,
-                    status: 'In-Transit',
-                    consignmentNumber: consignmentController.text.trim(),
-                    carrierName: carrierController.text.trim(),
-                    uid: profile.uid,
+            titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+            actionsPadding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            title: const Text('Enter Dispatch Details'),
+            content: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Please enter consignment details and select a courier partner to move this order to In-Transit.',
+                    style: TextStyle(fontSize: 12, color: AppColors.mutedText),
                   ),
-                );
-                Navigator.pop(dialogContext); // Close dialog
-                Navigator.pop(context); // Close bottom sheet
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: consignmentController,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Consignment / Reference Number *',
+                      hintText: 'e.g. SP123456789IN',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                    ),
+                    validator: (v) {
+                      final trimmed = v?.trim() ?? '';
+                      if (trimmed.isEmpty) {
+                        return 'Consignment number is required.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: confirmConsignmentController,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm Consignment Number *',
+                      hintText: 'Re-enter consignment number',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                    ),
+                    validator: (v) {
+                      final trimmed = v?.trim() ?? '';
+                      if (trimmed.isEmpty) {
+                        return 'Please confirm consignment number.';
+                      }
+                      if (trimmed != consignmentController.text.trim()) {
+                        return 'Consignment numbers do not match.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    value: selectedCourier,
+                    decoration: const InputDecoration(
+                      labelText: 'Courier / Carrier Partner *',
+                      hintText: 'Select Courier Partner',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                    ),
+                    items: courierOptions.map((courier) {
+                      return DropdownMenuItem<String>(
+                        value: courier,
+                        child: Text(
+                          courier,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      setDialogState(() {
+                        selectedCourier = val;
+                      });
+                    },
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) {
+                        return 'Please select a courier partner.';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
             ),
-            child: const Text('Confirm & Move to In-Transit'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (formKey.currentState!.validate()) {
+                    onStatusUpdateInitiated('In-Transit');
+                    context.read<CreatorBloc>().add(
+                          CreatorUpdateOrderStatus(
+                            orderId: order.id,
+                            status: 'In-Transit',
+                            consignmentNumber:
+                                consignmentController.text.trim(),
+                            carrierName: selectedCourier,
+                            uid: profile.uid,
+                          ),
+                        );
+                    Navigator.pop(dialogContext); // Close dialog
+                    Navigator.pop(context); // Close bottom sheet
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+                child: const Text('Confirm & Move to In-Transit'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

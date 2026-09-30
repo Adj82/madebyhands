@@ -50,6 +50,13 @@ final class CreatorNotificationsLoaded extends CreatorState {
   CreatorNotificationsLoaded(this.notifications);
 }
 
+final class CreatorBankAccountLoaded extends CreatorState {
+  final CreatorBankAccount? bankDetail;
+  CreatorBankAccountLoaded(this.bankDetail);
+}
+
+final class CreatorSaveBankAccountSuccess extends CreatorState {}
+
 final class CreatorFailure extends CreatorState {
   final String message;
   CreatorFailure(this.message);

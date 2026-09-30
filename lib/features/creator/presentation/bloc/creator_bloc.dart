@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_bank_account.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_notification.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
@@ -33,6 +34,8 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
     on<CreatorMarkNotificationAsRead>(_onMarkNotificationAsRead);
     on<CreatorMarkAllNotificationsAsRead>(_onMarkAllNotificationsAsRead);
     on<CreatorDeleteNotifications>(_onDeleteNotifications);
+    on<CreatorFetchBankAccount>(_onFetchBankAccount);
+    on<CreatorSaveBankAccount>(_onSaveBankAccount);
   }
 
   void _onCheckProfileExists(
@@ -347,6 +350,32 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
     res.fold(
       (l) => emit(CreatorFailure(l.message)),
       (r) => add(CreatorFetchNotifications(event.uid)),
+    );
+  }
+
+  void _onFetchBankAccount(
+    CreatorFetchBankAccount event,
+    Emitter<CreatorState> emit,
+  ) async {
+    emit(CreatorLoading());
+    final res = await _creatorRepository.getCreatorBankAccount(event.uid);
+    res.fold(
+      (l) => emit(CreatorFailure(l.message)),
+      (r) => emit(CreatorBankAccountLoaded(r)),
+    );
+  }
+
+  void _onSaveBankAccount(
+    CreatorSaveBankAccount event,
+    Emitter<CreatorState> emit,
+  ) async {
+    emit(CreatorLoading());
+    final res = await _creatorRepository.saveCreatorBankAccount(
+      event.bankDetail,
+    );
+    res.fold(
+      (l) => emit(CreatorFailure(l.message)),
+      (r) => emit(CreatorSaveBankAccountSuccess()),
     );
   }
 }
