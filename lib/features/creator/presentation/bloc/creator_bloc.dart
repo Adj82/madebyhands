@@ -316,7 +316,7 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
     }
     final res = await _creatorRepository.getCreatorNotifications(event.uid);
     res.fold(
-      (l) => emit(CreatorFailure(l.message)),
+      (l) => emit(CreatorNotificationsLoaded(const [])),
       (r) => emit(CreatorNotificationsLoaded(r)),
     );
   }

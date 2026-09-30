@@ -166,7 +166,7 @@ class FirestoreOrderRepository implements OrderRepository {
           'creatorNetAmount': fee.creatorNetAmount,
           'status': 'Placed',
           'paymentStatus': paymentStatus,
-          if (paymentId != null) 'paymentId': paymentId,
+          'paymentId': paymentId,
           'payoutStatus': 'pending',
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
@@ -190,11 +190,13 @@ class FirestoreOrderRepository implements OrderRepository {
         final notificationDocRef = firestore.collection('notifications').doc();
         batch.set(notificationDocRef, {
           'creatorUid': entry.key,
+          'userId': entry.key,
           'title': 'New Incoming Order! 🛒',
           'message':
               'You received a new order for ${creatorItems.length} item(s) totaling ₹$subtotal from $buyerName.',
           'type': 'order',
           'createdAt': FieldValue.serverTimestamp(),
+          'timestamp': FieldValue.serverTimestamp(),
           'isRead': false,
           'targetId': orderReferences[orderIndex++].id,
         });

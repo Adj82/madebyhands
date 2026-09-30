@@ -151,16 +151,7 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
-      allow read: if signedIn() && (
-        isAdminOrManager() ||
-        resource.data.creatorUid == request.auth.uid ||
-        resource.data.userId == request.auth.uid
-      );
-      allow create: if signedIn();
-      allow update: if signedIn() && (
-        resource.data.creatorUid == request.auth.uid ||
-        resource.data.userId == request.auth.uid
-      );
+      allow read, write: if signedIn();
     }
   }
 }
