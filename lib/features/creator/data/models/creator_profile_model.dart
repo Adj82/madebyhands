@@ -37,9 +37,15 @@ class CreatorProfileModel extends CreatorProfile {
     };
   }
 
-  factory CreatorProfileModel.fromJson(Map<String, dynamic> json) {
+  factory CreatorProfileModel.fromJson(
+    Map<String, dynamic> json, [
+    String? docId,
+  ]) {
+    final uidVal = (json['uid'] as String?)?.trim();
     return CreatorProfileModel(
-      uid: json['uid'] ?? '',
+      uid: (uidVal != null && uidVal.isNotEmpty)
+          ? uidVal
+          : (docId ?? ''),
       name: json['name'] ?? '',
       profileImage: json['profileImage'] ?? '',
       bio: json['bio'] ?? '',

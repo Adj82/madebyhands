@@ -58,7 +58,6 @@ class _AddProductPageState extends State<AddProductPage> {
 
   // Customization
   bool _isCustomizable = false;
-  final List<String> _selectedPredefinedCustomizations = [];
   final List<_CustomizationControllers> _customizationList = [];
 
   @override
@@ -78,7 +77,6 @@ class _AddProductPageState extends State<AddProductPage> {
     if (p != null) {
       _existingImageUrls.addAll(p.images);
       _isCustomizable = p.isCustomizable;
-      _selectedPredefinedCustomizations.addAll(p.predefinedCustomizations);
 
       if (p.categories.isNotEmpty) {
         _selectedCategories.addAll(p.categories);
@@ -208,10 +206,6 @@ class _AddProductPageState extends State<AddProductPage> {
             p.shippingInfo != _shippingController.text ||
             p.isCustomizable != _isCustomizable ||
             p.isFramed != finalIsFramed ||
-            !listEquals(
-              p.predefinedCustomizations,
-              _selectedPredefinedCustomizations,
-            ) ||
             _imageFiles.isNotEmpty ||
             _existingImageUrls.length != p.images.length;
 
@@ -241,8 +235,7 @@ class _AddProductPageState extends State<AddProductPage> {
                 creatorName: widget.profile.name,
                 isCustomizable: _isCustomizable,
                 isFramed: finalIsFramed,
-                predefinedCustomizations:
-                    _isCustomizable ? _selectedPredefinedCustomizations : const [],
+                predefinedCustomizations: const [],
                 customizations: customizations,
                 hasChanges: hasChanges,
               ),
@@ -266,8 +259,7 @@ class _AddProductPageState extends State<AddProductPage> {
                 creatorName: widget.profile.name,
                 isCustomizable: _isCustomizable,
                 isFramed: finalIsFramed,
-                predefinedCustomizations:
-                    _isCustomizable ? _selectedPredefinedCustomizations : const [],
+                predefinedCustomizations: const [],
                 customizations: customizations,
               ),
             );
@@ -805,7 +797,6 @@ class _AddProductPageState extends State<AddProductPage> {
                 isSelected: !_isCustomizable,
                 onSelected: (v) => setState(() {
                   _isCustomizable = false;
-                  _selectedPredefinedCustomizations.clear();
                   _customizationList.clear();
                 }),
               ),
@@ -827,102 +818,10 @@ class _AddProductPageState extends State<AddProductPage> {
     );
   }
 
-  Widget _buildCommonCustomizationsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Common Customizations',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: AppColors.primary,
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Select common customization types you offer for this product:',
-          style: TextStyle(fontSize: 12, color: AppColors.mutedText),
-        ),
-        const SizedBox(height: 12),
-        ..._predefinedOptions.map((option) {
-          final isSelected =
-              _selectedPredefinedCustomizations.contains(option.id);
-          return Card(
-            margin: const EdgeInsets.only(bottom: 10),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(
-                color: isSelected
-                    ? AppColors.primary
-                    : AppColors.outline.withValues(alpha: 0.5),
-                width: isSelected ? 1.5 : 1.0,
-              ),
-            ),
-            color: isSelected
-                ? AppColors.primary.withValues(alpha: 0.05)
-                : AppColors.surface,
-            child: CheckboxListTile(
-              value: isSelected,
-              activeColor: AppColors.primary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              secondary: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppColors.primary.withValues(alpha: 0.1)
-                      : AppColors.outline.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  option.icon,
-                  color: isSelected ? AppColors.primary : AppColors.mutedText,
-                  size: 20,
-                ),
-              ),
-              title: Text(
-                option.title,
-                style: TextStyle(
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-              subtitle: Text(
-                option.description,
-                style:
-                    const TextStyle(fontSize: 12, color: AppColors.mutedText),
-              ),
-              onChanged: (bool? selected) {
-                setState(() {
-                  if (selected == true) {
-                    if (!_selectedPredefinedCustomizations
-                        .contains(option.id)) {
-                      _selectedPredefinedCustomizations.add(option.id);
-                    }
-                  } else {
-                    _selectedPredefinedCustomizations.remove(option.id);
-                  }
-                });
-              },
-            ),
-          );
-        }),
-      ],
-    );
-  }
-
   Widget _buildCustomizationSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildCommonCustomizationsSection(),
-        const SizedBox(height: 24),
-        const Divider(),
-        const SizedBox(height: 16),
         const Text(
           'Define Customizations (Max 5)',
           style: TextStyle(
@@ -1449,50 +1348,3 @@ class _CustomizationControllers {
     }
   }
 }
-
-class _PredefinedOption {
-  final String id;
-  final String title;
-  final String description;
-  final IconData icon;
-
-  const _PredefinedOption({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.icon,
-  });
-}
-
-const List<_PredefinedOption> _predefinedOptions = [
-  _PredefinedOption(
-    id: 'Name/Text',
-    title: 'Name/Text',
-    description: 'Buyers can customize their name or any text on the product.',
-    icon: Icons.edit_note,
-  ),
-  _PredefinedOption(
-    id: 'Color',
-    title: 'Color',
-    description: 'Buyers can customize the color of the product.',
-    icon: Icons.palette_outlined,
-  ),
-  _PredefinedOption(
-    id: 'Size',
-    title: 'Size',
-    description: 'Buyers can customize the size of the product.',
-    icon: Icons.aspect_ratio,
-  ),
-  _PredefinedOption(
-    id: 'Design',
-    title: 'Design',
-    description: 'Buyers can customize the design of the product.',
-    icon: Icons.brush_outlined,
-  ),
-  _PredefinedOption(
-    id: 'Material',
-    title: 'Material',
-    description: 'Buyers can customize the material of the product.',
-    icon: Icons.texture,
-  ),
-];
