@@ -16,27 +16,49 @@ class WelcomeScreen extends StatefulWidget {
 class _WelcomeScreenState extends State<WelcomeScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  bool _termsAccepted = true; // Pre-ticked checkbox by default
 
   final List<OnboardingData> _onboardingPages = [
     OnboardingData(
       title: 'Crafted with Soul',
-      subtitle: 'Discover unique handmade pieces that carry the spirit of the artist who made them.',
-      imageUrl: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?q=80&w=1000&auto=format&fit=crop',
+      subtitle:
+          'Discover unique handmade pieces that carry the spirit of the artist who made them.',
+      imageUrl:
+          'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?q=80&w=1000&auto=format&fit=crop',
       color: AppColors.primary,
     ),
     OnboardingData(
       title: 'Stories in Every Thread',
-      subtitle: 'Connect with independent Indian artisans and support traditional craftsmanship.',
-      imageUrl: 'https://images.unsplash.com/photo-1610701596007-11502861dcfa?q=80&w=1000&auto=format&fit=crop',
+      subtitle:
+          'Connect with independent Indian artisans and support traditional craftsmanship.',
+      imageUrl:
+          'https://images.unsplash.com/photo-1610701596007-11502861dcfa?q=80&w=1000&auto=format&fit=crop',
       color: AppColors.accent,
     ),
     OnboardingData(
       title: 'Experience Authenticity',
-      subtitle: 'A marketplace built for creators, by people who value the beauty of the handmade.',
-      imageUrl: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?q=80&w=1000&auto=format&fit=crop',
+      subtitle:
+          'A marketplace built for creators, by people who value the beauty of the handmade.',
+      imageUrl:
+          'https://images.unsplash.com/photo-1513364776144-60967b0f800f?q=80&w=1000&auto=format&fit=crop',
       color: AppColors.primaryDark,
     ),
   ];
+
+  void _handleLogin() {
+    if (!_termsAccepted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please accept the Terms and Conditions to continue login.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    context.read<AuthBloc>().add(AuthGoogleSignInRequested());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +68,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         listener: (context, state) {
           if (state is AuthFailure) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message), backgroundColor: Colors.redAccent),
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.redAccent,
+              ),
             );
           }
         },
@@ -60,7 +85,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   key: ValueKey(_currentPage),
                   decoration: BoxDecoration(
                     image: DecorationImage(
-                      image: NetworkImage(_onboardingPages[_currentPage].imageUrl),
+                      image: NetworkImage(
+                        _onboardingPages[_currentPage].imageUrl,
+                      ),
                       fit: BoxFit.cover,
                       colorFilter: ColorFilter.mode(
                         Colors.black.withValues(alpha: 0.35),
@@ -106,11 +133,19 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             fontWeight: FontWeight.w900,
                             letterSpacing: 4,
                           ),
-                        ).animate().fadeIn(duration: 800.ms).slideX(begin: -0.2),
+                        )
+                            .animate()
+                            .fadeIn(duration: 800.ms)
+                            .slideX(begin: -0.2),
                         if (_currentPage < _onboardingPages.length - 1)
                           TextButton(
-                            onPressed: () => _pageController.jumpToPage(_onboardingPages.length - 1),
-                            child: const Text('Skip', style: TextStyle(color: Colors.white70)),
+                            onPressed: () => _pageController.jumpToPage(
+                              _onboardingPages.length - 1,
+                            ),
+                            child: const Text(
+                              'Skip',
+                              style: TextStyle(color: Colors.white70),
+                            ),
                           ),
                       ],
                     ),
@@ -123,7 +158,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     height: 220,
                     child: PageView.builder(
                       controller: _pageController,
-                      onPageChanged: (index) => setState(() => _currentPage = index),
+                      onPageChanged: (index) =>
+                          setState(() => _currentPage = index),
                       itemCount: _onboardingPages.length,
                       itemBuilder: (context, index) {
                         return Padding(
@@ -133,20 +169,34 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             children: [
                               Text(
                                 _onboardingPages[index].title,
-                                style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                                  color: index == _currentPage ? AppColors.text : Colors.white,
-                                  height: 1.1,
-                                ),
-                              ).animate(key: ValueKey('title_$index')).fadeIn(delay: 200.ms).slideY(begin: 0.2),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .displayMedium
+                                    ?.copyWith(
+                                      color: index == _currentPage
+                                          ? AppColors.text
+                                          : Colors.white,
+                                      height: 1.1,
+                                    ),
+                              )
+                                  .animate(key: ValueKey('title_$index'))
+                                  .fadeIn(delay: 200.ms)
+                                  .slideY(begin: 0.2),
                               const SizedBox(height: 20),
                               Text(
                                 _onboardingPages[index].subtitle,
-                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                  color: AppColors.mutedText,
-                                  fontSize: 16,
-                                  height: 1.5,
-                                ),
-                              ).animate(key: ValueKey('sub_$index')).fadeIn(delay: 400.ms).slideY(begin: 0.2),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.copyWith(
+                                      color: AppColors.mutedText,
+                                      fontSize: 16,
+                                      height: 1.5,
+                                    ),
+                              )
+                                  .animate(key: ValueKey('sub_$index'))
+                                  .fadeIn(delay: 400.ms)
+                                  .slideY(begin: 0.2),
                             ],
                           ),
                         );
@@ -173,7 +223,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                 spacing: 10,
                               ),
                             ),
-                            
+
                             // Action Button
                             _currentPage == _onboardingPages.length - 1
                                 ? const SizedBox.shrink()
@@ -184,7 +234,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                     ),
                                     backgroundColor: AppColors.primary,
                                     elevation: 0,
-                                    child: const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 24),
+                                    child: const Icon(
+                                      Icons.arrow_forward_ios,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
                                   ).animate().scale().fadeIn(),
                           ],
                         ),
@@ -194,22 +248,69 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             children: [
                               const SizedBox(height: 20),
                               FilledButton.icon(
-                                onPressed: state is AuthLoading
-                                    ? null
-                                    : () => context.read<AuthBloc>().add(AuthGoogleSignInRequested()),
+                                onPressed: state is AuthLoading ? null : _handleLogin,
                                 icon: state is AuthLoading
                                     ? const SizedBox(
-                                        height: 20, 
-                                        width: 20, 
-                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
                                       )
-                                    : Image.asset('assets/images/icon_google.png', height: 24, errorBuilder: (context, error, stackTrace) => const Icon(Icons.login)),
+                                    : Image.asset(
+                                        'assets/images/icon_google.png',
+                                        height: 24,
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                const Icon(Icons.login),
+                                      ),
                                 label: const Text('Continue with Google'),
                               ).animate().slideY(begin: 0.5).fadeIn(),
-                              const SizedBox(height: 20),
-                              Text(
-                                'By joining, you agree to our Terms and Conditions',
-                                style: TextStyle(color: AppColors.mutedText, fontSize: 12),
+                              const SizedBox(height: 16),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: Checkbox(
+                                      value: _termsAccepted,
+                                      activeColor: AppColors.primary,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      onChanged: (val) {
+                                        setState(() {
+                                          _termsAccepted = val ?? false;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          _termsAccepted = !_termsAccepted;
+                                        });
+                                      },
+                                      child: Text(
+                                        'By joining, you agree to our Terms and Conditions',
+                                        style: TextStyle(
+                                          color: _termsAccepted
+                                              ? AppColors.mutedText
+                                              : Colors.red.shade700,
+                                          fontSize: 12,
+                                          fontWeight: _termsAccepted
+                                              ? FontWeight.normal
+                                              : FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

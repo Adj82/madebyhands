@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 
@@ -58,26 +59,38 @@ class _PhoneCompletionPageState extends State<PhoneCompletionPage> {
                 LengthLimitingTextInputFormatter(10),
               ],
               decoration: const InputDecoration(
-                labelText: 'Phone number',
+                labelText: 'Phone number *',
+                hintText: '10-digit mobile number',
                 prefixText: '+91 ',
+                prefixStyle: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: AppColors.text,
+                ),
               ),
               validator: (value) {
                 final digits = value?.replaceAll(RegExp(r'\D'), '') ?? '';
-                return digits.length == 10
-                    ? null
-                    : 'Enter a valid 10-digit phone number';
+                if (digits.isEmpty) {
+                  return 'Phone number is required.';
+                }
+                if (digits.length != 10) {
+                  return 'Enter a valid 10-digit phone number.';
+                }
+                return null;
               },
             ),
             const SizedBox(height: 20),
             FilledButton(
               onPressed: () {
                 if (!_formKey.currentState!.validate()) return;
+                final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
+                final fullPhone = '+91$digits';
                 context.read<AuthBloc>().add(
                   AuthSignUpWithRoleRequested(
                     uid: widget.user.uid,
                     email: widget.user.email,
                     name: widget.user.name,
-                    phone: _phone.text.trim(),
+                    phone: fullPhone,
                     role: widget.user.role,
                   ),
                 );
