@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:madebyhands/features/auth/data/models/user_model.dart';
@@ -21,6 +22,7 @@ abstract interface class AuthRemoteDataSource {
   });
   Future<void> sendPasswordReset(String email);
   Future<void> requestAccountDeletion(UserModel user);
+  Future<void> deleteAccount(String uid);
   Future<void> signOut();
 }
 
@@ -237,13 +239,125 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       'type': 'admin',
       'category': 'deletion_request',
       'title': 'Account Deletion Request ⚠️',
-      'message': '${user.name.isNotEmpty ? user.name : "A user"} (${user.email}) requested permanent account deletion.',
+      'message':
+          '${user.name.isNotEmpty ? user.name : "A user"} (${user.email}) requested permanent account deletion.',
       'targetId': user.uid,
       'createdAt': FieldValue.serverTimestamp(),
       'isRead': false,
     });
 
     await batch.commit();
+  }
+
+  @override
+  Future<void> deleteAccount(String uid) async {
+    final currentUser = firebaseAuth.currentUser;
+
+    try {
+      // 1. Fetch user role safely
+      DocumentSnapshot<Map<String, dynamic>>? userDoc;
+      try {
+        userDoc = await firestore.collection('users').doc(uid).get();
+      } catch (_) {}
+
+      final role = userDoc?.data()?['role'] as String? ?? '';
+
+      // 2. Safely clean up Firestore subcollections & documents
+      if (role == 'creator') {
+        try {
+          await firestore.collection('creator_profiles').doc(uid).delete();
+        } catch (_) {}
+        try {
+          await firestore.collection('creator_bank_accounts').doc(uid).delete();
+        } catch (_) {}
+        try {
+          final products = await firestore
+              .collection('products')
+              .where('creatorUid', isEqualTo: uid)
+              .get();
+          for (final doc in products.docs) {
+            try {
+              await doc.reference.delete();
+            } catch (_) {}
+          }
+        } catch (_) {}
+        try {
+          final notifications = await firestore
+              .collection('notifications')
+              .where('creatorUid', isEqualTo: uid)
+              .get();
+          for (final doc in notifications.docs) {
+            try {
+              await doc.reference.delete();
+            } catch (_) {}
+          }
+        } catch (_) {}
+
+        try {
+          final storage = FirebaseStorage.instance;
+          final result = await storage.ref('creator_profiles/$uid').listAll();
+          for (final item in result.items) {
+            try {
+              await item.delete();
+            } catch (_) {}
+          }
+        } catch (_) {}
+      } else if (role == 'buyer') {
+        try {
+          final favs = await firestore
+              .collection('users')
+              .doc(uid)
+              .collection('favorites')
+              .get();
+          for (final doc in favs.docs) {
+            try {
+              await doc.reference.delete();
+            } catch (_) {}
+          }
+        } catch (_) {}
+        try {
+          final addrs = await firestore
+              .collection('users')
+              .doc(uid)
+              .collection('addresses')
+              .get();
+          for (final doc in addrs.docs) {
+            try {
+              await doc.reference.delete();
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+
+      // 3. Delete main user document
+      try {
+        await firestore.collection('users').doc(uid).delete();
+      } catch (_) {}
+
+      // 4. Delete Firebase Auth User
+      if (currentUser != null && currentUser.uid == uid) {
+        await currentUser.delete();
+      }
+
+      // 5. Sign out Google
+      try {
+        await googleSignIn.signOut();
+      } catch (_) {}
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        throw Exception(
+          'For security reasons, please sign out and sign in again before deleting your account.',
+        );
+      }
+      throw Exception(
+        e.message ?? 'An error occurred while deleting your account.',
+      );
+    } catch (e) {
+      if (firebaseAuth.currentUser == null) {
+        return;
+      }
+      throw Exception('An error occurred while deleting your account: $e');
+    }
   }
 
   @override

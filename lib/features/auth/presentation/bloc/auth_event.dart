@@ -27,4 +27,13 @@ final class AuthSignUpWithRoleRequested extends AuthEvent {
 
 final class AuthIsUserLoggedIn extends AuthEvent {}
 
+final class AuthDeleteAccountRequested extends AuthEvent {
+  final String uid;
+
+  const AuthDeleteAccountRequested(this.uid);
+
+  @override
+  List<Object> get props => [uid];
+}
+
 final class AuthLogoutRequested extends AuthEvent {}
