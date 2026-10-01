@@ -160,10 +160,21 @@ class FirestoreSupportRepository implements SupportRepository {
 
     final ticket = firestore.collection('support_tickets').doc();
     final firstMessage = ticket.collection('messages').doc();
+    final adminNotificationRef = firestore.collection('notifications').doc();
+    final userRef = firestore.collection('users').doc(userId);
+
     final batch = firestore.batch();
 
     final messageText = 'Account Deletion Request Reason: $reason';
 
+    // 1. Mark deletion requested on user document
+    batch.update(userRef, {
+      'isDeletionRequested': true,
+      'deletionReason': reason,
+      'deletionRequestedAt': FieldValue.serverTimestamp(),
+    });
+
+    // 2. Write support ticket
     batch.set(ticket, {
       'userId': userId,
       'userRole': 'creator',
@@ -183,6 +194,18 @@ class FirestoreSupportRepository implements SupportRepository {
       'senderRole': 'creator',
       'message': messageText,
       'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    // 3. Write admin notification
+    batch.set(adminNotificationRef, {
+      'type': 'admin',
+      'category': 'deletion_request',
+      'title': 'Account Deletion Request ⚠️',
+      'message': '$userName requested account deletion. Reason: "$reason"',
+      'targetId': userId,
+      'ticketId': ticket.id,
+      'createdAt': FieldValue.serverTimestamp(),
+      'isRead': false,
     });
 
     await batch.commit();
@@ -266,6 +289,11 @@ class FirestoreSupportRepository implements SupportRepository {
       'requestStatus': 'Rejected',
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    final userRef = firestore.collection('users').doc(creatorUid);
+    batch.set(userRef, {
+      'isDeletionRequested': false,
+    }, SetOptions(merge: true));
 
     final msgRef = ticketRef.collection('messages').doc();
     batch.set(msgRef, {

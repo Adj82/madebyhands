@@ -183,31 +183,65 @@ class AdminDashboardPage extends StatelessWidget {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance.collection('notifications').snapshots(),
       builder: (context, snapshot) {
-        int unreadCount = 0;
-        final List<Map<String, dynamic>> adminNotifications = [];
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('support_tickets')
+              .snapshots(),
+          builder: (context, ticketSnapshot) {
+            int unreadCount = 0;
+            final List<Map<String, dynamic>> adminNotifications = [];
+            final Set<String> addedTicketIds = {};
 
-        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-          for (var doc in snapshot.data!.docs) {
-            final data = doc.data();
-            final type = data['type'] as String? ?? 'general';
-            final isRead = data['isRead'] as bool? ?? false;
+            if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+              for (var doc in snapshot.data!.docs) {
+                final data = doc.data();
+                final type = data['type'] as String? ?? 'general';
+                final isRead = data['isRead'] as bool? ?? false;
 
-            if (type == 'admin' || type == 'general' || data['category'] == 'deletion_request') {
-              adminNotifications.add({'id': doc.id, ...data});
-              if (!isRead) unreadCount++;
+                if (type == 'admin' || type == 'general' || data['category'] == 'deletion_request') {
+                  adminNotifications.add({'id': doc.id, ...data});
+                  if (data['ticketId'] != null) addedTicketIds.add(data['ticketId'] as String);
+                  if (!isRead) unreadCount++;
+                }
+              }
             }
-          }
-        }
 
-        return IconButton(
-          tooltip: 'Admin Notifications',
-          onPressed: () => _showAdminNotificationsModal(context, adminNotifications),
-          icon: Badge(
-            isLabelVisible: unreadCount > 0,
-            label: Text('$unreadCount'),
-            backgroundColor: Colors.redAccent,
-            child: const Icon(Icons.notifications_outlined),
-          ),
+            // Stream deletion support tickets directly so deletion requests NEVER miss!
+            if (ticketSnapshot.hasData && ticketSnapshot.data!.docs.isNotEmpty) {
+              for (var doc in ticketSnapshot.data!.docs) {
+                final data = doc.data();
+                final requestStatus = data['requestStatus'] as String? ?? 'Pending';
+                final status = data['status'] as String? ?? 'open';
+                final isDeletionTicket = data['type'] == 'account_deletion' ||
+                    data['subject'] == 'Account Deletion Request';
+
+                if (isDeletionTicket && requestStatus == 'Pending' && status == 'open' && !addedTicketIds.contains(doc.id)) {
+                  adminNotifications.add({
+                    'id': doc.id,
+                    'type': 'admin',
+                    'category': 'deletion_request',
+                    'title': 'Account Deletion Request ⚠️',
+                    'message': '${data['userName'] ?? "User"} requested account deletion. Reason: "${data['reason'] ?? data['lastMessage'] ?? "N/A"}"',
+                    'targetId': data['userId'],
+                    'ticketId': doc.id,
+                    'isRead': false,
+                  });
+                  unreadCount++;
+                }
+              }
+            }
+
+            return IconButton(
+              tooltip: 'Admin Notifications',
+              onPressed: () => _showAdminNotificationsModal(context, adminNotifications),
+              icon: Badge(
+                isLabelVisible: unreadCount > 0,
+                label: Text('$unreadCount'),
+                backgroundColor: Colors.redAccent,
+                child: const Icon(Icons.notifications_outlined),
+              ),
+            );
+          },
         );
       },
     );
@@ -289,11 +323,15 @@ class AdminDashboardPage extends StatelessWidget {
                                 : IconButton(
                                     icon: Icon(isRead ? Icons.check_circle : Icons.circle_outlined, size: 20, color: isRead ? Colors.green : Colors.grey),
                                     onPressed: () {
-                                      FirebaseFirestore.instance.collection('notifications').doc(id).update({'isRead': !isRead});
+                                      try {
+                                        FirebaseFirestore.instance.collection('notifications').doc(id).update({'isRead': !isRead});
+                                      } catch (_) {}
                                     },
                                   ),
                             onTap: () {
-                              FirebaseFirestore.instance.collection('notifications').doc(id).update({'isRead': true});
+                              try {
+                                FirebaseFirestore.instance.collection('notifications').doc(id).update({'isRead': true});
+                              } catch (_) {}
                               Navigator.pop(modalContext);
                               if (category == 'deletion_request') {
                                 context.read<AdminCubit>().changePage(5);
