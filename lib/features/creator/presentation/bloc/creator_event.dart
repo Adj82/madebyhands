@@ -20,6 +20,10 @@ final class CreatorSubmitOnboarding extends CreatorEvent {
   final String story;
   final String? existingProfileImageUrl;
   final List<String>? existingPortfolioUrls;
+  final File? panCardFile;
+  final File? aadhaarCardFile;
+  final String? existingPanCardUrl;
+  final String? existingAadhaarCardUrl;
 
   CreatorSubmitOnboarding({
     required this.uid,
@@ -33,6 +37,10 @@ final class CreatorSubmitOnboarding extends CreatorEvent {
     required this.story,
     this.existingProfileImageUrl,
     this.existingPortfolioUrls,
+    this.panCardFile,
+    this.aadhaarCardFile,
+    this.existingPanCardUrl,
+    this.existingAadhaarCardUrl,
   });
 }
 

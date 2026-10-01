@@ -7,7 +7,7 @@ import 'package:madebyhands/features/creator/domain/entities/creator_order.dart'
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 
-abstract interface class CreatorRepository {
+abstract class CreatorRepository {
   Future<Either<Failure, CreatorProfile?>> getCreatorProfile(String uid);
 
   Future<Either<Failure, void>> saveCreatorProfile({
@@ -22,6 +22,10 @@ abstract interface class CreatorRepository {
     required String story,
     String? existingProfileImageUrl,
     List<String>? existingPortfolioUrls,
+    File? panCardFile,
+    File? aadhaarCardFile,
+    String? existingPanCardUrl,
+    String? existingAadhaarCardUrl,
   });
 
   Future<Either<Failure, void>> submitVerification({

@@ -70,6 +70,10 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
       story: event.story,
       existingProfileImageUrl: event.existingProfileImageUrl,
       existingPortfolioUrls: event.existingPortfolioUrls,
+      panCardFile: event.panCardFile,
+      aadhaarCardFile: event.aadhaarCardFile,
+      existingPanCardUrl: event.existingPanCardUrl,
+      existingAadhaarCardUrl: event.existingAadhaarCardUrl,
     );
 
     res.fold(
