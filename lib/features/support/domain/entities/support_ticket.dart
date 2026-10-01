@@ -30,6 +30,7 @@ class SupportTicket {
   bool get isOpen => status == 'open';
   bool get isAccountDeletionRequest =>
       type == 'account_deletion' || subject == 'Account Deletion Request';
+  bool get isAccountDeletion => isAccountDeletionRequest;
 }
 
 class SupportMessage {

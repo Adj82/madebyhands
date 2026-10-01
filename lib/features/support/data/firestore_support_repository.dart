@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:madebyhands/features/support/data/models/support_message_model.dart';
 import 'package:madebyhands/features/support/data/models/support_ticket_model.dart';
-import 'package:madebyhands/features/support/domain/entities/support_message.dart';
 import 'package:madebyhands/features/support/domain/entities/support_ticket.dart';
 import 'package:madebyhands/features/support/domain/repositories/support_repository.dart';
 
