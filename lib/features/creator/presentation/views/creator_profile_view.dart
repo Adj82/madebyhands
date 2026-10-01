@@ -9,9 +9,6 @@ import 'package:madebyhands/features/creator/presentation/pages/creator_onboardi
 import 'package:madebyhands/features/creator/presentation/pages/manage_bank_account_page.dart';
 import 'package:madebyhands/features/creator/presentation/pages/privacy_policy_page.dart';
 import 'package:madebyhands/features/creator/presentation/pages/terms_and_conditions_page.dart';
-import 'package:madebyhands/features/support/domain/entities/support_ticket.dart';
-import 'package:madebyhands/features/support/domain/repositories/support_repository.dart';
-import 'package:madebyhands/init_dependencies.dart';
 
 class CreatorProfileView extends StatefulWidget {
   final CreatorProfile profile;
@@ -72,7 +69,6 @@ class _CreatorProfileViewState extends State<CreatorProfileView> {
                 const SizedBox(height: 10),
                 _buildProfileCard(profile),
                 const SizedBox(height: 24),
-                _buildDeletionRequestStatusCard(profile),
                 _buildActionItem(
                   icon: Icons.edit_outlined,
                   title: 'Edit Creator Profile',
@@ -135,11 +131,11 @@ class _CreatorProfileViewState extends State<CreatorProfileView> {
                 ),
                 _buildActionItem(
                   icon: Icons.delete_forever_outlined,
-                  title: 'Request Account Deletion',
+                  title: 'Delete Account',
                   subtitle:
-                      'Submit a request to delete your creator account and data',
+                      'Permanently delete your creator account, products, and studio data',
                   badgeColor: Colors.red,
-                  onTap: () => _showAccountDeletionDialog(profile),
+                  onTap: () => _confirmAccountDeletion(profile),
                 ),
                 const SizedBox(height: 30),
                 OutlinedButton.icon(
@@ -248,229 +244,44 @@ class _CreatorProfileViewState extends State<CreatorProfileView> {
     );
   }
 
-  Widget _buildDeletionRequestStatusCard(CreatorProfile profile) {
-    final supportRepo = serviceLocator<SupportRepository>();
-    return StreamBuilder<SupportTicket?>(
-      stream: supportRepo.watchLatestDeletionRequest(profile.uid),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data == null) {
-          return const SizedBox.shrink();
-        }
-
-        final ticket = snapshot.data!;
-        Color statusColor;
-        switch (ticket.requestStatus) {
-          case 'Approved':
-            statusColor = Colors.green;
-            break;
-          case 'Rejected':
-            statusColor = Colors.red;
-            break;
-          case 'Pending':
-          default:
-            statusColor = Colors.orange;
-        }
-
-        return Container(
-          width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: statusColor.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.person_remove_outlined,
-                          color: statusColor, size: 20),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Account Deletion Request',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      ticket.requestStatus,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: statusColor,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                ticket.requestStatus == 'Pending'
-                    ? 'Your request is pending Admin review and approval.'
-                    : (ticket.requestStatus == 'Approved'
-                        ? 'Your account deletion request has been approved and processed.'
-                        : 'Your account deletion request was rejected by Admin.'),
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.mutedText),
-              ),
-              if (ticket.reason.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Text(
-                  'Reason: "${ticket.reason}"',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _showAccountDeletionDialog(CreatorProfile profile) async {
-    final supportRepo = serviceLocator<SupportRepository>();
-
-    final latestTicket =
-        await supportRepo.watchLatestDeletionRequest(profile.uid).first;
-
-    if (!mounted) return;
-
-    if (latestTicket != null &&
-        latestTicket.requestStatus == 'Pending' &&
-        latestTicket.isOpen) {
-      showDialog(
-        context: context,
-        builder: (dialogCtx) => AlertDialog(
-          title: const Text('Active Request Pending'),
-          content: const Text(
-            'You already have an active pending account deletion request under Admin review. Please wait for Admin approval or response.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogCtx),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    final reasonController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    if (!mounted) return;
-
-    showDialog(
+  Future<void> _confirmAccountDeletion(CreatorProfile profile) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
         title: const Row(
           children: [
             Icon(Icons.warning_amber_rounded, color: Colors.red),
             SizedBox(width: 8),
-            Text('Request Account Deletion'),
+            Expanded(
+              child: Text(
+                'Permanently Delete Account?',
+                style: TextStyle(color: Colors.red, fontSize: 18),
+              ),
+            ),
           ],
         ),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Submitting this request will create an official support ticket for Admin review. Your account will NOT be deleted immediately and will only be executed after Admin approval.',
-                  style: TextStyle(fontSize: 13, color: AppColors.mutedText),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: reasonController,
-                  autofocus: true,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Why do you want to delete your account? *',
-                    hintText: 'Enter reason for requesting account deletion...',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (v) {
-                    final trimmed = v?.trim() ?? '';
-                    if (trimmed.isEmpty) {
-                      return 'Please enter a reason for account deletion.';
-                    }
-                    if (trimmed.length < 5) {
-                      return 'Reason must be at least 5 characters.';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ),
-          ),
+        content: const Text(
+          'Are you sure you want to permanently delete your creator account? Your studio profile, products, bank details, and all associated data will be immediately and permanently deleted. This action cannot be undone.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogCtx),
+            onPressed: () => Navigator.pop(dialogCtx, false),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                final reason = reasonController.text.trim();
-                try {
-                  await supportRepo.createAccountDeletionRequest(
-                    userId: profile.uid,
-                    userName: profile.name,
-                    reason: reason,
-                  );
-                  if (mounted) {
-                    if (dialogCtx.mounted) Navigator.pop(dialogCtx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Account deletion request submitted for Admin review.',
-                        ),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              }
-            },
+            onPressed: () => Navigator.pop(dialogCtx, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Submit Request'),
+            child: const Text('Permanently Delete'),
           ),
         ],
       ),
     );
+
+    if (confirmed == true && mounted) {
+      context.read<AuthBloc>().add(AuthDeleteAccountRequested(profile.uid));
+    }
   }
 }

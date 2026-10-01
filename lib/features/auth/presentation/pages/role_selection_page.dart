@@ -27,12 +27,14 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
 
   void _submit(String role) {
     if (!_formKey.currentState!.validate()) return;
+    final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
+    final fullPhone = '+91$digits';
     context.read<AuthBloc>().add(
       AuthSignUpWithRoleRequested(
         uid: widget.tempUser.uid,
         email: widget.tempUser.email,
         name: widget.tempUser.name,
-        phone: _phone.text.trim(),
+        phone: fullPhone,
         role: role,
       ),
     );
@@ -110,16 +112,25 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                       LengthLimitingTextInputFormatter(10),
                     ],
                     decoration: const InputDecoration(
-                      labelText: 'Phone number',
+                      labelText: 'Phone number *',
                       hintText: '10-digit mobile number',
-                      prefixText: '+91 ',
                       prefixIcon: Icon(Icons.phone_outlined),
+                      prefixText: '+91 ',
+                      prefixStyle: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: AppColors.text,
+                      ),
                     ),
                     validator: (value) {
                       final digits = value?.replaceAll(RegExp(r'\D'), '') ?? '';
-                      return digits.length == 10
-                          ? null
-                          : 'Enter a valid 10-digit phone number';
+                      if (digits.isEmpty) {
+                        return 'Phone number is required.';
+                      }
+                      if (digits.length != 10) {
+                        return 'Enter a valid 10-digit phone number.';
+                      }
+                      return null;
                     },
                   ),
                 ),

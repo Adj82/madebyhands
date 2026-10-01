@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/auth/domain/repositories/auth_repository.dart';
+import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 
 class BuyerAccountPage extends StatefulWidget {
@@ -52,17 +54,25 @@ class _BuyerAccountPageState extends State<BuyerAccountPage> {
     });
   }
 
-  Future<void> _requestDeletion() async {
+  Future<void> _confirmAccountDeletion() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFFFAF6EE),
-        title: const Text(
-          'Request account deletion?',
-          style: TextStyle(color: Color(0xFF8B261D)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Permanently Delete Account?',
+                style: TextStyle(color: Colors.red, fontSize: 18),
+              ),
+            ),
+          ],
         ),
         content: const Text(
-          'A support request will be created for the admin. Your account will remain accessible until the request is processed.',
+          'Are you sure you want to permanently delete your buyer account? Your saved addresses, favorite items, and account details will be immediately and permanently deleted. This action cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -72,22 +82,19 @@ class _BuyerAccountPageState extends State<BuyerAccountPage> {
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF8B261D),
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
             ),
-            child: const Text('Submit request'),
+            child: const Text('Permanently Delete'),
           ),
         ],
       ),
     );
-    if (confirmed != true) return;
-    setState(() => _busy = true);
-    final result = await widget.repository.requestAccountDeletion(widget.user);
-    if (!mounted) return;
-    setState(() => _busy = false);
-    result.fold(
-      (failure) => _message(failure.message),
-      (_) => _message('Account deletion request submitted.'),
-    );
+
+    if (confirmed == true && mounted) {
+      context.read<AuthBloc>().add(AuthDeleteAccountRequested(widget.user.uid));
+      Navigator.pop(context); // Close account settings page
+    }
   }
 
   void _message(String text) =>
@@ -205,17 +212,18 @@ class _BuyerAccountPageState extends State<BuyerAccountPage> {
                       contentPadding:
                           const EdgeInsets.symmetric(horizontal: 16),
                       leading:
-                          const Icon(Icons.delete_outline, color: Colors.red),
+                          const Icon(Icons.delete_forever, color: Colors.red),
                       title: const Text(
-                        'Request account deletion',
+                        'Delete Account',
                         style: TextStyle(
                           color: Colors.red,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      subtitle:
-                          const Text('Creates a request for the admin team.'),
-                      onTap: _requestDeletion,
+                      subtitle: const Text(
+                        'Permanently delete your account and profile data.',
+                      ),
+                      onTap: _confirmAccountDeletion,
                     ),
                   ),
                 ],

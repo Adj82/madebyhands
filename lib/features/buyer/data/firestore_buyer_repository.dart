@@ -74,6 +74,7 @@ class FirestoreBuyerRepository implements BuyerRepository {
       .doc(userId)
       .collection('favorites')
       .snapshots()
+      .handleError((_) => const <String>{})
       .map((snapshot) => snapshot.docs.map((doc) => doc.id).toSet());
 
   @override
@@ -102,6 +103,7 @@ class FirestoreBuyerRepository implements BuyerRepository {
       .collection('orders')
       .where('buyerId', isEqualTo: userId)
       .snapshots()
+      .handleError((_) => const <BuyerOrder>[])
       .map((snapshot) {
         final orders = snapshot.docs.map(_orderFromDocument).toList();
         orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));

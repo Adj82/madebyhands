@@ -15,6 +15,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthGoogleSignInRequested>(_onGoogleSignInRequested);
     on<AuthSignUpWithRoleRequested>(_onSignUpWithRoleRequested);
     on<AuthIsUserLoggedIn>(_onIsUserLoggedIn);
+    on<AuthDeleteAccountRequested>(_onDeleteAccountRequested);
     on<AuthLogoutRequested>(_onLogoutRequested);
   }
 
@@ -63,6 +64,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(AuthSuccess(r));
       }
     });
+  }
+
+  void _onDeleteAccountRequested(
+    AuthDeleteAccountRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
+    final res = await _authRepository.deleteAccount(event.uid);
+
+    res.fold((l) => emit(AuthFailure(l.message)), (r) => emit(AuthInitial()));
   }
 
   void _onLogoutRequested(
