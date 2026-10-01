@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
@@ -815,6 +816,10 @@ class _OrderDetailSheet extends StatelessWidget {
                   TextFormField(
                     controller: consignmentController,
                     autofocus: true,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9-]')),
+                      LengthLimitingTextInputFormatter(30),
+                    ],
                     decoration: const InputDecoration(
                       labelText: 'Consignment / Reference Number *',
                       hintText: 'e.g. SP123456789IN',
@@ -836,6 +841,10 @@ class _OrderDetailSheet extends StatelessWidget {
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: confirmConsignmentController,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9-]')),
+                      LengthLimitingTextInputFormatter(30),
+                    ],
                     decoration: const InputDecoration(
                       labelText: 'Confirm Consignment Number *',
                       hintText: 'Re-enter consignment number',
@@ -860,7 +869,7 @@ class _OrderDetailSheet extends StatelessWidget {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     isExpanded: true,
-                    value: selectedCourier,
+                    initialValue: selectedCourier,
                     decoration: const InputDecoration(
                       labelText: 'Courier / Carrier Partner *',
                       hintText: 'Select Courier Partner',

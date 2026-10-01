@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
@@ -516,7 +517,10 @@ class _AddProductPageState extends State<AddProductPage> {
                   labelText: 'Base Price (₹) *',
                   prefixIcon: Icon(Icons.currency_rupee),
                 ),
-                keyboardType: TextInputType.number,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                ],
                 validator: (v) =>
                     v == null || v.trim().isEmpty ? 'Required' : null,
               ),
@@ -530,6 +534,10 @@ class _AddProductPageState extends State<AddProductPage> {
                   prefixIcon: Icon(Icons.inventory_2_outlined),
                 ),
                 keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(6),
+                ],
                 validator: (v) =>
                     v == null || v.trim().isEmpty ? 'Required' : null,
               ),

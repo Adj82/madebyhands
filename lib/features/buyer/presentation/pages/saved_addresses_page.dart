@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
@@ -336,25 +337,88 @@ class _AddressFormState extends State<_AddressForm> {
               ),
             ),
             const SizedBox(height: 18),
-            _field(_label, 'Label (Home, Work)'),
-            _field(_name, 'Recipient name'),
-            _field(_phone, 'Phone number', keyboardType: TextInputType.phone),
-            _field(_line, 'Address line'),
+            _field(
+              _label,
+              'Label (Home, Work)',
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                LengthLimitingTextInputFormatter(20),
+              ],
+            ),
+            _field(
+              _name,
+              'Recipient name',
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s.-]')),
+                LengthLimitingTextInputFormatter(50),
+              ],
+            ),
+            _field(
+              _phone,
+              'Phone number',
+              keyboardType: TextInputType.phone,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(10),
+              ],
+              validator: (v) {
+                final digits = v?.replaceAll(RegExp(r'\D'), '') ?? '';
+                if (digits.isEmpty) return 'Required';
+                if (digits.length != 10) return 'Must be a 10-digit mobile number';
+                return null;
+              },
+            ),
+            _field(
+              _line,
+              'Address line',
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\s,./#-]')),
+                LengthLimitingTextInputFormatter(150),
+              ],
+            ),
             Row(
               children: [
-                Expanded(child: _field(_city, 'City')),
+                Expanded(
+                  child: _field(
+                    _city,
+                    'City',
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                      LengthLimitingTextInputFormatter(40),
+                    ],
+                  ),
+                ),
                 const SizedBox(width: 10),
-                Expanded(child: _field(_state, 'State')),
+                Expanded(
+                  child: _field(
+                    _state,
+                    'State',
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                      LengthLimitingTextInputFormatter(40),
+                    ],
+                  ),
+                ),
               ],
             ),
             _field(
               _postalCode,
               'Postal code',
               keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(6),
+              ],
+              validator: (v) {
+                final digits = v?.replaceAll(RegExp(r'\D'), '') ?? '';
+                if (digits.isEmpty) return 'Required';
+                if (digits.length != 6) return 'Must be a 6-digit postal code';
+                return null;
+              },
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              activeColor: const Color(0xFF8B261D),
+              activeThumbColor: const Color(0xFF8B261D),
               title: const Text(
                 'Make this my default address',
                 style: TextStyle(fontWeight: FontWeight.w600),
@@ -380,17 +444,20 @@ class _AddressFormState extends State<_AddressForm> {
     TextEditingController controller,
     String label, {
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    String? Function(String?)? validator,
   }) => Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: TextFormField(
           controller: controller,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           decoration: InputDecoration(
             labelText: label,
             labelStyle: const TextStyle(color: Color(0xFF8B261D)),
           ),
-          validator: (value) =>
-              value == null || value.trim().isEmpty ? 'Required' : null,
+          validator: validator ??
+              (value) => value == null || value.trim().isEmpty ? 'Required' : null,
         ),
       );
 
