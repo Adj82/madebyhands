@@ -181,67 +181,45 @@ class AdminDashboardPage extends StatelessWidget {
 
   Widget _buildAdminNotificationBell(BuildContext context) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('notifications').snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('notifications')
+          .where('type', isEqualTo: 'admin')
+          .snapshots(),
       builder: (context, snapshot) {
-        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance
-              .collection('support_tickets')
-              .snapshots(),
-          builder: (context, ticketSnapshot) {
-            int unreadCount = 0;
-            final List<Map<String, dynamic>> adminNotifications = [];
-            final Set<String> addedTicketIds = {};
+        int unreadCount = 0;
+        final List<Map<String, dynamic>> adminNotifications = [];
 
-            if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-              for (var doc in snapshot.data!.docs) {
-                final data = doc.data();
-                final type = data['type'] as String? ?? 'general';
-                final isRead = data['isRead'] as bool? ?? false;
+        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+          for (var doc in snapshot.data!.docs) {
+            final data = doc.data();
+            final category = data['category'] as String? ?? 'general';
+            final isRead = data['isRead'] as bool? ?? false;
 
-                if (type == 'admin' || type == 'general' || data['category'] == 'deletion_request') {
-                  adminNotifications.add({'id': doc.id, ...data});
-                  if (data['ticketId'] != null) addedTicketIds.add(data['ticketId'] as String);
-                  if (!isRead) unreadCount++;
-                }
-              }
-            }
+            // Do not show obsolete account-deletion notifications
+            if (category == 'deletion_request') continue;
 
-            // Stream deletion support tickets directly so deletion requests NEVER miss!
-            if (ticketSnapshot.hasData && ticketSnapshot.data!.docs.isNotEmpty) {
-              for (var doc in ticketSnapshot.data!.docs) {
-                final data = doc.data();
-                final requestStatus = data['requestStatus'] as String? ?? 'Pending';
-                final status = data['status'] as String? ?? 'open';
-                final isDeletionTicket = data['type'] == 'account_deletion' ||
-                    data['subject'] == 'Account Deletion Request';
+            adminNotifications.add({'id': doc.id, ...data});
+            if (!isRead) unreadCount++;
+          }
 
-                if (isDeletionTicket && requestStatus == 'Pending' && status == 'open' && !addedTicketIds.contains(doc.id)) {
-                  adminNotifications.add({
-                    'id': doc.id,
-                    'type': 'admin',
-                    'category': 'deletion_request',
-                    'title': 'Account Deletion Request ⚠️',
-                    'message': '${data['userName'] ?? "User"} requested account deletion. Reason: "${data['reason'] ?? data['lastMessage'] ?? "N/A"}"',
-                    'targetId': data['userId'],
-                    'ticketId': doc.id,
-                    'isRead': false,
-                  });
-                  unreadCount++;
-                }
-              }
-            }
+          // Sort latest notifications first
+          adminNotifications.sort((a, b) {
+            final aTime = (a['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+            final bTime = (b['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+            return bTime.compareTo(aTime);
+          });
+        }
 
-            return IconButton(
-              tooltip: 'Admin Notifications',
-              onPressed: () => _showAdminNotificationsModal(context, adminNotifications),
-              icon: Badge(
-                isLabelVisible: unreadCount > 0,
-                label: Text('$unreadCount'),
-                backgroundColor: Colors.redAccent,
-                child: const Icon(Icons.notifications_outlined),
-              ),
-            );
-          },
+        return IconButton(
+          tooltip: 'Admin Notifications',
+          onPressed: () =>
+              _showAdminNotificationsModal(context, adminNotifications),
+          icon: Badge(
+            isLabelVisible: unreadCount > 0,
+            label: Text('$unreadCount'),
+            backgroundColor: Colors.redAccent,
+            child: const Icon(Icons.notifications_outlined),
+          ),
         );
       },
     );
@@ -271,7 +249,14 @@ class AdminDashboardPage extends StatelessWidget {
                   children: [
                     Icon(Icons.notifications_active, color: AppColors.primary),
                     SizedBox(width: 10),
-                    Text('Admin Notifications', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                    Text(
+                      'Admin Notifications',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
                   ],
                 ),
                 IconButton(
@@ -284,7 +269,10 @@ class AdminDashboardPage extends StatelessWidget {
             Expanded(
               child: notifications.isEmpty
                   ? const Center(
-                      child: Text('No system notifications at the moment.', style: TextStyle(color: AppColors.mutedText)),
+                      child: Text(
+                        'No system notifications at the moment.',
+                        style: TextStyle(color: AppColors.mutedText),
+                      ),
                     )
                   : ListView.builder(
                       itemCount: notifications.length,
@@ -296,80 +284,84 @@ class AdminDashboardPage extends StatelessWidget {
                         final category = item['category'] as String? ?? 'general';
                         final isRead = item['isRead'] as bool? ?? false;
 
+                        IconData categoryIcon = Icons.info_outline;
+                        if (category == 'product_approval' || category == 'product') {
+                          categoryIcon = Icons.inventory_2_outlined;
+                        } else if (category == 'creator_verification' || category == 'verification') {
+                          categoryIcon = Icons.verified_user_outlined;
+                        } else if (category == 'support_ticket' || category == 'support') {
+                          categoryIcon = Icons.support_agent_outlined;
+                        }
+
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          color: isRead ? AppColors.surface : Colors.red.shade50,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          color: isRead
+                              ? AppColors.surface
+                              : AppColors.primary.withValues(alpha: 0.08),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(16),
                             onTap: () {
                               try {
-                                FirebaseFirestore.instance.collection('notifications').doc(id).update({'isRead': true});
+                                FirebaseFirestore.instance
+                                    .collection('notifications')
+                                    .doc(id)
+                                    .update({'isRead': true});
                               } catch (_) {}
                               Navigator.pop(modalContext);
-                              if (category == 'deletion_request') {
-                                context.read<AdminCubit>().changePage(5);
-                              } else if (category == 'verification') {
+                              if (category == 'creator_verification' ||
+                                  category == 'verification') {
                                 context.read<AdminCubit>().changePage(1);
-                              } else if (category == 'product') {
+                              } else if (category == 'product_approval' ||
+                                  category == 'product') {
                                 context.read<AdminCubit>().changePage(2);
+                              } else if (category == 'support_ticket' ||
+                                  category == 'support') {
+                                context.read<AdminCubit>().changePage(6);
                               }
                             },
                             child: Padding(
                               padding: const EdgeInsets.all(16),
-                              child: Column(
+                              child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 18,
-                                        backgroundColor: category == 'deletion_request' ? Colors.red : AppColors.primary,
-                                        child: Icon(
-                                          category == 'deletion_request' ? Icons.warning_amber_rounded : Icons.info_outline,
-                                          color: Colors.white,
-                                          size: 18,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              title,
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.text),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              message,
-                                              style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  if (category == 'deletion_request') ...[
-                                    const SizedBox(height: 12),
-                                    Align(
-                                      alignment: Alignment.centerRight,
-                                      child: FilledButton.icon(
-                                        style: FilledButton.styleFrom(
-                                          backgroundColor: Colors.red,
-                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                        ),
-                                        onPressed: () {
-                                          Navigator.pop(modalContext);
-                                          context.read<AdminCubit>().changePage(5);
-                                        },
-                                        icon: const Icon(Icons.arrow_forward, size: 14),
-                                        label: const Text('Review Deletion Request', style: TextStyle(fontSize: 11)),
-                                      ),
+                                  CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: AppColors.primary
+                                        .withValues(alpha: 0.15),
+                                    child: Icon(
+                                      categoryIcon,
+                                      color: AppColors.primary,
+                                      size: 20,
                                     ),
-                                  ],
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          title,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                            color: AppColors.text,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          message,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.mutedText,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),

@@ -92,6 +92,17 @@ class FirestoreSupportRepository implements SupportRepository {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
+    final adminNotifRef = firestore.collection('notifications').doc();
+    batch.set(adminNotifRef, {
+      'type': 'admin',
+      'category': 'support_ticket',
+      'title': 'New Support Ticket Raised 💬',
+      'message': '${userName.isNotEmpty ? userName : "User"} ($userRole) raised a ticket: "$subject"',
+      'targetId': ticket.id,
+      'createdAt': FieldValue.serverTimestamp(),
+      'isRead': false,
+    });
+
     await batch.commit();
     return ticket.id;
   }
@@ -155,18 +166,6 @@ class FirestoreSupportRepository implements SupportRepository {
       'senderRole': 'creator',
       'message': messageText,
       'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    // 3. Write admin notification
-    batch.set(adminNotificationRef, {
-      'type': 'admin',
-      'category': 'deletion_request',
-      'title': 'Account Deletion Request ⚠️',
-      'message': '$userName requested account deletion. Reason: "$reason"',
-      'targetId': userId,
-      'ticketId': ticket.id,
-      'createdAt': FieldValue.serverTimestamp(),
-      'isRead': false,
     });
 
     await batch.commit();
