@@ -297,37 +297,11 @@ class AdminDashboardPage extends StatelessWidget {
                         final isRead = item['isRead'] as bool? ?? false;
 
                         return Card(
-                          margin: const EdgeInsets.only(bottom: 10),
+                          margin: const EdgeInsets.only(bottom: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           color: isRead ? AppColors.surface : Colors.red.shade50,
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: category == 'deletion_request' ? Colors.red : AppColors.primary,
-                              child: Icon(
-                                category == 'deletion_request' ? Icons.warning_amber_rounded : Icons.info_outline,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                            title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                            subtitle: Text(message, style: const TextStyle(fontSize: 12, color: AppColors.mutedText)),
-                            trailing: category == 'deletion_request'
-                                ? FilledButton(
-                                    style: FilledButton.styleFrom(backgroundColor: Colors.red, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
-                                    onPressed: () {
-                                      Navigator.pop(modalContext);
-                                      context.read<AdminCubit>().changePage(5); // Users & Deletions tab
-                                    },
-                                    child: const Text('Review', style: TextStyle(fontSize: 11)),
-                                  )
-                                : IconButton(
-                                    icon: Icon(isRead ? Icons.check_circle : Icons.circle_outlined, size: 20, color: isRead ? Colors.green : Colors.grey),
-                                    onPressed: () {
-                                      try {
-                                        FirebaseFirestore.instance.collection('notifications').doc(id).update({'isRead': !isRead});
-                                      } catch (_) {}
-                                    },
-                                  ),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
                             onTap: () {
                               try {
                                 FirebaseFirestore.instance.collection('notifications').doc(id).update({'isRead': true});
@@ -341,6 +315,64 @@ class AdminDashboardPage extends StatelessWidget {
                                 context.read<AdminCubit>().changePage(2);
                               }
                             },
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 18,
+                                        backgroundColor: category == 'deletion_request' ? Colors.red : AppColors.primary,
+                                        child: Icon(
+                                          category == 'deletion_request' ? Icons.warning_amber_rounded : Icons.info_outline,
+                                          color: Colors.white,
+                                          size: 18,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              title,
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.text),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              message,
+                                              style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (category == 'deletion_request') ...[
+                                    const SizedBox(height: 12),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: FilledButton.icon(
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                        onPressed: () {
+                                          Navigator.pop(modalContext);
+                                          context.read<AdminCubit>().changePage(5);
+                                        },
+                                        icon: const Icon(Icons.arrow_forward, size: 14),
+                                        label: const Text('Review Deletion Request', style: TextStyle(fontSize: 11)),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
                           ),
                         );
                       },

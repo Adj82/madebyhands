@@ -38,12 +38,12 @@ service cloud.firestore {
     match /users/{userId} {
       allow create: if signedIn() && request.auth.uid == userId;
       allow read: if signedIn() && (request.auth.uid == userId || isAdminOrManager());
-      allow update: if isSuperAdmin() ||
+      allow update: if isAdminOrManager() ||
         (signedIn() && request.auth.uid == userId &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'name', 'phone', 'email'
           ]));
-      allow delete: if isSuperAdmin();
+      allow delete: if isAdminOrManager();
 
       match /favorites/{productId} {
         allow read, write: if signedIn() && request.auth.uid == userId;
@@ -79,7 +79,7 @@ service cloud.firestore {
           request.resource.data.comment is string &&
           request.resource.data.comment.size() >= 3 &&
           request.resource.data.comment.size() <= 1000;
-        allow delete: if isSuperAdmin();
+        allow delete: if isAdminOrManager();
       }
     }
 
@@ -95,7 +95,7 @@ service cloud.firestore {
         resource.data.buyerId == request.auth.uid ||
         resource.data.creatorId == request.auth.uid
       );
-      allow update: if isSuperAdmin() ||
+      allow update: if isAdminOrManager() ||
         (signedIn() &&
           resource.data.creatorId == request.auth.uid &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -106,7 +106,7 @@ service cloud.firestore {
             'carrierName',
             'payoutStatus'
           ]));
-      allow delete: if isSuperAdmin();
+      allow delete: if isAdminOrManager();
     }
 
     match /support_tickets/{ticketId} {
@@ -116,7 +116,7 @@ service cloud.firestore {
         (isAdminOrManager() || resource.data.userId == request.auth.uid);
       allow update: if signedIn() &&
         (isAdminOrManager() || resource.data.userId == request.auth.uid);
-      allow delete: if isSuperAdmin();
+      allow delete: if isAdminOrManager();
 
       match /messages/{messageId} {
         allow read: if signedIn() && (
@@ -130,7 +130,7 @@ service cloud.firestore {
 
     match /settings/{settingId} {
       allow read: if signedIn();
-      allow write: if isSuperAdmin();
+      allow write: if isAdminOrManager();
     }
 
     match /creator_profiles/{creatorId} {
@@ -153,6 +153,7 @@ service cloud.firestore {
       );
       allow create: if signedIn();
       allow update: if signedIn() && (
+        isAdminOrManager() ||
         resource.data.creatorUid == request.auth.uid ||
         resource.data.userId == request.auth.uid ||
         resource.data.buyerId == request.auth.uid

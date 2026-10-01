@@ -1,4 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:madebyhands/features/support/data/models/support_message_model.dart';
+import 'package:madebyhands/features/support/data/models/support_ticket_model.dart';
+import 'package:madebyhands/features/support/domain/entities/support_message.dart';
 import 'package:madebyhands/features/support/domain/entities/support_ticket.dart';
 import 'package:madebyhands/features/support/domain/repositories/support_repository.dart';
 
@@ -12,47 +15,20 @@ class FirestoreSupportRepository implements SupportRepository {
       .collection('support_tickets')
       .where('userId', isEqualTo: userId)
       .snapshots()
-      .map(_tickets);
+      .map(_ticketsFromSnapshot);
 
   @override
-  Stream<List<SupportTicket>> watchAllTickets() =>
-      firestore.collection('support_tickets').snapshots().map(_tickets);
-
-  List<SupportTicket> _tickets(QuerySnapshot<Map<String, dynamic>> snapshot) {
-    final tickets = snapshot.docs.map((document) {
-      final data = document.data();
-      final createdAt = _date(data['createdAt']);
-      final status = data['status'] as String? ?? 'open';
-      final subject = data['subject'] as String? ?? 'Support request';
-      final type = data['type'] as String? ??
-          (subject == 'Account Deletion Request'
-              ? 'account_deletion'
-              : 'general');
-      final requestStatus = data['requestStatus'] as String? ??
-          (type == 'account_deletion'
-              ? (status == 'resolved' ? 'Approved' : 'Pending')
-              : 'none');
-      final reason =
-          data['reason'] as String? ?? data['lastMessage'] as String? ?? '';
-
-      return SupportTicket(
-        id: document.id,
-        userId: data['userId'] as String? ?? '',
-        userRole: data['userRole'] as String? ?? 'buyer',
-        userName: data['userName'] as String? ?? 'User',
-        subject: subject,
-        status: status,
-        requestStatus: requestStatus,
-        reason: reason,
-        type: type,
-        lastMessage: data['lastMessage'] as String? ?? '',
-        createdAt: createdAt,
-        updatedAt: _date(data['updatedAt'], fallback: createdAt),
-      );
-    }).toList();
-    tickets.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return tickets;
-  }
+  Stream<List<SupportTicket>> watchAllTickets() => firestore
+      .collection('support_tickets')
+      .snapshots()
+      .map((snapshot) {
+        final tickets = snapshot.docs
+            .map(SupportTicketModel.fromDocument)
+            .where((ticket) => !ticket.isAccountDeletion)
+            .toList();
+        tickets.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+        return tickets;
+      });
 
   @override
   Stream<List<SupportMessage>> watchMessages(String ticketId) => firestore
@@ -61,18 +37,15 @@ class FirestoreSupportRepository implements SupportRepository {
       .collection('messages')
       .orderBy('createdAt')
       .snapshots()
-      .map(
-        (snapshot) => snapshot.docs.map((document) {
-          final data = document.data();
-          return SupportMessage(
-            id: document.id,
-            senderId: data['senderId'] as String? ?? '',
-            senderRole: data['senderRole'] as String? ?? 'buyer',
-            message: data['message'] as String? ?? '',
-            createdAt: _date(data['createdAt']),
-          );
-        }).toList(),
-      );
+      .map((snapshot) => snapshot.docs.map(SupportMessageModel.fromDocument).toList());
+
+  List<SupportTicket> _ticketsFromSnapshot(
+    QuerySnapshot<Map<String, dynamic>> snapshot,
+  ) {
+    final tickets = snapshot.docs.map(SupportTicketModel.fromDocument).toList();
+    tickets.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return tickets;
+  }
 
   @override
   Future<String> createTicket({
@@ -85,58 +58,32 @@ class FirestoreSupportRepository implements SupportRepository {
     final ticket = firestore.collection('support_tickets').doc();
     final firstMessage = ticket.collection('messages').doc();
     final batch = firestore.batch();
+
     batch.set(ticket, {
       'userId': userId,
       'userRole': userRole,
       'userName': userName,
       'subject': subject,
+      'type': 'general',
       'status': 'open',
       'lastMessage': message,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
     batch.set(firstMessage, {
       'senderId': userId,
       'senderRole': userRole,
       'message': message,
       'createdAt': FieldValue.serverTimestamp(),
     });
+
     await batch.commit();
     return ticket.id;
   }
 
   @override
-  Future<void> sendMessage({
-    required String ticketId,
-    required String senderId,
-    required String senderRole,
-    required String message,
-  }) async {
-    final ticket = firestore.collection('support_tickets').doc(ticketId);
-    final messageDocument = ticket.collection('messages').doc();
-    final batch = firestore.batch();
-    batch.set(messageDocument, {
-      'senderId': senderId,
-      'senderRole': senderRole,
-      'message': message,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    batch.update(ticket, {
-      'lastMessage': message,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-    await batch.commit();
-  }
-
-  @override
-  Future<void> resolveTicket(String ticketId) =>
-      firestore.collection('support_tickets').doc(ticketId).update({
-        'status': 'resolved',
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
-  @override
-  Future<String> createAccountDeletionRequest({
+  Future<String> requestCreatorAccountDeletion({
     required String userId,
     required String userName,
     required String reason,
@@ -245,6 +192,7 @@ class FirestoreSupportRepository implements SupportRepository {
     final userRef = firestore.collection('users').doc(creatorUid);
     batch.set(userRef, {
       'isDeactivated': true,
+      'isDeletionRequested': false,
       'role': 'deactivated',
       'isVerified': false,
     }, SetOptions(merge: true));
@@ -318,17 +266,35 @@ class FirestoreSupportRepository implements SupportRepository {
   }
 
   @override
-  Stream<SupportTicket?> watchLatestDeletionRequest(String userId) => firestore
-      .collection('support_tickets')
-      .where('userId', isEqualTo: userId)
-      .where('type', isEqualTo: 'account_deletion')
-      .snapshots()
-      .map((snapshot) {
-        if (snapshot.docs.isEmpty) return null;
-        final tickets = _tickets(snapshot);
-        return tickets.first;
-      });
+  Future<void> sendMessage({
+    required String ticketId,
+    required String senderId,
+    required String senderRole,
+    required String message,
+  }) async {
+    final ticketRef = firestore.collection('support_tickets').doc(ticketId);
+    final messageRef = ticketRef.collection('messages').doc();
+    final batch = firestore.batch();
 
-  static DateTime _date(Object? value, {DateTime? fallback}) =>
-      value is Timestamp ? value.toDate() : fallback ?? DateTime(1970);
+    batch.set(messageRef, {
+      'senderId': senderId,
+      'senderRole': senderRole,
+      'message': message,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    batch.update(ticketRef, {
+      'lastMessage': message,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+  }
+
+  @override
+  Future<void> resolveTicket(String ticketId) =>
+      firestore.collection('support_tickets').doc(ticketId).update({
+        'status': 'resolved',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 }

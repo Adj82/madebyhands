@@ -18,6 +18,8 @@ class UserManagementView extends StatelessWidget {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: const TabBar(
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           tabs: [
             Tab(text: 'Buyers'),
             Tab(text: 'Sellers / Creators'),
@@ -234,12 +236,13 @@ class UserManagementView extends StatelessWidget {
                   color: Colors.red.shade50,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(color: Colors.red.shade200),
+                    side: BorderSide(color: Colors.red.shade200, width: 1.2),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Row(
                           children: [
@@ -254,7 +257,7 @@ class UserManagementView extends StatelessWidget {
                                 children: [
                                   Text(
                                     name.isNotEmpty ? name : 'User Account',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.text),
                                   ),
                                   Text(
                                     '$email · $role',
@@ -276,25 +279,28 @@ class UserManagementView extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 12),
                         Container(
-                          padding: const EdgeInsets.all(10),
+                          padding: const EdgeInsets.all(12),
                           width: double.infinity,
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            borderRadius: BorderRadius.circular(10),
+                            color: Colors.white.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: Colors.red.shade100),
                           ),
                           child: Text(
                             'Reason: "$reason"',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.text),
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.text),
                           ),
                         ),
-                        const SizedBox(height: 14),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 10,
+                          alignment: WrapAlignment.end,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            OutlinedButton(
+                            OutlinedButton.icon(
                               onPressed: () async {
                                 final messenger = ScaffoldMessenger.of(context);
                                 try {
@@ -312,13 +318,23 @@ class UserManagementView extends StatelessWidget {
                                   }
                                   messenger.showSnackBar(SnackBar(content: Text('Cancelled deletion request for $email.')));
                                 } catch (e) {
-                                  messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                                  try {
+                                    await FirebaseFirestore.instance.collection('users').doc(uid).update({
+                                      'isDeletionRequested': false,
+                                    });
+                                    messenger.showSnackBar(SnackBar(content: Text('Cancelled deletion request for $email.')));
+                                  } catch (err) {
+                                    messenger.showSnackBar(SnackBar(content: Text('Error: $err')));
+                                  }
                                 }
                               },
-                              style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.grey)),
-                              child: const Text('Reject Request', style: TextStyle(color: AppColors.text)),
+                              icon: const Icon(Icons.close, size: 16),
+                              label: const Text('Reject Request'),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Colors.grey),
+                                foregroundColor: AppColors.text,
+                              ),
                             ),
-                            const SizedBox(width: 12),
                             FilledButton.icon(
                               onPressed: () => _confirmAccountDeletion(
                                 context,
@@ -328,7 +344,7 @@ class UserManagementView extends StatelessWidget {
                                 ticketId: ticketId,
                               ),
                               icon: const Icon(Icons.delete_forever, size: 16),
-                              label: const Text('Approve & Delete'),
+                              label: const Text('Approve & Delete Account'),
                               style: FilledButton.styleFrom(backgroundColor: Colors.red),
                             ),
                           ],
@@ -368,11 +384,16 @@ class UserManagementView extends StatelessWidget {
 
               try {
                 if (ticketId != null && ticketId.isNotEmpty) {
-                  final supportRepo = serviceLocator<SupportRepository>();
-                  await supportRepo.approveAccountDeletion(
-                    ticketId: ticketId,
-                    creatorUid: uid,
-                  );
+                  try {
+                    final supportRepo = serviceLocator<SupportRepository>();
+                    await supportRepo.approveAccountDeletion(
+                      ticketId: ticketId,
+                      creatorUid: uid,
+                    );
+                  } catch (_) {
+                    await FirebaseFirestore.instance.collection('users').doc(uid).delete();
+                    await FirebaseFirestore.instance.collection('creator_profiles').doc(uid).delete();
+                  }
                 } else {
                   await FirebaseFirestore.instance.collection('users').doc(uid).delete();
                   await FirebaseFirestore.instance.collection('creator_profiles').doc(uid).delete();
