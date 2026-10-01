@@ -16,6 +16,8 @@ class CreatorProfileModel extends CreatorProfile {
     super.address,
     super.latestPhoto,
     super.idCard,
+    super.panCard,
+    super.aadhaarCard,
   });
 
   Map<String, dynamic> toJson() {
@@ -34,6 +36,8 @@ class CreatorProfileModel extends CreatorProfile {
       'address': address,
       'latestPhoto': latestPhoto,
       'idCard': idCard,
+      'panCard': panCard,
+      'aadhaarCard': aadhaarCard,
     };
   }
 
@@ -59,6 +63,8 @@ class CreatorProfileModel extends CreatorProfile {
       address: json['address'] ?? '',
       latestPhoto: json['latestPhoto'] ?? '',
       idCard: json['idCard'] ?? '',
+      panCard: json['panCard'] ?? '',
+      aadhaarCard: json['aadhaarCard'] ?? '',
     );
   }
 
@@ -78,6 +84,8 @@ class CreatorProfileModel extends CreatorProfile {
       address: entity.address,
       latestPhoto: entity.latestPhoto,
       idCard: entity.idCard,
+      panCard: entity.panCard,
+      aadhaarCard: entity.aadhaarCard,
     );
   }
 }

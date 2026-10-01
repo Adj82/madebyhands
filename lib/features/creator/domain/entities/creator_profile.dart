@@ -13,6 +13,8 @@ class CreatorProfile {
   final String address;
   final String latestPhoto;
   final String idCard;
+  final String panCard;
+  final String aadhaarCard;
 
   CreatorProfile({
     required this.uid,
@@ -29,5 +31,7 @@ class CreatorProfile {
     this.address = '',
     this.latestPhoto = '',
     this.idCard = '',
+    this.panCard = '',
+    this.aadhaarCard = '',
   });
 }

@@ -48,6 +48,10 @@ class CreatorRepositoryImpl implements CreatorRepository {
     required String story,
     String? existingProfileImageUrl,
     List<String>? existingPortfolioUrls,
+    File? panCardFile,
+    File? aadhaarCardFile,
+    String? existingPanCardUrl,
+    String? existingAadhaarCardUrl,
   }) async {
     try {
       String profileImageUrl = existingProfileImageUrl ?? '';
@@ -67,6 +71,30 @@ class CreatorRepositoryImpl implements CreatorRepository {
         portfolioUrls.addAll(newUrls);
       }
 
+      String panCardUrl = existingPanCardUrl ?? '';
+      if (panCardFile != null) {
+        final ext = panCardFile.path.contains('.')
+            ? panCardFile.path.split('.').last.toLowerCase()
+            : 'jpg';
+        panCardUrl = await remoteDataSource.uploadVerificationFile(
+          file: panCardFile,
+          uid: uid,
+          fileName: 'pan_card.$ext',
+        );
+      }
+
+      String aadhaarCardUrl = existingAadhaarCardUrl ?? '';
+      if (aadhaarCardFile != null) {
+        final ext = aadhaarCardFile.path.contains('.')
+            ? aadhaarCardFile.path.split('.').last.toLowerCase()
+            : 'jpg';
+        aadhaarCardUrl = await remoteDataSource.uploadVerificationFile(
+          file: aadhaarCardFile,
+          uid: uid,
+          fileName: 'aadhaar_card.$ext',
+        );
+      }
+
       final profileModel = CreatorProfileModel(
         uid: uid,
         name: name,
@@ -77,6 +105,8 @@ class CreatorRepositoryImpl implements CreatorRepository {
         socialLinks: socialLinks,
         portfolio: portfolioUrls,
         story: story,
+        panCard: panCardUrl,
+        aadhaarCard: aadhaarCardUrl,
       );
 
       await remoteDataSource.saveCreatorProfile(profileModel);

@@ -132,7 +132,6 @@ class FirestoreSupportRepository implements SupportRepository {
 
     final ticket = firestore.collection('support_tickets').doc();
     final firstMessage = ticket.collection('messages').doc();
-    final adminNotificationRef = firestore.collection('notifications').doc();
     final userRef = firestore.collection('users').doc(userId);
 
     final batch = firestore.batch();

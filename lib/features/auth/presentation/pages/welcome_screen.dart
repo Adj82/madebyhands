@@ -1,9 +1,12 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:madebyhands/features/buyer/presentation/pages/buyer_privacy_policy_page.dart';
+import 'package:madebyhands/features/buyer/presentation/pages/buyer_terms_and_conditions_page.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -50,7 +53,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Please accept the Terms and Conditions to continue login.',
+            'Please accept the Terms and Conditions and Privacy Policy to continue login.',
           ),
           backgroundColor: Colors.red,
         ),
@@ -290,14 +293,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          _termsAccepted = !_termsAccepted;
-                                        });
-                                      },
-                                      child: Text(
-                                        'By joining, you agree to our Terms and Conditions',
+                                    child: RichText(
+                                      text: TextSpan(
                                         style: TextStyle(
                                           color: _termsAccepted
                                               ? AppColors.mutedText
@@ -307,6 +304,50 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                               ? FontWeight.normal
                                               : FontWeight.w600,
                                         ),
+                                        children: [
+                                          const TextSpan(
+                                            text: 'By joining, you agree to our ',
+                                          ),
+                                          TextSpan(
+                                            text: 'Terms and Conditions',
+                                            style: const TextStyle(
+                                              decoration: TextDecoration.underline,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.primary,
+                                            ),
+                                            recognizer: TapGestureRecognizer()
+                                              ..onTap = () {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) =>
+                                                        const BuyerTermsAndConditionsPage(),
+                                                  ),
+                                                );
+                                              },
+                                          ),
+                                          const TextSpan(
+                                            text: ' and ',
+                                          ),
+                                          TextSpan(
+                                            text: 'Privacy Policy',
+                                            style: const TextStyle(
+                                              decoration: TextDecoration.underline,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.primary,
+                                            ),
+                                            recognizer: TapGestureRecognizer()
+                                              ..onTap = () {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) =>
+                                                        const BuyerPrivacyPolicyPage(),
+                                                  ),
+                                                );
+                                              },
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ),

@@ -34,6 +34,10 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
   final _storyController = TextEditingController();
 
   File? _profileImage;
+  File? _panCardFile;
+  File? _aadhaarCardFile;
+  String? _existingPanCardUrl;
+  String? _existingAadhaarCardUrl;
   final List<File> _portfolioImages = [];
   final List<String> _existingPortfolioUrls = [];
   final List<String> _socialLinks = [];
@@ -67,6 +71,8 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
     if (p != null) {
       _socialLinks.addAll(p.socialLinks);
       _existingPortfolioUrls.addAll(p.portfolio);
+      if (p.panCard.isNotEmpty) _existingPanCardUrl = p.panCard;
+      if (p.aadhaarCard.isNotEmpty) _existingAadhaarCardUrl = p.aadhaarCard;
     }
   }
 
@@ -106,8 +112,73 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
     }
   }
 
+  Future<void> _pickDocument({
+    required String docName,
+    required Function(File file) onFilePicked,
+  }) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+
+    if (pickedFile != null) {
+      final ext = pickedFile.path.contains('.')
+          ? pickedFile.path.split('.').last.toLowerCase()
+          : '';
+      final validExtensions = ['pdf', 'png', 'jpg', 'jpeg'];
+      if (ext.isNotEmpty && !validExtensions.contains(ext)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Invalid file format for $docName. Only PDF or Image (JPG, PNG) files are allowed.',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        onFilePicked(File(pickedFile.path));
+      });
+    }
+  }
+
+  bool _validateDocuments() {
+    final hasPan = _panCardFile != null ||
+        (_existingPanCardUrl != null && _existingPanCardUrl!.isNotEmpty);
+    final hasAadhaar = _aadhaarCardFile != null ||
+        (_existingAadhaarCardUrl != null &&
+            _existingAadhaarCardUrl!.isNotEmpty);
+
+    if (!hasPan) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('PAN Card document is required to proceed.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
+    }
+
+    if (!hasAadhaar) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Aadhaar Card document is required to proceed.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
+    }
+
+    return true;
+  }
+
   void _submit() {
-    if (_formKey.currentState!.validate()) {
+    if (_formKey.currentState!.validate() && _validateDocuments()) {
       context.read<CreatorBloc>().add(
             CreatorSubmitOnboarding(
               uid: widget.user.uid,
@@ -121,6 +192,10 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
               story: _storyController.text.trim(),
               existingProfileImageUrl: widget.existingProfile?.profileImage,
               existingPortfolioUrls: _existingPortfolioUrls,
+              panCardFile: _panCardFile,
+              aadhaarCardFile: _aadhaarCardFile,
+              existingPanCardUrl: _existingPanCardUrl,
+              existingAadhaarCardUrl: _existingAadhaarCardUrl,
             ),
           );
     }
@@ -221,6 +296,8 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
                     _buildProfileImagePicker(),
                     const SizedBox(height: 30),
                     _buildFormFields(),
+                    const SizedBox(height: 30),
+                    _buildDocumentSection(),
                     const SizedBox(height: 30),
                     _buildSocialLinksSection(),
                     const SizedBox(height: 30),
@@ -333,6 +410,143 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
           validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
         ),
       ],
+    );
+  }
+
+  Widget _buildDocumentSection() {
+    final hasPan = _panCardFile != null ||
+        (_existingPanCardUrl != null && _existingPanCardUrl!.isNotEmpty);
+    final hasAadhaar = _aadhaarCardFile != null ||
+        (_existingAadhaarCardUrl != null &&
+            _existingAadhaarCardUrl!.isNotEmpty);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Required Identity & Tax Documents *',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppColors.primary,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Upload official PAN Card and Aadhaar Card (PDF or Image format required)',
+          style: TextStyle(fontSize: 12, color: AppColors.mutedText),
+        ),
+        const SizedBox(height: 16),
+        _buildDocUploadCard(
+          title: 'PAN Card *',
+          subtitle: 'Upload clear copy of PAN Card (PDF, PNG, JPG)',
+          file: _panCardFile,
+          existingUrl: _existingPanCardUrl,
+          hasDoc: hasPan,
+          onTap: () => _pickDocument(
+            docName: 'PAN Card',
+            onFilePicked: (f) => _panCardFile = f,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildDocUploadCard(
+          title: 'Aadhaar Card *',
+          subtitle: 'Upload clear copy of Aadhaar Card (PDF, PNG, JPG)',
+          file: _aadhaarCardFile,
+          existingUrl: _existingAadhaarCardUrl,
+          hasDoc: hasAadhaar,
+          onTap: () => _pickDocument(
+            docName: 'Aadhaar Card',
+            onFilePicked: (f) => _aadhaarCardFile = f,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDocUploadCard({
+    required String title,
+    required String subtitle,
+    required File? file,
+    required String? existingUrl,
+    required bool hasDoc,
+    required VoidCallback onTap,
+  }) {
+    String statusText = subtitle;
+    if (file != null) {
+      final fileName = file.path.split('/').last.split('\\').last;
+      statusText = 'Selected: $fileName';
+    } else if (existingUrl != null && existingUrl.isNotEmpty) {
+      statusText = 'Uploaded document on file';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: hasDoc
+            ? AppColors.primary.withValues(alpha: 0.05)
+            : AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: hasDoc ? AppColors.primary : Colors.red.shade300,
+          width: hasDoc ? 1.5 : 1.0,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color:
+                  (hasDoc ? Colors.green : Colors.red).withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              hasDoc ? Icons.check_circle_outline : Icons.upload_file,
+              color: hasDoc ? Colors.green : Colors.red,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: hasDoc ? AppColors.text : Colors.red.shade900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  statusText,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: hasDoc ? AppColors.mutedText : Colors.red.shade700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            onPressed: onTap,
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              minimumSize: const Size(0, 36),
+            ),
+            child: Text(
+              hasDoc ? 'Replace' : 'Upload',
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
