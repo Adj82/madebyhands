@@ -257,6 +257,24 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
         batch.update(doc.reference, {'isActive': isVerified && isApproved});
       }
       await batch.commit();
+
+      if (status == 'In-Process') {
+        try {
+          final profileDoc =
+              await firestore.collection('creator_profiles').doc(uid).get();
+          final name = profileDoc.data()?['name'] as String? ?? 'Creator';
+          await firestore.collection('notifications').add({
+            'type': 'admin',
+            'category': 'creator_verification',
+            'title': 'New Creator Verification Request 🆔',
+            'message':
+                'Creator "$name" submitted verification documents for review.',
+            'targetId': uid,
+            'createdAt': FieldValue.serverTimestamp(),
+            'isRead': false,
+          });
+        } catch (_) {}
+      }
     } catch (e) {
       throw Exception(e.toString());
     }
