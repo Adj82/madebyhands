@@ -61,7 +61,8 @@ service cloud.firestore {
       allow update: if signedIn() && (
         isAdminOrManager() ||
         resource.data.creatorUid == request.auth.uid ||
-        resource.data.creatorId == request.auth.uid
+        resource.data.creatorId == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock'])
       );
       allow delete: if signedIn() &&
         (isAdminOrManager() || resource.data.creatorUid == request.auth.uid || resource.data.creatorId == request.auth.uid);
@@ -83,11 +84,12 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      // Customer orders are created by the authenticated payment API (Admin SDK).
-      // Super admins may create clearly marked operational/sample records.
-      allow create: if isSuperAdmin() &&
-        request.resource.data.payoutStatus == 'pending' &&
-        request.resource.data.paymentStatus != 'paid';
+      allow create: if signedIn() &&
+        request.resource.data.buyerId == request.auth.uid &&
+        request.resource.data.creatorId is string &&
+        request.resource.data.creatorId.size() > 0 &&
+        (request.resource.data.paymentStatus == 'paid' || request.resource.data.paymentStatus == 'skipped') &&
+        request.resource.data.payoutStatus == 'pending';
       allow read: if signedIn() && (
         isAdminOrManager() ||
         resource.data.buyerId == request.auth.uid ||
@@ -105,14 +107,6 @@ service cloud.firestore {
             'payoutStatus'
           ]));
       allow delete: if isSuperAdmin();
-    }
-
-    match /paymentIntents/{intentId} {
-      allow read, write: if false;
-    }
-
-    match /paymentReceipts/{paymentId} {
-      allow read, write: if false;
     }
 
     match /support_tickets/{ticketId} {
@@ -154,12 +148,20 @@ service cloud.firestore {
       allow read: if signedIn() && (
         isAdminOrManager() ||
         resource.data.creatorUid == request.auth.uid ||
-        resource.data.userId == request.auth.uid
+        resource.data.userId == request.auth.uid ||
+        resource.data.buyerId == request.auth.uid
       );
       allow create: if signedIn();
       allow update: if signedIn() && (
         resource.data.creatorUid == request.auth.uid ||
-        resource.data.userId == request.auth.uid
+        resource.data.userId == request.auth.uid ||
+        resource.data.buyerId == request.auth.uid
+      );
+      allow delete: if signedIn() && (
+        isAdminOrManager() ||
+        resource.data.creatorUid == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.buyerId == request.auth.uid
       );
     }
   }

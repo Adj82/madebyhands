@@ -12,8 +12,8 @@ class ApiConfigPage extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         children: [
           const _ConfigHeader(title: 'Razorpay Payment Gateway'),
-          const _ConfigDetail(label: 'Key ID', value: 'rzp_test_ThYi51dfwooow6'),
-          const _ConfigDetail(label: 'Key Secret', value: '7IZI4o8q5fuwxIK9XOHMS8MO'),
+          const _ConfigDetail(label: 'Key ID (Public Client Key)', value: 'rzp_test_TiG6pSEctm7B3a'),
+          const _ConfigDetail(label: 'Key Secret', value: '•••••••• (Secured on Server / Vercel Environment Variables)'),
           const _ConfigDetail(label: 'Environment', value: 'Active Test / Live Sandbox'),
           const SizedBox(height: 30),
           const _ConfigHeader(title: 'Firebase Project Settings'),
@@ -32,7 +32,7 @@ class ApiConfigPage extends StatelessWidget {
               children: [
                 Icon(Icons.warning_amber_rounded, color: Colors.orange),
                 SizedBox(width: 15),
-                Expanded(child: Text('Changes to production API keys require redeploying environment variables.', style: TextStyle(fontSize: 12, color: Colors.brown))),
+                Expanded(child: Text('Razorpay Key Secret is stored strictly in server-side environment variables and is never exposed to the client application.', style: TextStyle(fontSize: 12, color: Colors.brown))),
               ],
             ),
           )
