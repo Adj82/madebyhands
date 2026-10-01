@@ -22,8 +22,8 @@ class FirestoreSupportRepository implements SupportRepository {
       .collection('support_tickets')
       .snapshots()
       .map((snapshot) {
-        final tickets = snapshot.docs
-            .map(SupportTicketModel.fromDocument)
+        final List<SupportTicket> tickets = snapshot.docs
+            .map<SupportTicket>(SupportTicketModel.fromDocument)
             .where((ticket) => !ticket.isAccountDeletion)
             .toList();
         tickets.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
@@ -37,12 +37,27 @@ class FirestoreSupportRepository implements SupportRepository {
       .collection('messages')
       .orderBy('createdAt')
       .snapshots()
-      .map((snapshot) => snapshot.docs.map(SupportMessageModel.fromDocument).toList());
+      .map((snapshot) => snapshot.docs.map<SupportMessage>(SupportMessageModel.fromDocument).toList());
+
+  @override
+  Stream<SupportTicket?> watchLatestDeletionRequest(String userId) => firestore
+      .collection('support_tickets')
+      .where('userId', isEqualTo: userId)
+      .snapshots()
+      .map((snapshot) {
+        final List<SupportTicket> deletionTickets = snapshot.docs
+            .map<SupportTicket>(SupportTicketModel.fromDocument)
+            .where((t) => t.isAccountDeletion)
+            .toList();
+        if (deletionTickets.isEmpty) return null;
+        deletionTickets.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+        return deletionTickets.first;
+      });
 
   List<SupportTicket> _ticketsFromSnapshot(
     QuerySnapshot<Map<String, dynamic>> snapshot,
   ) {
-    final tickets = snapshot.docs.map(SupportTicketModel.fromDocument).toList();
+    final List<SupportTicket> tickets = snapshot.docs.map<SupportTicket>(SupportTicketModel.fromDocument).toList();
     tickets.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return tickets;
   }
@@ -83,7 +98,7 @@ class FirestoreSupportRepository implements SupportRepository {
   }
 
   @override
-  Future<String> requestCreatorAccountDeletion({
+  Future<String> createAccountDeletionRequest({
     required String userId,
     required String userName,
     required String reason,
@@ -158,6 +173,16 @@ class FirestoreSupportRepository implements SupportRepository {
     await batch.commit();
     return ticket.id;
   }
+
+  Future<String> requestCreatorAccountDeletion({
+    required String userId,
+    required String userName,
+    required String reason,
+  }) => createAccountDeletionRequest(
+    userId: userId,
+    userName: userName,
+    reason: reason,
+  );
 
   @override
   Future<void> approveAccountDeletion({
