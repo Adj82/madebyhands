@@ -12,13 +12,14 @@ class UserManagementView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: const TabBar(
           tabs: [
             Tab(text: 'Buyers'),
             Tab(text: 'Sellers / Creators'),
+            Tab(text: 'Deletion Requests'),
           ],
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.mutedText,
@@ -38,6 +39,8 @@ class UserManagementView extends StatelessWidget {
             }
 
             final docs = snapshot.data?.docs ?? [];
+            final List<Map<String, dynamic>> rawUsers = docs.map((doc) => {'uid': doc.id, ...doc.data()}).toList();
+
             final List<UserEntity> allUsers = docs.map<UserEntity>((doc) {
               final data = doc.data();
               return UserEntity(
@@ -51,13 +54,15 @@ class UserManagementView extends StatelessWidget {
               );
             }).toList();
 
-            final List<UserEntity> buyers = allUsers.where((u) => u.role == 'buyer').toList();
-            final List<UserEntity> creators = allUsers.where((u) => u.role == 'creator' || u.role == 'seller').toList();
+            final buyers = allUsers.where((u) => u.role == 'buyer').toList();
+            final creators = allUsers.where((u) => u.role == 'creator' || u.role == 'seller').toList();
+            final deletionRequests = rawUsers.where((u) => u['isDeletionRequested'] == true).toList();
 
             return TabBarView(
               children: [
                 _buildUserList(context, buyers, 'No buyers registered yet.'),
                 _buildUserList(context, creators, 'No creators registered yet.'),
+                _buildDeletionRequestsList(context, deletionRequests),
               ],
             );
           },
@@ -144,6 +149,163 @@ class UserManagementView extends StatelessWidget {
                 );
               },
             ),
+    );
+  }
+
+  Widget _buildDeletionRequestsList(BuildContext context, List<Map<String, dynamic>> deletionRequests) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<AdminBloc>().add(AdminLoadDataRequested());
+      },
+      child: deletionRequests.isEmpty
+          ? Center(
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Container(
+                  height: 400,
+                  alignment: Alignment.center,
+                  child: const Text('No pending account deletion requests.', style: TextStyle(color: AppColors.mutedText)),
+                ),
+              ),
+            )
+          : ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              itemCount: deletionRequests.length,
+              itemBuilder: (context, index) {
+                final user = deletionRequests[index];
+                final uid = user['uid'] as String;
+                final name = user['name'] as String? ?? 'User';
+                final email = user['email'] as String? ?? '';
+                final role = (user['role'] as String? ?? 'buyer').toUpperCase();
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  color: Colors.red.shade50,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: Colors.red.shade200),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const CircleAvatar(
+                              backgroundColor: Colors.red,
+                              child: Icon(Icons.warning_amber_rounded, color: Colors.white),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name.isNotEmpty ? name : 'User Account',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                  Text(
+                                    '$email · $role',
+                                    style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'DELETION REQUESTED',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton(
+                              onPressed: () async {
+                                final messenger = ScaffoldMessenger.of(context);
+                                try {
+                                  await FirebaseFirestore.instance.collection('users').doc(uid).update({
+                                    'isDeletionRequested': false,
+                                  });
+                                  messenger.showSnackBar(SnackBar(content: Text('Cancelled deletion request for $email.')));
+                                } catch (e) {
+                                  messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                                }
+                              },
+                              style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.grey)),
+                              child: const Text('Reject Request', style: TextStyle(color: AppColors.text)),
+                            ),
+                            const SizedBox(width: 12),
+                            FilledButton.icon(
+                              onPressed: () => _confirmAccountDeletion(context, uid: uid, name: name, email: email),
+                              icon: const Icon(Icons.delete_forever, size: 16),
+                              label: const Text('Approve & Delete'),
+                              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
+  }
+
+  void _confirmAccountDeletion(
+    BuildContext context, {
+    required String uid,
+    required String name,
+    required String email,
+  }) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Permanently Delete $name?'),
+        content: Text(
+          'Are you sure you want to permanently delete the account for $name ($email)?\n\nThis will remove their user document and creator profile from Cloud Firestore.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              Navigator.pop(dialogContext);
+
+              try {
+                // 1. Delete user document from users collection
+                await FirebaseFirestore.instance.collection('users').doc(uid).delete();
+                // 2. Delete creator profile if exists
+                await FirebaseFirestore.instance.collection('creator_profiles').doc(uid).delete();
+
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Account for $email has been permanently deleted.')),
+                );
+              } catch (e) {
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Failed to delete account: $e')),
+                );
+              }
+            },
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete Account'),
+          ),
+        ],
+      ),
     );
   }
 

@@ -200,7 +200,18 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<void> requestAccountDeletion(UserModel user) async {
     final ticket = firestore.collection('support_tickets').doc();
     final firstMessage = ticket.collection('messages').doc();
+    final notificationRef = firestore.collection('notifications').doc();
+    final userRef = firestore.collection('users').doc(user.uid);
+
     final batch = firestore.batch();
+
+    // 1. Mark deletion requested on user document
+    batch.update(userRef, {
+      'isDeletionRequested': true,
+      'deletionRequestedAt': FieldValue.serverTimestamp(),
+    });
+
+    // 2. Write support ticket
     batch.set(ticket, {
       'userId': user.uid,
       'userName': user.name,
@@ -213,12 +224,25 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
     batch.set(firstMessage, {
       'senderId': user.uid,
       'senderRole': user.role,
       'message': 'Please permanently delete my MADEBYHANDS account.',
       'createdAt': FieldValue.serverTimestamp(),
     });
+
+    // 3. Write admin notification
+    batch.set(notificationRef, {
+      'type': 'admin',
+      'category': 'deletion_request',
+      'title': 'Account Deletion Request ⚠️',
+      'message': '${user.name.isNotEmpty ? user.name : "A user"} (${user.email}) requested permanent account deletion.',
+      'targetId': user.uid,
+      'createdAt': FieldValue.serverTimestamp(),
+      'isRead': false,
+    });
+
     await batch.commit();
   }
 

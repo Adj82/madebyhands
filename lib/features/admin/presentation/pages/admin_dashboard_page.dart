@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
@@ -25,7 +26,7 @@ class AdminDashboardPage extends StatelessWidget {
     'Product Approvals',
     'Categories',
     'Orders',
-    'User Management',
+    'User Management & Deletions',
     'Support Tickets',
     'Payouts & Finance',
     'Admin Settings',
@@ -47,6 +48,7 @@ class AdminDashboardPage extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
             actions: [
+              _buildAdminNotificationBell(context),
               IconButton(
                 onPressed: () {
                   context.read<AuthBloc>().add(AuthLogoutRequested());
@@ -124,7 +126,7 @@ class AdminDashboardPage extends StatelessWidget {
                       _buildDrawerTile(context, 4, Icons.receipt_long_outlined,
                           Icons.receipt_long, 'Orders', selectedIndex),
                       _buildDrawerTile(context, 5, Icons.people_outline,
-                          Icons.people, 'Users', selectedIndex),
+                          Icons.people, 'Users & Deletions', selectedIndex),
                       _buildDrawerTile(
                           context,
                           6,
@@ -174,6 +176,141 @@ class AdminDashboardPage extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildAdminNotificationBell(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance.collection('notifications').snapshots(),
+      builder: (context, snapshot) {
+        int unreadCount = 0;
+        final List<Map<String, dynamic>> adminNotifications = [];
+
+        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+          for (var doc in snapshot.data!.docs) {
+            final data = doc.data();
+            final type = data['type'] as String? ?? 'general';
+            final isRead = data['isRead'] as bool? ?? false;
+
+            if (type == 'admin' || type == 'general' || data['category'] == 'deletion_request') {
+              adminNotifications.add({'id': doc.id, ...data});
+              if (!isRead) unreadCount++;
+            }
+          }
+        }
+
+        return IconButton(
+          tooltip: 'Admin Notifications',
+          onPressed: () => _showAdminNotificationsModal(context, adminNotifications),
+          icon: Badge(
+            isLabelVisible: unreadCount > 0,
+            label: Text('$unreadCount'),
+            backgroundColor: Colors.redAccent,
+            child: const Icon(Icons.notifications_outlined),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAdminNotificationsModal(
+    BuildContext context,
+    List<Map<String, dynamic>> notifications,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (modalContext) => Container(
+        height: MediaQuery.of(modalContext).size.height * 0.75,
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.notifications_active, color: AppColors.primary),
+                    SizedBox(width: 10),
+                    Text('Admin Notifications', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(modalContext),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: notifications.isEmpty
+                  ? const Center(
+                      child: Text('No system notifications at the moment.', style: TextStyle(color: AppColors.mutedText)),
+                    )
+                  : ListView.builder(
+                      itemCount: notifications.length,
+                      itemBuilder: (context, index) {
+                        final item = notifications[index];
+                        final id = item['id'] as String;
+                        final title = item['title'] as String? ?? 'System Alert';
+                        final message = item['message'] as String? ?? '';
+                        final category = item['category'] as String? ?? 'general';
+                        final isRead = item['isRead'] as bool? ?? false;
+
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          color: isRead ? AppColors.surface : Colors.red.shade50,
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: category == 'deletion_request' ? Colors.red : AppColors.primary,
+                              child: Icon(
+                                category == 'deletion_request' ? Icons.warning_amber_rounded : Icons.info_outline,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                            title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                            subtitle: Text(message, style: const TextStyle(fontSize: 12, color: AppColors.mutedText)),
+                            trailing: category == 'deletion_request'
+                                ? FilledButton(
+                                    style: FilledButton.styleFrom(backgroundColor: Colors.red, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
+                                    onPressed: () {
+                                      Navigator.pop(modalContext);
+                                      context.read<AdminCubit>().changePage(5); // Users & Deletions tab
+                                    },
+                                    child: const Text('Review', style: TextStyle(fontSize: 11)),
+                                  )
+                                : IconButton(
+                                    icon: Icon(isRead ? Icons.check_circle : Icons.circle_outlined, size: 20, color: isRead ? Colors.green : Colors.grey),
+                                    onPressed: () {
+                                      FirebaseFirestore.instance.collection('notifications').doc(id).update({'isRead': !isRead});
+                                    },
+                                  ),
+                            onTap: () {
+                              FirebaseFirestore.instance.collection('notifications').doc(id).update({'isRead': true});
+                              Navigator.pop(modalContext);
+                              if (category == 'deletion_request') {
+                                context.read<AdminCubit>().changePage(5);
+                              } else if (category == 'verification') {
+                                context.read<AdminCubit>().changePage(1);
+                              } else if (category == 'product') {
+                                context.read<AdminCubit>().changePage(2);
+                              }
+                            },
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
