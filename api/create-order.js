@@ -5,11 +5,9 @@ const { priceCart } = require('../server/checkout');
 module.exports = async (req, res) => {
   const origin = req.headers.origin;
   const allowedOrigins = (process.env.PAYMENT_ALLOWED_ORIGINS || '').split(',').map((value) => value.trim());
-  if (origin && (allowedOrigins.includes(origin) || allowedOrigins.includes('*') || !process.env.PAYMENT_ALLOWED_ORIGINS)) {
-    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
   }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -26,8 +24,11 @@ module.exports = async (req, res) => {
     const user = await requireUser(req, res);
     if (!user) return;
 
-    const key_id = process.env.RAZORPAY_KEY_ID || 'rzp_test_TiG6pSEctm7B3a';
-    const key_secret = process.env.RAZORPAY_KEY_SECRET || 'uEq5czjdlqLwM8TK86PpRKw0';
+    // Credentials come from the environment only. A hardcoded fallback would
+    // put the key secret in version control and silently charge against the
+    // wrong Razorpay account when the env vars are missing.
+    const key_id = process.env.RAZORPAY_KEY_ID;
+    const key_secret = process.env.RAZORPAY_KEY_SECRET;
 
     if (!key_id || !key_secret) {
       return res.status(503).json({ error: 'Razorpay API credentials are not configured on the payment server' });
@@ -41,33 +42,18 @@ module.exports = async (req, res) => {
     const admin = getFirebaseAdmin();
     let pricedItems;
     try {
+      // priceCart is the only source of prices. Falling back to amounts sent
+      // by the client would let a buyer name their own total and would skip
+      // the stock and availability checks, so its errors are surfaced to the
+      // caller instead of being worked around.
       pricedItems = await priceCart(admin, items);
     } catch (error) {
-      console.warn('priceCart warning, using fallback item totals:', error.message);
-      if (Array.isArray(items) && items.length > 0) {
-        pricedItems = items.map((item) => {
-          const qty = Number(item.quantity) || 1;
-          const price = Math.round(Number(item.unitPrice || item.price || 100));
-          return {
-            productId: String(item.productId || 'prod'),
-            name: String(item.name || 'Handmade Item'),
-            creatorId: String(item.creatorId || item.creatorUid || 'creator'),
-            creatorName: String(item.creatorName || item.artisan || 'Artisan'),
-            quantity: qty,
-            unitPrice: price,
-            baseUnitPrice: Math.round(Number(item.baseUnitPrice || price)),
-            customizationPrice: Math.round(Number(item.customizationPrice || 0)),
-            subtotal: price * qty,
-            customizations: item.customizations || {},
-          };
-        });
-      } else {
-        return res.status(400).json({ error: 'Cart must contain items' });
-      }
+      return res.status(400).json({ error: error.message });
     }
 
     const groups = new Set(pricedItems.map((item) => item.creatorId));
     let flatFeePerCreator = 50;
+    let platformFeeRate = 5;
     try {
       const settingsSnapshot = await admin.firestore().collection('settings').doc('platform_economics').get();
       const settings = settingsSnapshot.data() || {};
@@ -75,7 +61,13 @@ module.exports = async (req, res) => {
       if (Number.isFinite(configuredFlatFee)) {
         flatFeePerCreator = Math.max(0, Math.round(configuredFlatFee));
       }
-    } catch (_) {}
+      const configuredRate = Number(settings.percentFee);
+      if (Number.isFinite(configuredRate)) {
+        platformFeeRate = Math.min(100, Math.max(0, configuredRate));
+      }
+    } catch (error) {
+      console.warn('Platform economics lookup failed, using defaults:', error.message || error);
+    }
 
     const buyerPlatformFee = flatFeePerCreator * groups.size;
     const subtotal = pricedItems.reduce((sum, item) => sum + item.subtotal, 0);
@@ -108,6 +100,10 @@ module.exports = async (req, res) => {
         buyerId: user.uid,
         subtotal,
         buyerPlatformFee,
+        // finalize-payment.js reads this to compute commission. Omitting it
+        // silently pins every order to the 5% default regardless of the rate
+        // configured in settings/platform_economics.
+        platformFeeRate,
         amount: order.amount,
         currency: order.currency,
         items: pricedItems.map((item) => ({
@@ -124,8 +120,12 @@ module.exports = async (req, res) => {
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         status: 'pending',
       });
-    } catch (e) {
-      console.warn('paymentIntents store warning:', e.message);
+    } catch (error) {
+      // The intent is the priced snapshot finalize-payment settles against.
+      // Without it that endpoint refunds the capture, so fail here — before
+      // checkout opens and the buyer is charged — rather than warning.
+      console.error('paymentIntents write failed:', error.message || error);
+      return res.status(500).json({ error: 'Could not start checkout. Please try again.' });
     }
 
     return res.status(200).json({
@@ -137,10 +137,11 @@ module.exports = async (req, res) => {
       platform_fee: buyerPlatformFee,
     });
   } catch (error) {
+    // Details stay in the server log; echoing them to the client exposes
+    // internal Razorpay and Firestore errors to anyone calling the endpoint.
     console.error('Razorpay Create Order Error:', error.message || error);
     return res.status(500).json({
       error: 'Failed to create Razorpay order',
-      details: error.message || error,
     });
   }
 };

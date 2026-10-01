@@ -45,6 +45,9 @@ app.*.map.json
 /android/app/release
 .vercel
 .env*
+
+# Node dependencies for the payment API in api/ and server/
+node_modules/
 .codex-remote-attachments/
 
 # Firebase configuration files
