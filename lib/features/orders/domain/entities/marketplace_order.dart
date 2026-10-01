@@ -123,6 +123,29 @@ class CheckoutAddress {
   String get formatted => '$addressLine, $city, $state $postalCode';
 }
 
+/// Platform economics as stored in `settings/platform_economics`.
+///
+/// The payment API reads the same document, so the checkout total shown to a
+/// buyer must be derived from this rather than from a hardcoded fee.
+class PlatformFeeSettings {
+  final double flatFee;
+  final double percentFee;
+
+  const PlatformFeeSettings({this.flatFee = 50, this.percentFee = 5});
+
+  /// Matches `Math.round` in `api/create-order.js` so the client and the
+  /// server agree on the per-creator flat fee.
+  int get flatFeePerCreator => flatFee.round().clamp(0, 100000000);
+
+  factory PlatformFeeSettings.fromMap(Map<String, dynamic>? data) {
+    final settings = data ?? const <String, dynamic>{};
+    return PlatformFeeSettings(
+      flatFee: (settings['flatFee'] as num?)?.toDouble() ?? 50,
+      percentFee: (settings['percentFee'] as num?)?.toDouble() ?? 5,
+    );
+  }
+}
+
 class PlatformFeeBreakdown {
   final int flatFee;
   final double commissionRate;

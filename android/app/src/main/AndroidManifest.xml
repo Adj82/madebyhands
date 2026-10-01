@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Razorpay Checkout and the payment API need network access in release
+         builds. Plugin manifests usually merge this in, but Razorpay's
+         integration guide requires it declared here explicitly. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="madebyhands"
         android:name="${applicationName}"

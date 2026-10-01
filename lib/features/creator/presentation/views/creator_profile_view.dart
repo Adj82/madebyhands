@@ -6,6 +6,7 @@ import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 import 'package:madebyhands/features/creator/presentation/pages/creator_onboarding_page.dart';
+import 'package:madebyhands/features/creator/presentation/pages/manage_bank_account_page.dart';
 import 'package:madebyhands/features/creator/presentation/pages/privacy_policy_page.dart';
 import 'package:madebyhands/features/creator/presentation/pages/terms_and_conditions_page.dart';
 import 'package:madebyhands/features/support/domain/entities/support_ticket.dart';
@@ -89,6 +90,19 @@ class _CreatorProfileViewState extends State<CreatorProfileView> {
                           ),
                           existingProfile: profile,
                         ),
+                      ),
+                    );
+                  },
+                ),
+                _buildActionItem(
+                  icon: Icons.account_balance_outlined,
+                  title: 'Manage Bank Account',
+                  subtitle: 'Manage bank details, IFSC, and payout preferences',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ManageBankAccountPage(profile: profile),
                       ),
                     );
                   },

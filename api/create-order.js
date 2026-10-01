@@ -1,5 +1,5 @@
 const Razorpay = require('razorpay');
-const { requireUser } = require('../server/auth');
+const { getFirebaseAdmin, requireUser } = require('../server/auth');
 const { priceCart } = require('../server/checkout');
 
 module.exports = async (req, res) => {
@@ -36,7 +36,9 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Only INR payments are supported' });
     }
 
-    const admin = require('firebase-admin');
+    // Initialize explicitly rather than depending on requireUser having done
+    // it as a side effect.
+    const admin = getFirebaseAdmin();
     let pricedItems;
     try {
       pricedItems = await priceCart(admin, items);

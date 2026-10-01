@@ -2,8 +2,10 @@ import 'dart:io';
 import 'package:fpdart/fpdart.dart';
 import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/features/creator/data/datasources/creator_remote_data_source.dart';
+import 'package:madebyhands/features/creator/data/models/creator_bank_account_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_product_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_profile_model.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_bank_account.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_notification.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
@@ -517,6 +519,41 @@ class CreatorRepositoryImpl implements CreatorRepository {
   ) async {
     try {
       await remoteDataSource.deleteNotifications(notificationIds);
+      return right(null);
+    } catch (e) {
+      return left(Failure(_cleanExceptionMessage(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, CreatorBankAccount?>> getCreatorBankAccount(
+    String uid,
+  ) async {
+    try {
+      final bankDetail = await remoteDataSource.getCreatorBankAccount(uid);
+      return right(bankDetail);
+    } catch (e) {
+      return left(Failure(_cleanExceptionMessage(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> saveCreatorBankAccount(
+    CreatorBankAccount bankDetail,
+  ) async {
+    try {
+      final model = CreatorBankAccountModel(
+        uid: bankDetail.uid,
+        accountHolderName: bankDetail.accountHolderName,
+        accountNumber: bankDetail.accountNumber,
+        accountType: bankDetail.accountType,
+        bankName: bankDetail.bankName,
+        branchName: bankDetail.branchName,
+        ifscCode: bankDetail.ifscCode,
+        upiId: bankDetail.upiId,
+        panNumber: bankDetail.panNumber,
+      );
+      await remoteDataSource.saveCreatorBankAccount(model);
       return right(null);
     } catch (e) {
       return left(Failure(_cleanExceptionMessage(e)));

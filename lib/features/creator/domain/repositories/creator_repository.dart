@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:fpdart/fpdart.dart';
 import 'package:madebyhands/core/error/failures.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_bank_account.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_notification.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
@@ -116,6 +117,14 @@ abstract interface class CreatorRepository {
 
   Future<Either<Failure, void>> deleteNotifications(
     List<String> notificationIds,
+  );
+
+  Future<Either<Failure, CreatorBankAccount?>> getCreatorBankAccount(
+    String uid,
+  );
+
+  Future<Either<Failure, void>> saveCreatorBankAccount(
+    CreatorBankAccount bankDetail,
   );
 }
 

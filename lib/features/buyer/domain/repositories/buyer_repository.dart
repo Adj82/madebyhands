@@ -4,9 +4,14 @@ import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product_review.dart';
 import 'package:madebyhands/features/buyer/domain/entities/public_creator.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
+import 'package:madebyhands/features/orders/domain/entities/marketplace_order.dart';
 
 abstract interface class BuyerRepository {
   Stream<List<Product>> watchProducts();
+
+  /// Reads `settings/platform_economics` so checkout can show the same flat
+  /// fee the payment API will charge.
+  Future<PlatformFeeSettings> getPlatformFeeSettings();
 
   Stream<List<PublicCreator>> watchPublicCreators();
 

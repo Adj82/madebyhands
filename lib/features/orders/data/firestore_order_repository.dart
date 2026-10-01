@@ -166,7 +166,7 @@ class FirestoreOrderRepository implements OrderRepository {
           'creatorNetAmount': fee.creatorNetAmount,
           'status': 'Placed',
           'paymentStatus': paymentStatus,
-          if (paymentId != null) 'paymentId': paymentId,
+          'paymentId': paymentId,
           'payoutStatus': 'pending',
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
@@ -190,11 +190,13 @@ class FirestoreOrderRepository implements OrderRepository {
         final notificationDocRef = firestore.collection('notifications').doc();
         batch.set(notificationDocRef, {
           'creatorUid': entry.key,
+          'userId': entry.key,
           'title': 'New Incoming Order! 🛒',
           'message':
               'You received a new order for ${creatorItems.length} item(s) totaling ₹$subtotal from $buyerName.',
           'type': 'order',
           'createdAt': FieldValue.serverTimestamp(),
+          'timestamp': FieldValue.serverTimestamp(),
           'isRead': false,
           'targetId': orderReferences[orderIndex++].id,
         });
@@ -235,6 +237,7 @@ class FirestoreOrderRepository implements OrderRepository {
     String status, {
     String? rejectionReason,
     String? consignmentNumber,
+    String? carrierName,
   }) async {
     final orderRef = firestore.collection('orders').doc(orderId);
     final orderSnap = await orderRef.get();
@@ -349,6 +352,9 @@ class FirestoreOrderRepository implements OrderRepository {
         if (consignmentNumber != null && consignmentNumber.trim().isNotEmpty) {
           updateData['consignmentNumber'] = consignmentNumber.trim();
         }
+        if (carrierName != null && carrierName.trim().isNotEmpty) {
+          updateData['carrierName'] = carrierName.trim();
+        }
         transaction.update(orderRef, updateData);
       });
     } else {
@@ -358,6 +364,9 @@ class FirestoreOrderRepository implements OrderRepository {
       };
       if (consignmentNumber != null && consignmentNumber.trim().isNotEmpty) {
         updateData['consignmentNumber'] = consignmentNumber.trim();
+      }
+      if (carrierName != null && carrierName.trim().isNotEmpty) {
+        updateData['carrierName'] = carrierName.trim();
       }
       if (status == 'Delivered') {
         updateData['deliveredAt'] = FieldValue.serverTimestamp();
