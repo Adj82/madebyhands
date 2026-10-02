@@ -326,8 +326,10 @@ class _PerformanceSummary extends StatelessWidget {
         final active = all.where((o) => !OrderStatus.isRejectedOrCancelled(o.status)).toList();
         final pending = active.where((o) => OrderStatus.isNew(o.status)).length;
         final inProgress = active.where((o) => OrderStatus.isInProgress(o.status)).length;
-        final counted = active.where((o) => o.countsTowardEarnings).toList();
-        final totalEarned = counted.fold<int>(0, (total, o) => total + o.creatorNetAmount);
+        // "Settled" means the payout has actually been released, matching
+        // the definition used on the Earnings tab (see creator_earnings_view.dart).
+        final settled = active.where((o) => o.countsTowardEarnings && o.isPaidOut).toList();
+        final totalEarned = settled.fold<int>(0, (total, o) => total + o.creatorNetAmount);
 
         return GridView.count(
           crossAxisCount: 2,

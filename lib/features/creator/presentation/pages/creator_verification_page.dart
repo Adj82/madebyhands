@@ -122,6 +122,18 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.profile.isVerified) {
+      // Verified creators can only view what was submitted. Letting them
+      // resubmit would reset verificationStatus back to 'In-Process' and
+      // block them from listing products until an admin re-approves.
+      return _VerifiedDocumentsView(
+        profile: widget.profile,
+        businessName: _businessNameController.text,
+        address: _addressController.text,
+        photoUrl: _existingPhotoUrl,
+        idCardUrl: _existingIdCardUrl,
+      );
+    }
     return Scaffold(
       backgroundColor: AppColors.surface,
       appBar: AppBar(
@@ -269,6 +281,124 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _VerifiedDocumentsView extends StatelessWidget {
+  final CreatorProfile profile;
+  final String businessName;
+  final String address;
+  final String photoUrl;
+  final String idCardUrl;
+
+  const _VerifiedDocumentsView({
+    required this.profile,
+    required this.businessName,
+    required this.address,
+    required this.photoUrl,
+    required this.idCardUrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      appBar: AppBar(
+        title: const Text('Verification documents', style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.verified, color: Colors.green),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      "You're a verified creator. Your documents are on file "
+                      'with the MadeByHands team.',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              businessName.isEmpty ? profile.businessName : businessName,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              address.isEmpty ? profile.address : address,
+              style: const TextStyle(color: AppColors.mutedText),
+            ),
+            const SizedBox(height: 24),
+            const Text('Documents', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 15),
+            _SubmittedDocumentTile(
+              title: 'Recent photo of you',
+              uploaded: photoUrl.isNotEmpty,
+            ),
+            const SizedBox(height: 15),
+            _SubmittedDocumentTile(
+              title: 'PAN card / government ID',
+              uploaded: idCardUrl.isNotEmpty,
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'To update these documents, please contact the MadeByHands team.',
+              style: TextStyle(color: AppColors.mutedText, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SubmittedDocumentTile extends StatelessWidget {
+  final String title;
+  final bool uploaded;
+
+  const _SubmittedDocumentTile({required this.title, required this.uploaded});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            uploaded ? Icons.check_circle : Icons.error_outline,
+            color: uploaded ? Colors.green : AppColors.mutedText,
+            size: 30,
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          ),
+          Text(
+            uploaded ? 'On file' : 'Not on file',
+            style: const TextStyle(color: AppColors.mutedText, fontSize: 12),
+          ),
+        ],
       ),
     );
   }

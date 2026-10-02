@@ -539,15 +539,21 @@ void main() {
     await tester.ensureVisible(find.text('Delete Account'));
     await tester.tap(find.text('Delete Account'));
     await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Why are you leaving? *'),
+      'Switching to a different app',
+    );
     await tester.tap(find.text('Permanently Delete'));
     await tester.pumpAndSettle();
     expect(repository.deletedUid, buyer.uid);
+    expect(repository.deletedReason, 'Switching to a different app');
   });
 }
 
 class _FakeAccountAuthRepository implements AuthRepository {
   String? updatedName;
   String? deletedUid;
+  String? deletedReason;
 
   @override
   Future<Either<Failure, UserEntity>> updateProfile({
@@ -570,6 +576,7 @@ class _FakeAccountAuthRepository implements AuthRepository {
   @override
   Future<Either<Failure, void>> deleteAccount(String uid, String reason) async {
     deletedUid = uid;
+    deletedReason = reason;
     return right(null);
   }
 

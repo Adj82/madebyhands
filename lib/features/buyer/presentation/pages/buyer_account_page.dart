@@ -236,22 +236,28 @@ class _BuyerAccountPageState extends State<BuyerAccountPage> {
                         color: Colors.red.withValues(alpha: 0.5),
                       ),
                     ),
-                    child: ListTile(
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 16),
-                      leading:
-                          const Icon(Icons.delete_forever, color: Colors.red),
-                      title: const Text(
-                        'Delete Account',
-                        style: TextStyle(
+                    clipBehavior: Clip.antiAlias,
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: ListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16),
+                        leading: const Icon(
+                          Icons.delete_forever,
                           color: Colors.red,
-                          fontWeight: FontWeight.bold,
                         ),
+                        title: const Text(
+                          'Delete Account',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Permanently delete your account and profile data.',
+                        ),
+                        onTap: _confirmAccountDeletion,
                       ),
-                      subtitle: const Text(
-                        'Permanently delete your account and profile data.',
-                      ),
-                      onTap: _confirmAccountDeletion,
                     ),
                   ),
                 ],
