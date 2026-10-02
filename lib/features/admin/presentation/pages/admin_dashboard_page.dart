@@ -367,6 +367,7 @@ class _AdminNotificationBellState extends State<_AdminNotificationBell> {
   static int? _sectionFor(String category) => switch (category) {
     'creator_verification' || 'verification' => 1,
     'product_approval' || 'product' => 2,
+    'order_rejected' || 'order' => 4,
     'support_ticket' || 'support' => 6,
     _ => null,
   };
@@ -374,6 +375,7 @@ class _AdminNotificationBellState extends State<_AdminNotificationBell> {
   static IconData _iconFor(String category) => switch (_sectionFor(category)) {
     1 => Icons.verified_user_outlined,
     2 => Icons.inventory_2_outlined,
+    4 => Icons.receipt_long_outlined,
     6 => Icons.support_agent_outlined,
     _ => Icons.info_outline,
   };

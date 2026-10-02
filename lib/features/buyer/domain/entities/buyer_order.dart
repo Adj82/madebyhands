@@ -75,5 +75,5 @@ class BuyerOrder {
 String refundStatusLabel(String refundStatus) => switch (refundStatus) {
   'refunded' => 'Refunded to your original payment method',
   'failed' => 'Refund pending — our team is on it',
-  _ => 'Refund in progress',
+  _ => 'Refund in progress — you will be refunded in full within 5 days',
 };

@@ -114,19 +114,33 @@ module.exports = async (req, res) => {
     const order = outcome.order;
 
     // Let the creator know when someone else (an admin) rejected their
-    // order. Best-effort: never let a notification failure affect the
-    // rejection/refund response.
-    if (!outcome.alreadyRejected && isAdmin && order.creatorId && order.creatorId !== user.uid) {
+    // order, and let admins know when the creator rejected it themselves
+    // (so moderation can follow up) — but never both, and never when an
+    // admin rejects their own order. Best-effort: a notification failure
+    // never affects the rejection/refund response.
+    if (!outcome.alreadyRejected) {
       try {
-        await firestore.collection('notifications').add({
-          creatorUid: order.creatorId,
-          title: 'Order rejected',
-          message: `Order #${orderId.slice(-6).toUpperCase()} was rejected by an admin. Reason: ${reason}`,
-          type: 'order',
-          targetId: orderId,
-          createdAt: FieldValue.serverTimestamp(),
-          isRead: false,
-        });
+        if (isAdmin && order.creatorId && order.creatorId !== user.uid) {
+          await firestore.collection('notifications').add({
+            creatorUid: order.creatorId,
+            title: 'Order rejected',
+            message: `Order #${orderId.slice(-6).toUpperCase()} was rejected by an admin. Reason: ${reason}`,
+            type: 'order',
+            targetId: orderId,
+            createdAt: FieldValue.serverTimestamp(),
+            isRead: false,
+          });
+        } else if (!isAdmin) {
+          await firestore.collection('notifications').add({
+            type: 'admin',
+            category: 'order_rejected',
+            title: 'Order rejected by creator',
+            message: `Order #${orderId.slice(-6).toUpperCase()} was rejected by its creator. Reason: ${reason}`,
+            targetId: orderId,
+            createdAt: FieldValue.serverTimestamp(),
+            isRead: false,
+          });
+        }
       } catch (notifyError) {
         console.error('Order rejection notification failed:', notifyError.message || notifyError);
       }

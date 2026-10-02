@@ -298,6 +298,7 @@ class FirestoreBuyerRepository implements BuyerRepository {
                   orderId: order.id,
                   orderStatus: order.status,
                   publishedAt: order.updatedAt ?? order.createdAt,
+                  orderRejectionReason: order.rejectionReason,
                 ),
               )
               .toList();
