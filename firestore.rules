@@ -45,6 +45,16 @@ service cloud.firestore {
       return isSuperAdmin() || role() in ['admin', 'manager'];
     }
 
+    // Suspension must actually stop a user from writing, not just hide the
+    // UI behind a blocking screen (/api/suspend-user.js is what sets this
+    // flag, and also disables their Firebase Auth account). Admin/manager
+    // actions are never gated by this — only a user's own self-service
+    // writes are.
+    function isSuspended() {
+      return signedIn() && exists(userPath()) &&
+        get(userPath()).data.get('isSuspended', false) == true;
+    }
+
     function changedKeys() {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
@@ -94,7 +104,7 @@ service cloud.firestore {
 
       // New listings always start hidden and pending admin approval.
       allow create: if isAdminOrManager() ||
-        (signedIn() &&
+        (signedIn() && !isSuspended() &&
           request.resource.data.creatorUid == request.auth.uid &&
           request.resource.data.status == 'Pending Approval' &&
           request.resource.data.isActive == false &&
@@ -102,14 +112,14 @@ service cloud.firestore {
 
       allow update: if isAdminOrManager() ||
         // Creator edits go back to review and stay hidden until approved.
-        (signedIn() && isOwnProduct() &&
+        (signedIn() && !isSuspended() && isOwnProduct() &&
           request.resource.data.get('creatorUid', '') == resource.data.get('creatorUid', '') &&
           request.resource.data.status == 'Pending Approval' &&
           request.resource.data.isActive == false &&
           request.resource.data.get('orderCount', 0) == resource.data.get('orderCount', 0) &&
           request.resource.data.get('wishlistCount', 0) == resource.data.get('wishlistCount', 0)) ||
         // Creators may publish/unpublish approved listings and adjust stock.
-        (signedIn() && isOwnProduct() &&
+        (signedIn() && !isSuspended() && isOwnProduct() &&
           changedKeys().hasOnly(['isActive', 'stock', 'updatedAt']) &&
           (request.resource.data.isActive == false ||
             (resource.data.status == 'Approved' &&
@@ -126,7 +136,7 @@ service cloud.firestore {
 
       match /reviews/{buyerId} {
         allow read: if signedIn();
-        allow create, update: if signedIn() &&
+        allow create, update: if signedIn() && !isSuspended() &&
           request.auth.uid == buyerId &&
           request.resource.data.buyerId == buyerId &&
           request.resource.data.productId == productId &&
@@ -157,7 +167,7 @@ service cloud.firestore {
       allow update: if isSuperAdmin() ||
         (isAdminOrManager() &&
           !changedKeys().hasAny(['payoutStatus', 'payoutReleasedAt', 'paidAt', 'paymentStatus', 'refundStatus'])) ||
-        (signedIn() &&
+        (signedIn() && !isSuspended() &&
           resource.data.creatorId == request.auth.uid &&
           !(resource.data.status in ['Rejected', 'Cancelled']) &&
           changedKeys().hasOnly(['status', 'updatedAt', 'consignmentNumber', 'carrierName', 'deliveredAt']) &&

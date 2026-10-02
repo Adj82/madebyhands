@@ -63,6 +63,7 @@ Future<void> initDependencies() async {
 
 void _initSharedData() {
   serviceLocator.registerLazySingleton(() => OrderActionsApi());
+  serviceLocator.registerLazySingleton(() => UserModerationApi());
   serviceLocator.registerLazySingleton<SupportRepository>(
     () => FirestoreSupportRepository(firestore: serviceLocator()),
   );
@@ -132,7 +133,7 @@ void _initAdmin() {
 
   // Repository
   serviceLocator.registerFactory<AdminRepository>(
-    () => AdminRepositoryImpl(serviceLocator()),
+    () => AdminRepositoryImpl(serviceLocator(), userModerationApi: serviceLocator()),
   );
 
   // Cubit/Bloc

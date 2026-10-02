@@ -1,13 +1,15 @@
 import 'package:fpdart/fpdart.dart';
 import 'package:madebyhands/core/error/failures.dart';
+import 'package:madebyhands/core/services/payment_api.dart';
 import 'package:madebyhands/features/admin/data/datasources/admin_remote_data_source.dart';
 import 'package:madebyhands/features/admin/domain/repositories/admin_repository.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 
 class AdminRepositoryImpl implements AdminRepository {
   final AdminRemoteDataSource remoteDataSource;
+  final UserModerationApi userModerationApi;
 
-  AdminRepositoryImpl(this.remoteDataSource);
+  AdminRepositoryImpl(this.remoteDataSource, {required this.userModerationApi});
 
   Future<Either<Failure, T>> _guard<T>(Future<T> Function() action) async {
     try {
@@ -58,9 +60,12 @@ class AdminRepositoryImpl implements AdminRepository {
   Future<Either<Failure, void>> deleteCategory(String name) =>
       _guard(() => remoteDataSource.deleteCategory(name));
 
+  // Goes through the payment API, not a direct Firestore write: suspending
+  // must disable the user's actual Firebase Auth account and revoke any
+  // open session, which only the Admin SDK (server-side) can do.
   @override
   Future<Either<Failure, void>> suspendUser(String uid, bool isSuspended) =>
-      _guard(() => remoteDataSource.suspendUser(uid, isSuspended));
+      _guard(() => userModerationApi.setSuspended(uid: uid, suspend: isSuspended));
 
   @override
   Future<Either<Failure, void>> reviewProduct({

@@ -11,7 +11,6 @@ abstract interface class AdminRemoteDataSource {
   Future<List<String>> getCategories({bool seedDefaults = false});
   Future<void> addCategory(String name);
   Future<void> deleteCategory(String name);
-  Future<void> suspendUser(String uid, bool isSuspended);
   Future<void> reviewProduct({
     required String productId,
     required bool approve,
@@ -154,12 +153,6 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
     batch.delete(firestore.collection('categories').doc(_categoryId(name)));
     await batch.commit();
   }
-
-  @override
-  Future<void> suspendUser(String uid, bool isSuspended) => firestore
-      .collection('users')
-      .doc(uid)
-      .update({'isSuspended': isSuspended});
 
   /// Approving publishes the listing; rejecting hides it with a reason the
   /// creator sees. The creator is notified either way.

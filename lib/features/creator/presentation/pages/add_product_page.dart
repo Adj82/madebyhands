@@ -35,9 +35,49 @@ class _AddProductPageState extends State<AddProductPage> {
 
   // Optional Product Details
   late final TextEditingController _materialsController;
-  late final TextEditingController _dimensionsController;
-  late final TextEditingController _weightController;
+  late final TextEditingController _lengthController;
+  late final TextEditingController _widthController;
+  late final TextEditingController _heightController;
+  String _dimensionUnit = 'cm';
+  late final TextEditingController _weightValueController;
+  String _weightUnit = 'g';
   late final TextEditingController _shippingController;
+
+  static const _dimensionUnits = ['cm', 'mm'];
+  static const _weightUnits = ['g', 'kg'];
+
+  // Set only when an existing product's dimensions/weight were stored as
+  // free text (before this structured input existed) and couldn't be parsed
+  // back into number + unit — shown as a hint so the creator can re-enter it.
+  String? _unparsedDimensionsHint;
+  String? _unparsedWeightHint;
+
+  /// Best-effort parse of an existing "12 x 8 x 5 cm" style string, for
+  /// prefilling the structured fields when editing a product saved before
+  /// this UI existed. Falls back to leaving the fields blank.
+  static final _dimensionsPattern = RegExp(
+    r'^\s*([\d.]+)\s*[x×X]\s*([\d.]+)\s*[x×X]\s*([\d.]+)\s*(cm|mm)?\s*$',
+  );
+  static final _weightPattern = RegExp(
+    r'^\s*([\d.]+)\s*(kg|kilograms?|g|grams?)?\s*$',
+    caseSensitive: false,
+  );
+
+  /// Combines the structured fields back into the single string the
+  /// backend/schema has always stored, so nothing downstream needs to change.
+  String get _composedDimensions {
+    final l = _lengthController.text.trim();
+    final w = _widthController.text.trim();
+    final h = _heightController.text.trim();
+    if (l.isEmpty || w.isEmpty || h.isEmpty) return '';
+    return '$l x $w x $h $_dimensionUnit';
+  }
+
+  String get _composedWeight {
+    final v = _weightValueController.text.trim();
+    if (v.isEmpty) return '';
+    return '$v $_weightUnit';
+  }
 
   // Is it framed? (Only for 'Paintings, Drawing, Fine Art & Traditional Art')
   bool? _isFramed;
@@ -58,9 +98,29 @@ class _AddProductPageState extends State<AddProductPage> {
     _priceController = TextEditingController(text: p?.price.round().toString());
     _stockController = TextEditingController(text: p?.stock.toString());
     _materialsController = TextEditingController(text: p?.materials);
-    _dimensionsController = TextEditingController(text: p?.dimensions);
-    _weightController = TextEditingController(text: p?.weight);
     _shippingController = TextEditingController(text: p?.shippingInfo);
+
+    final dimensionsMatch = p == null ? null : _dimensionsPattern.firstMatch(p.dimensions);
+    _lengthController = TextEditingController(text: dimensionsMatch?.group(1) ?? '');
+    _widthController = TextEditingController(text: dimensionsMatch?.group(2) ?? '');
+    _heightController = TextEditingController(text: dimensionsMatch?.group(3) ?? '');
+    final parsedDimensionUnit = dimensionsMatch?.group(4)?.toLowerCase();
+    if (parsedDimensionUnit != null && _dimensionUnits.contains(parsedDimensionUnit)) {
+      _dimensionUnit = parsedDimensionUnit;
+    }
+    if (p != null && p.dimensions.isNotEmpty && dimensionsMatch == null) {
+      _unparsedDimensionsHint = p.dimensions;
+    }
+
+    final weightMatch = p == null ? null : _weightPattern.firstMatch(p.weight.trim());
+    _weightValueController = TextEditingController(text: weightMatch?.group(1) ?? '');
+    final parsedWeightUnit = weightMatch?.group(2)?.toLowerCase();
+    if (parsedWeightUnit != null) {
+      _weightUnit = parsedWeightUnit.startsWith('k') ? 'kg' : 'g';
+    }
+    if (p != null && p.weight.isNotEmpty && weightMatch == null) {
+      _unparsedWeightHint = p.weight;
+    }
     _isFramed = p?.isFramed;
 
     if (p != null) {
@@ -115,8 +175,10 @@ class _AddProductPageState extends State<AddProductPage> {
     _priceController.dispose();
     _stockController.dispose();
     _materialsController.dispose();
-    _dimensionsController.dispose();
-    _weightController.dispose();
+    _lengthController.dispose();
+    _widthController.dispose();
+    _heightController.dispose();
+    _weightValueController.dispose();
     _shippingController.dispose();
     for (var c in _customizationList) {
       c.dispose();
@@ -145,13 +207,34 @@ class _AddProductPageState extends State<AddProductPage> {
     });
   }
 
+  static const _minProductPhotos = 2;
+  static const _maxProductPhotos = 6;
+
+  int get _totalProductPhotos => _existingImageUrls.length + _imageFiles.length;
+
   Future<void> _pickImages() async {
+    final remaining = _maxProductPhotos - _totalProductPhotos;
+    if (remaining <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Maximum $_maxProductPhotos photos allowed.')),
+      );
+      return;
+    }
     final picker = ImagePicker();
     final pickedFiles = await picker.pickMultiImage(imageQuality: 70);
-    if (pickedFiles.isNotEmpty) {
-      setState(() {
-        _imageFiles.addAll(pickedFiles.map((f) => File(f.path)));
-      });
+    if (pickedFiles.isEmpty) return;
+    final accepted = pickedFiles.take(remaining).toList();
+    setState(() {
+      _imageFiles.addAll(accepted.map((f) => File(f.path)));
+    });
+    if (pickedFiles.length > accepted.length && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Only added $remaining of ${pickedFiles.length} photos — maximum $_maxProductPhotos per product.',
+          ),
+        ),
+      );
     }
   }
 
@@ -164,9 +247,15 @@ class _AddProductPageState extends State<AddProductPage> {
 
   void _submit() {
     FocusScope.of(context).unfocus();
-    if (_existingImageUrls.isEmpty && _imageFiles.isEmpty) {
+    if (_totalProductPhotos < _minProductPhotos) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Add at least one product photo.')),
+        const SnackBar(content: Text('Add at least $_minProductPhotos product photos.')),
+      );
+      return;
+    }
+    if (_totalProductPhotos > _maxProductPhotos) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Remove some photos — maximum $_maxProductPhotos allowed.')),
       );
       return;
     }
@@ -227,8 +316,8 @@ class _AddProductPageState extends State<AddProductPage> {
           initial.price.round() != price.round() ||
           initial.stock != stock ||
           initial.materials != _materialsController.text.trim() ||
-          initial.dimensions != _dimensionsController.text.trim() ||
-          initial.weight != _weightController.text.trim() ||
+          initial.dimensions != _composedDimensions ||
+          initial.weight != _composedWeight ||
           initial.shippingInfo != _shippingController.text.trim() ||
           initial.isCustomizable != _isCustomizable ||
           initial.isFramed != isFramed ||
@@ -255,8 +344,8 @@ class _AddProductPageState extends State<AddProductPage> {
           price: price.roundToDouble(),
           stock: stock,
           materials: _materialsController.text.trim(),
-          dimensions: _dimensionsController.text.trim(),
-          weight: _weightController.text.trim(),
+          dimensions: _composedDimensions,
+          weight: _composedWeight,
           shippingInfo: _shippingController.text.trim(),
           creatorUid: widget.profile.uid,
           creatorName: widget.profile.businessName.trim().isNotEmpty
@@ -318,9 +407,14 @@ class _AddProductPageState extends State<AddProductPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildSectionTitle('Product photos *'),
+                  _buildSectionTitle('Product photos * (2–6)'),
                   const SizedBox(height: 10),
                   _buildProductImagePicker(),
+                  const SizedBox(height: 6),
+                  Text(
+                    '$_totalProductPhotos of $_maxProductPhotos photos added — minimum $_minProductPhotos required.',
+                    style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+                  ),
                   const SizedBox(height: 30),
 
                   _buildSectionTitle('General Information'),
@@ -381,7 +475,7 @@ class _AddProductPageState extends State<AddProductPage> {
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
-          _buildAddImageButton(_pickImages),
+          if (_totalProductPhotos < _maxProductPhotos) _buildAddImageButton(_pickImages),
           ..._existingImageUrls.asMap().entries.map(
                 (e) => _buildExistingImageItem(
                   e.key,
@@ -919,22 +1013,112 @@ class _AddProductPageState extends State<AddProductPage> {
           validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
         ),
         const SizedBox(height: 15),
-        TextFormField(
-          controller: _dimensionsController,
-          decoration: const InputDecoration(
-            labelText: 'Dimensions (LxWxH) *',
-            prefixIcon: Icon(Icons.straighten),
-          ),
-          validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+        const Text(
+          'Dimensions (L × W × H) *',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
         ),
+        const SizedBox(height: 6),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 3,
+              child: TextFormField(
+                controller: _lengthController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                decoration: const InputDecoration(
+                  hintText: 'L',
+                  prefixIcon: Icon(Icons.straighten),
+                ),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Req.' : null,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 3,
+              child: TextFormField(
+                controller: _widthController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                decoration: const InputDecoration(hintText: 'W'),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Req.' : null,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 3,
+              child: TextFormField(
+                controller: _heightController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                decoration: const InputDecoration(hintText: 'H'),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Req.' : null,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 2,
+              child: DropdownButtonFormField<String>(
+                initialValue: _dimensionUnit,
+                items: _dimensionUnits
+                    .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _dimensionUnit = v);
+                },
+                decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 8)),
+              ),
+            ),
+          ],
+        ),
+        if (_unparsedDimensionsHint != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Previously entered: "$_unparsedDimensionsHint" — please re-enter above.',
+            style: const TextStyle(fontSize: 11, color: AppColors.mutedText),
+          ),
+        ],
         const SizedBox(height: 15),
-        TextFormField(
-          controller: _weightController,
-          decoration: const InputDecoration(
-            labelText: 'Weight',
-            prefixIcon: Icon(Icons.monitor_weight_outlined),
-          ),
+        const Text('Weight', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: TextFormField(
+                controller: _weightValueController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                decoration: const InputDecoration(
+                  hintText: 'e.g. 250',
+                  prefixIcon: Icon(Icons.monitor_weight_outlined),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 2,
+              child: DropdownButtonFormField<String>(
+                initialValue: _weightUnit,
+                items: _weightUnits
+                    .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _weightUnit = v);
+                },
+                decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 8)),
+              ),
+            ),
+          ],
         ),
+        if (_unparsedWeightHint != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Previously entered: "$_unparsedWeightHint" — please re-enter above.',
+            style: const TextStyle(fontSize: 11, color: AppColors.mutedText),
+          ),
+        ],
         const SizedBox(height: 15),
         TextFormField(
           controller: _shippingController,

@@ -103,3 +103,30 @@ class OrderActionsApi {
     }
   }
 }
+
+/// Suspending or reinstating a user must disable/enable their actual Firebase
+/// Auth account (and revoke any open session), which only the Admin SDK can
+/// do — so this runs on the server, never as a direct Firestore write.
+class UserModerationApi {
+  final Dio _dio;
+
+  UserModerationApi({Dio? dio}) : _dio = dio ?? PaymentApi.createClient();
+
+  Future<void> setSuspended({required String uid, required bool suspend}) async {
+    final token = await PaymentApi.idToken();
+    try {
+      await _dio.post<Map<String, dynamic>>(
+        '/api/suspend-user',
+        data: {'uid': uid, 'suspend': suspend},
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+    } on DioException catch (error) {
+      throw StateError(
+        PaymentApi.errorMessage(
+          error,
+          fallback: 'Could not update this user. Please try again.',
+        ),
+      );
+    }
+  }
+}

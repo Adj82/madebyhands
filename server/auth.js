@@ -70,8 +70,17 @@ async function requireUser(req, res) {
   }
 
   try {
-    return await firebaseAdmin.auth().verifyIdToken(match[1]);
+    // checkRevoked so a token issued before a suspension is rejected even if
+    // it has not naturally expired yet (admin.auth().revokeRefreshTokens()
+    // in api/suspend-user.js is what sets the revocation time this checks).
+    return await firebaseAdmin.auth().verifyIdToken(match[1], true);
   } catch (error) {
+    if (error.code === 'auth/id-token-revoked') {
+      res.status(401).json({
+        error: 'Your account access was revoked. Sign out and sign in again.',
+      });
+      return null;
+    }
     console.error('Firebase ID token verification failed:', error.message || error);
     res.status(401).json({
       error: 'Your session could not be verified. Sign out, sign in again and retry.',
