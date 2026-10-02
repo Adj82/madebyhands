@@ -15,68 +15,188 @@ class UserManagementView extends StatefulWidget {
   State<UserManagementView> createState() => _UserManagementViewState();
 }
 
-class _UserManagementViewState extends State<UserManagementView> {
+enum _VerifiedFilter { all, verified, unverified }
+
+class _UserManagementViewState extends State<UserManagementView>
+    with SingleTickerProviderStateMixin {
   final Stream<QuerySnapshot<Map<String, dynamic>>> _users = FirebaseFirestore
       .instance
       .collection('users')
       .snapshots();
 
+  late final TabController _tabController;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  _VerifiedFilter _creatorFilter = _VerifiedFilter.all;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this)
+      ..addListener(() {
+        // Rebuild so the verified/unverified filter row only shows on
+        // the Creators tab.
+        if (!_tabController.indexIsChanging) setState(() {});
+      });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  bool _matchesSearch(UserEntity user) {
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return true;
+    return user.name.toLowerCase().contains(query) ||
+        user.email.toLowerCase().contains(query) ||
+        user.phone.toLowerCase().contains(query);
+  }
+
+  bool _matchesCreatorFilter(UserEntity user) {
+    return switch (_creatorFilter) {
+      _VerifiedFilter.all => true,
+      _VerifiedFilter.verified => user.isVerified,
+      _VerifiedFilter.unverified => !user.isVerified,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: const TabBar(
-          tabs: [
-            Tab(text: 'Buyers'),
-            Tab(text: 'Creators'),
-          ],
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.mutedText,
-          indicatorColor: AppColors.primary,
-        ),
-        body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _users,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(child: Text('Could not load users: ${snapshot.error}'));
-            }
-            if (!snapshot.hasData) {
-              return const Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
-              );
-            }
-            final users = snapshot.data!.docs.map((doc) {
-              final data = doc.data();
-              return UserEntity(
-                uid: doc.id,
-                email: data['email'] as String? ?? '',
-                name: data['name'] as String? ?? '',
-                phone: data['phone'] as String? ?? '',
-                role: data['role'] as String? ?? 'buyer',
-                isVerified: data['isVerified'] as bool? ?? false,
-                isSuspended: data['isSuspended'] as bool? ?? false,
-              );
-            }).toList()
-              ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: TabBar(
+        controller: _tabController,
+        tabs: const [
+          Tab(text: 'Buyers'),
+          Tab(text: 'Creators'),
+        ],
+        labelColor: AppColors.primary,
+        unselectedLabelColor: AppColors.mutedText,
+        indicatorColor: AppColors.primary,
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) => setState(() => _searchQuery = value),
+              decoration: InputDecoration(
+                hintText: 'Search by name, email or phone',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Clear search',
+                        icon: const Icon(Icons.close),
+                        onPressed: () => setState(() {
+                          _searchController.clear();
+                          _searchQuery = '';
+                        }),
+                      ),
+                isDense: true,
+                filled: true,
+                fillColor: AppColors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.outline),
+                ),
+              ),
+            ),
+          ),
+          if (_tabController.index == 1)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('All'),
+                      selected: _creatorFilter == _VerifiedFilter.all,
+                      onSelected: (_) =>
+                          setState(() => _creatorFilter = _VerifiedFilter.all),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Verified'),
+                      selected: _creatorFilter == _VerifiedFilter.verified,
+                      onSelected: (_) => setState(
+                        () => _creatorFilter = _VerifiedFilter.verified,
+                      ),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Not verified'),
+                      selected: _creatorFilter == _VerifiedFilter.unverified,
+                      onSelected: (_) => setState(
+                        () => _creatorFilter = _VerifiedFilter.unverified,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _users,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(child: Text('Could not load users: ${snapshot.error}'));
+                }
+                if (!snapshot.hasData) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  );
+                }
+                final users = snapshot.data!.docs.map((doc) {
+                  final data = doc.data();
+                  return UserEntity(
+                    uid: doc.id,
+                    email: data['email'] as String? ?? '',
+                    name: data['name'] as String? ?? '',
+                    phone: data['phone'] as String? ?? '',
+                    role: data['role'] as String? ?? 'buyer',
+                    isVerified: data['isVerified'] as bool? ?? false,
+                    isSuspended: data['isSuspended'] as bool? ?? false,
+                  );
+                }).toList()
+                  ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
-            return TabBarView(
-              children: [
-                _UserList(
-                  users: users
-                      .where((u) => !u.isCreator && !u.isAdminOrManager)
-                      .toList(),
-                  emptyMessage: 'No buyers registered yet.',
-                ),
-                _UserList(
-                  users: users.where((u) => u.isCreator).toList(),
-                  emptyMessage: 'No creators registered yet.',
-                ),
-              ],
-            );
-          },
-        ),
+                final buyers = users
+                    .where((u) => !u.isCreator && !u.isAdminOrManager)
+                    .where(_matchesSearch)
+                    .toList();
+                final creators = users
+                    .where((u) => u.isCreator)
+                    .where(_matchesCreatorFilter)
+                    .where(_matchesSearch)
+                    .toList();
+
+                return TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _UserList(
+                      users: buyers,
+                      emptyMessage: _searchQuery.isEmpty
+                          ? 'No buyers registered yet.'
+                          : 'No buyers match "$_searchQuery".',
+                    ),
+                    _UserList(
+                      users: creators,
+                      emptyMessage: _searchQuery.isEmpty &&
+                              _creatorFilter == _VerifiedFilter.all
+                          ? 'No creators registered yet.'
+                          : 'No creators match the current search/filter.',
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

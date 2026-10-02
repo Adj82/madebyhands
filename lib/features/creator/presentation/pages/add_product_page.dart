@@ -151,17 +151,20 @@ class _AddProductPageState extends State<AddProductPage> {
         _customizationList.add(controllers);
       }
     }
-    final adminBloc = context.read<AdminBloc>();
-    if (adminBloc.state.categories.isEmpty) {
-      adminBloc.add(AdminCategoriesRequested());
-    }
+    // Always refetch (not just when empty) so a category the admin added or
+    // deleted since the last time this bloc loaded is reflected here too —
+    // the admin categories collection is the single source of truth.
+    context.read<AdminBloc>().add(AdminCategoriesRequested());
   }
 
   bool get _isEditing => widget.initialProduct != null;
 
+  // Admin's categories collection is the single source of truth — no
+  // hardcoded fallback list here. A product's already-selected categories
+  // (e.g. one an admin has since deleted) stay selectable so editing an
+  // existing listing doesn't silently drop them.
   List<String> get _categoryOptions {
-    final fromAdmin = context.read<AdminBloc>().state.categories;
-    final options = [...(fromAdmin.isEmpty ? kProductCategories : fromAdmin)];
+    final options = [...context.read<AdminBloc>().state.categories];
     for (final selected in _selectedCategories) {
       if (!options.contains(selected)) options.add(selected);
     }

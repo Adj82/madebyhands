@@ -150,7 +150,10 @@ class _OrderDetailBody extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        OrderStatus.label(order.status),
+                        // Buyers only ever see Confirmed/Delivered (or
+                        // Rejected/Cancelled, unchanged) — not the full
+                        // creator/admin fulfilment pipeline.
+                        OrderStatus.buyerLabel(order.status),
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
@@ -330,9 +333,18 @@ class _ShipmentTimeline extends StatelessWidget {
 
   const _ShipmentTimeline({required this.currentStatus});
 
+  // Buyers only track two milestones — Confirmed, then Delivered. The full
+  // placed→confirmed→processing→in_transit→shipped→out_for_delivery
+  // pipeline stays internal to creator fulfilment and admin tracking; it
+  // never surfaces here.
+  static const _buyerFlow = [OrderStatus.confirmed, OrderStatus.delivered];
+
   @override
   Widget build(BuildContext context) {
-    final currentStep = OrderStatus.shipmentStep(currentStatus);
+    final currentStep = OrderStatus.buyerStatus(currentStatus) ==
+            OrderStatus.delivered
+        ? 1
+        : 0;
     return Card(
       elevation: 1,
       color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
@@ -346,7 +358,7 @@ class _ShipmentTimeline extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Shipment progress',
+              'Order progress',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
@@ -354,16 +366,12 @@ class _ShipmentTimeline extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            for (
-              var index = 0;
-              index < OrderStatus.shipmentFlow.length;
-              index++
-            )
+            for (var index = 0; index < _buyerFlow.length; index++)
               _TimelineStep(
-                label: OrderStatus.label(OrderStatus.shipmentFlow[index]),
+                label: OrderStatus.label(_buyerFlow[index]),
                 isComplete: index < currentStep,
                 isCurrent: index == currentStep,
-                showConnector: index < OrderStatus.shipmentFlow.length - 1,
+                showConnector: index < _buyerFlow.length - 1,
               ),
           ],
         ),

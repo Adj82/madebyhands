@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:madebyhands/core/constants/product_categories.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
+import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 class HomeTab extends StatefulWidget {
@@ -31,51 +32,55 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   late final PageController _storyPageController;
 
-  final List<Map<String, String>> _stories = [
+  // Editorial picks — titles/images are curated copy, not tied to any
+  // specific admin category (categories can be renamed/added/deleted by
+  // admin at any time, so these cards open Browse All rather than hardcode
+  // a category name that may no longer exist).
+  final List<Map<String, String>> _stories = const [
     {
       'title': 'The Story of Madhubani Art',
       'image':
           'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?q=80&w=800&auto=format&fit=crop',
       'asset': 'assets/main_page_elements/painting_main.png',
-      'category': kProductCategories[0],
     },
     {
       'title': 'The Heritage of Phulkari',
       'image':
           'https://images.unsplash.com/photo-1606744888344-493238951221?q=80&w=800&auto=format&fit=crop',
       'asset': 'assets/main_page_elements/textile_main.png',
-      'category': kProductCategories[3],
     },
     {
       'title': 'Royal Terracotta & Pottery',
       'image':
           'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?q=80&w=800&auto=format&fit=crop',
       'asset': 'assets/main_page_elements/pottery_main.png',
-      'category': kProductCategories[2],
     },
     {
       'title': 'Handcrafted Cultural Heritage',
       'image':
           'https://images.unsplash.com/photo-1544816155-12df9643f363?q=80&w=800&auto=format&fit=crop',
       'asset': 'assets/main_page_elements/handicraft_main.png',
-      'category': kProductCategories[8],
     },
   ];
 
-  /// Artwork for each entry of [kProductCategories], in the same order.
-  static const _categoryArt = <String>[
-    'painting_main.png',
-    'digital_main.png',
-    'pottery_main.png',
-    'textile_main.png',
-    'fashion_main.png',
-    'homedec_main.png',
-    'wood_main.png',
-    'paper_main.png',
-    'handicraft_main.png',
-    'resin_main.png',
-    'other_main.png',
-  ];
+  /// Artwork for a handful of well-known category names, purely cosmetic —
+  /// if an admin category happens to match one of these names it gets this
+  /// artwork, otherwise the tile falls back to a plain text card. This is
+  /// not a list of "available" categories; availability always comes from
+  /// admin's live categories collection.
+  static const Map<String, String> _categoryArtByName = {
+    'Paintings, Drawing, Fine Art & Traditional Art': 'painting_main.png',
+    'Digital Art, Illustration, Design & Photography': 'digital_main.png',
+    'Pottery, Ceramics, Clay & Sculpture': 'pottery_main.png',
+    'Textile, Fiber, Embroidery, Toys & Dolls': 'textile_main.png',
+    'Fashion, Jewellery & Wearables': 'fashion_main.png',
+    'Home Décor & Lifestyle': 'homedec_main.png',
+    'Wood, Metal, Leather & Natural Crafts': 'wood_main.png',
+    'Paper, Books & Stationery': 'paper_main.png',
+    'Handicrafts & Artisan Goods': 'handicraft_main.png',
+    'Resin & Mixed-Material Art': 'resin_main.png',
+    'Other Creative Works': 'other_main.png',
+  };
 
   @override
   void initState() {
@@ -378,7 +383,7 @@ class _HomeTabState extends State<HomeTab> {
             itemBuilder: (context, index) {
               final story = _stories[index];
               return GestureDetector(
-                onTap: () => _openCategory(story['category']!),
+                onTap: _openSearch,
                 child: _buildStoryCard(story),
               );
             },
@@ -553,34 +558,46 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildCategoriesGrid() {
-    final count = kProductCategories.length;
-    final rowsCount = (count / 2).ceil();
+    return BlocBuilder<BuyerBloc, BuyerState>(
+      buildWhen: (previous, current) => previous.categories != current.categories,
+      builder: (context, state) {
+        // Admin's categories collection is the single source of truth — no
+        // hardcoded fallback list. If admin hasn't added any yet, show
+        // nothing rather than a stale constant list.
+        final categories = state.categories;
+        if (categories.isEmpty) return const SizedBox.shrink();
+        final count = categories.length;
+        final rowsCount = (count / 2).ceil();
 
-    return Column(
-      children: List.generate(rowsCount, (rowIndex) {
-        final firstIndex = rowIndex * 2;
-        final secondIndex = firstIndex + 1;
+        return Column(
+          children: List.generate(rowsCount, (rowIndex) {
+            final firstIndex = rowIndex * 2;
+            final secondIndex = firstIndex + 1;
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12.0),
-          child: Row(
-            children: [
-              Expanded(child: _buildCategoryCard(firstIndex)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: secondIndex < count
-                    ? _buildCategoryCard(secondIndex)
-                    : const SizedBox.shrink(),
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildCategoryCard(categories[firstIndex]),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: secondIndex < count
+                        ? _buildCategoryCard(categories[secondIndex])
+                        : const SizedBox.shrink(),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          }),
         );
-      }),
+      },
     );
   }
 
-  Widget _buildCategoryCard(int index) {
-    final name = kProductCategories[index];
+  Widget _buildCategoryCard(String name) {
+    final art = _categoryArtByName[name];
     return GestureDetector(
       onTap: () => _openCategory(name),
       child: AspectRatio(
@@ -598,26 +615,32 @@ class _HomeTabState extends State<HomeTab> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Image.asset(
-              'assets/main_page_elements/${_categoryArt[index]}',
-              semanticLabel: name,
-              fit: BoxFit.contain,
-              errorBuilder: (_, _, _) => Container(
-                color: const Color(0xFFF5EFE3),
-                padding: const EdgeInsets.all(8),
-                alignment: Alignment.center,
-                child: Text(
-                  name,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.playfairDisplay(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF6B1D1D),
+            child: art == null
+                ? _buildCategoryTextFallback(name)
+                : Image.asset(
+                    'assets/main_page_elements/$art',
+                    semanticLabel: name,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) => _buildCategoryTextFallback(name),
                   ),
-                ),
-              ),
-            ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryTextFallback(String name) {
+    return Container(
+      color: const Color(0xFFF5EFE3),
+      padding: const EdgeInsets.all(8),
+      alignment: Alignment.center,
+      child: Text(
+        name,
+        textAlign: TextAlign.center,
+        style: GoogleFonts.playfairDisplay(
+          fontSize: 11.5,
+          fontWeight: FontWeight.bold,
+          color: const Color(0xFF6B1D1D),
         ),
       ),
     );

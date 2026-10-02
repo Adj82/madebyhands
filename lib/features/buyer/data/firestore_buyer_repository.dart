@@ -3,7 +3,6 @@ import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:madebyhands/core/constants/product_categories.dart';
 import 'package:madebyhands/features/buyer/domain/entities/buyer_order.dart';
 import 'package:madebyhands/features/buyer/domain/entities/buyer_product_notification.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
@@ -64,16 +63,18 @@ class FirestoreBuyerRepository implements BuyerRepository {
         }).toList(),
       );
 
+  // The admin-managed `categories` collection is the single source of truth
+  // for which categories exist anywhere in the app — no hardcoded fallback
+  // here. Whatever admin has configured (including nothing) is what shows.
   @override
   Stream<List<String>> watchCategories() =>
       firestore.collection('categories').snapshots().map((snapshot) {
-        final names = snapshot.docs
+        return snapshot.docs
             .map((doc) => (doc.data()['name'] as String? ?? '').trim())
             .where((name) => name.isNotEmpty)
             .toSet()
             .toList()
           ..sort();
-        return names.isEmpty ? List<String>.of(kProductCategories) : names;
       });
 
   @override
@@ -293,8 +294,13 @@ class FirestoreBuyerRepository implements BuyerRepository {
         orderSubscription = watchOrders(userId).listen((value) {
           orders = value
               .map(
+                // Bucket to the buyer-facing status (confirmed / delivered /
+                // rejected / cancelled) so intermediate creator fulfilment
+                // transitions (processing, in_transit, shipped, out for
+                // delivery) collapse into the same notification instead of
+                // each spawning a separate one.
                 (order) => BuyerProductNotification.order(
-                  id: 'order-${order.id}-${OrderStatus.normalize(order.status)}',
+                  id: 'order-${order.id}-${OrderStatus.buyerStatus(order.status)}',
                   orderId: order.id,
                   orderStatus: order.status,
                   publishedAt: order.updatedAt ?? order.createdAt,

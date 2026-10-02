@@ -564,9 +564,12 @@ Future<void> _showReleaseSheet(BuildContext context, _PayoutOrder order) async {
           else ...[
             detail('Account holder', bank['accountHolderName'] as String?),
             detail('Account no.', bank['accountNumber'] as String?),
+            detail('Account type', bank['accountType'] as String?),
             detail('IFSC', bank['ifscCode'] as String?),
             detail('Bank', bank['bankName'] as String?),
+            detail('Branch', bank['branchName'] as String?),
             detail('UPI ID', bank['upiId'] as String?),
+            detail('PAN', bank['panNumber'] as String?),
           ],
           const SizedBox(height: 12),
           const Text(

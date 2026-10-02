@@ -129,8 +129,12 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
         });
       }
       await batch.commit();
+      return List<String>.from(kProductCategories);
     }
-    return List<String>.from(kProductCategories);
+    // Firestore is the single source of truth: an empty collection means
+    // admin has configured (or deleted down to) zero categories — never
+    // silently substitute the hardcoded defaults here.
+    return const [];
   }
 
   @override

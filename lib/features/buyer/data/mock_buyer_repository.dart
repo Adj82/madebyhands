@@ -138,7 +138,7 @@ class MockBuyerRepository implements BuyerRepository {
     ...productNotifications,
     ..._orders.map(
       (order) => BuyerProductNotification.order(
-        id: 'order-${order.id}-${order.status}',
+        id: 'order-${order.id}-${OrderStatus.buyerStatus(order.status)}',
         orderId: order.id,
         orderStatus: order.status,
         publishedAt: order.updatedAt ?? order.createdAt,

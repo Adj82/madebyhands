@@ -93,10 +93,10 @@ class _SearchTabState extends State<SearchTab> {
   }
 
   Future<void> _openCategoryFilter() async {
+    // Admin's categories collection is the single source of truth — no
+    // hardcoded fallback list here.
     final state = context.read<BuyerBloc>().state;
-    final categories = [
-      ...(state.categories.isEmpty ? kProductCategories : state.categories),
-    ];
+    final categories = [...state.categories];
     final draftSelection = Set<String>.from(_selectedCategories);
     final selection = await showModalBottomSheet<Set<String>>(
       context: context,

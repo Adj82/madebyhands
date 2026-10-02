@@ -488,8 +488,8 @@ void main() {
 
     await tester.tap(find.byTooltip('Open notifications'));
     await tester.pumpAndSettle();
-    expect(find.text('Order Delivered'), findsOneWidget);
-    await tester.tap(find.text('Order Delivered'));
+    expect(find.text('Order delivered'), findsOneWidget);
+    await tester.tap(find.text('Order delivered'));
     await tester.pumpAndSettle();
     expect(find.text('My orders'), findsOneWidget);
   });

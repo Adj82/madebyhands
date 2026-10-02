@@ -203,12 +203,12 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final normalized = OrderStatus.normalize(status);
-    final color = switch (normalized) {
+    // Buyers only ever see Confirmed / Delivered / Rejected / Cancelled —
+    // the full creator/admin fulfilment pipeline stays internal.
+    final bucket = OrderStatus.buyerStatus(status);
+    final color = switch (bucket) {
       OrderStatus.delivered => Colors.green.shade800,
       OrderStatus.rejected || OrderStatus.cancelled => Colors.red.shade800,
-      OrderStatus.outForDelivery => Colors.deepOrange.shade800,
-      OrderStatus.shipped || OrderStatus.inTransit => Colors.indigo.shade800,
       _ => const Color(0xFF8B261D),
     };
     return Container(
@@ -219,7 +219,7 @@ class _StatusChip extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
-        OrderStatus.label(status),
+        OrderStatus.buyerLabel(status),
         style: TextStyle(
           color: color,
           fontSize: 12,

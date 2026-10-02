@@ -40,11 +40,14 @@ class BuyerProductNotification {
        type = BuyerNotificationType.order;
 
   String get title => type == BuyerNotificationType.order
-      ? (OrderStatus.normalize(orderStatus ?? '') == OrderStatus.rejected
+      ? (OrderStatus.buyerStatus(orderStatus ?? '') == OrderStatus.rejected ||
+                OrderStatus.buyerStatus(orderStatus ?? '') ==
+                    OrderStatus.cancelled
             ? 'Order rejected'
-            : OrderStatus.normalize(orderStatus ?? '') == OrderStatus.confirmed
-            ? 'Order accepted'
-            : 'Order ${_statusLabel(orderStatus ?? '')}')
+            : OrderStatus.buyerStatus(orderStatus ?? '') ==
+                  OrderStatus.delivered
+            ? 'Order delivered'
+            : 'Order accepted')
       : 'New in $category';
 
   String get message {
@@ -60,23 +63,16 @@ class BuyerProductNotification {
       };
     }
 
-    final normalized = OrderStatus.normalize(orderStatus ?? '');
-    if (normalized == OrderStatus.rejected) {
+    final bucket = OrderStatus.buyerStatus(orderStatus ?? '');
+    if (bucket == OrderStatus.rejected || bucket == OrderStatus.cancelled) {
       final reason = (orderRejectionReason ?? '').trim();
       final reasonText = reason.isEmpty ? '' : ' Reason: $reason.';
       return 'Order #$orderId was rejected by the creator.$reasonText '
           'You will be refunded in full within 5 days.';
     }
-    if (normalized == OrderStatus.confirmed) {
-      return 'Order #$orderId has been accepted by the creator and is now being prepared.';
+    if (bucket == OrderStatus.delivered) {
+      return 'Order #$orderId has been delivered.';
     }
-    return 'Order #$orderId: ${OrderStatus.label(orderStatus ?? '').toLowerCase()}.';
+    return 'Order #$orderId has been accepted by the creator and is now being prepared.';
   }
-
-  /// Title-cased status, e.g. 'in_transit' -> 'In Transit'.
-  static String _statusLabel(String status) => OrderStatus.normalize(status)
-      .split('_')
-      .where((part) => part.isNotEmpty)
-      .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
-      .join(' ');
 }

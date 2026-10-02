@@ -130,6 +130,7 @@ class _AdminOrder {
   String? get refundStatus => data['refundStatus'] as String?;
   String get creatorId => data['creatorId'] as String? ?? '';
   String get creatorName => data['creatorName'] as String? ?? 'Creator';
+  String get buyerId => data['buyerId'] as String? ?? '';
   String get buyerName => data['buyerName'] as String? ?? 'Buyer';
   String get buyerPhone => data['buyerPhone'] as String? ?? '';
   String get buyerEmail => data['buyerEmail'] as String? ?? '';
@@ -250,27 +251,57 @@ class _OrderTileState extends State<_OrderTile> {
     );
   }
 
-  Future<void> _contactSeller() async {
-    String phone = '';
-    String email = '';
-    if (order.creatorId.isNotEmpty) {
+  /// Looks up [uid]'s current phone/email from their `users` profile (the
+  /// email they actually signed in with) and merges it with whatever was
+  /// snapshotted onto the order itself, preferring the live profile value
+  /// when present — covers older orders saved before a field existed, or
+  /// a buyer/creator who added their email after placing the order.
+  Future<void> _contactUser({
+    required String title,
+    required String uid,
+    required String fallbackName,
+    required String fallbackPhone,
+    required String fallbackEmail,
+  }) async {
+    String phone = fallbackPhone;
+    String email = fallbackEmail;
+    String name = fallbackName;
+    if (uid.isNotEmpty) {
       try {
         final user = await FirebaseFirestore.instance
             .collection('users')
-            .doc(order.creatorId)
+            .doc(uid)
             .get();
-        phone = user.data()?['phone'] as String? ?? '';
-        email = user.data()?['email'] as String? ?? '';
+        final data = user.data();
+        if (data != null) {
+          final liveName = data['name'] as String?;
+          final livePhone = data['phone'] as String?;
+          final liveEmail = data['email'] as String?;
+          if ((liveName ?? '').trim().isNotEmpty) name = liveName!;
+          if ((livePhone ?? '').trim().isNotEmpty) phone = livePhone!;
+          if ((liveEmail ?? '').trim().isNotEmpty) email = liveEmail!;
+        }
       } catch (_) {}
     }
     if (!mounted) return;
-    _showContactSheet(
-      title: 'Contact creator',
-      name: order.creatorName,
-      phone: phone,
-      email: email,
-    );
+    _showContactSheet(title: title, name: name, phone: phone, email: email);
   }
+
+  Future<void> _contactSeller() => _contactUser(
+        title: 'Contact creator',
+        uid: order.creatorId,
+        fallbackName: order.creatorName,
+        fallbackPhone: '',
+        fallbackEmail: '',
+      );
+
+  Future<void> _contactBuyer() => _contactUser(
+        title: 'Contact buyer',
+        uid: order.buyerId,
+        fallbackName: order.buyerName,
+        fallbackPhone: order.buyerPhone,
+        fallbackEmail: order.buyerEmail,
+      );
 
   void _showContactSheet({
     required String title,
@@ -440,12 +471,7 @@ class _OrderTileState extends State<_OrderTile> {
             runSpacing: 10,
             children: [
               OutlinedButton.icon(
-                onPressed: () => _showContactSheet(
-                  title: 'Contact buyer',
-                  name: order.buyerName,
-                  phone: order.buyerPhone,
-                  email: order.buyerEmail,
-                ),
+                onPressed: _contactBuyer,
                 icon: const Icon(Icons.person, size: 18),
                 label: const Text('Buyer'),
                 style: OutlinedButton.styleFrom(minimumSize: const Size(0, 40)),

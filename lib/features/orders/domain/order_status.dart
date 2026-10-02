@@ -107,4 +107,20 @@ abstract final class OrderStatus {
     final status = normalize(value);
     return status == placed || status == confirmed || status == processing;
   }
+
+  /// Buyer-facing status bucket. Creators and admins still track the full
+  /// granular pipeline (placed → confirmed → processing → in_transit →
+  /// shipped → out_for_delivery → delivered) to manage fulfilment, but
+  /// buyers only ever see two states: "Confirmed" while the order is
+  /// anywhere in that pipeline, and "Delivered" once it arrives. Rejected
+  /// and cancelled orders stay their own distinct, clearly-flagged state.
+  static String buyerStatus(String value) {
+    final normalized = normalize(value);
+    if (normalized == delivered) return delivered;
+    if (isRejectedOrCancelled(normalized)) return normalized;
+    return confirmed;
+  }
+
+  /// The label a buyer sees for [value] — see [buyerStatus].
+  static String buyerLabel(String value) => label(buyerStatus(value));
 }
