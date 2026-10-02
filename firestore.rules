@@ -268,5 +268,17 @@ service cloud.firestore {
             resource.data.userId == request.auth.uid));
     }
 
+    // ------------------------------------------------------ account deletions
+
+    // A one-way log of why someone deleted their account, written by the
+    // departing user themselves just before their account is removed.
+    // Write-only from the client: nobody can read, edit, or delete these
+    // through the app (super admins read them directly in the console).
+    match /account_deletions/{entryId} {
+      allow create: if signedIn() &&
+        request.resource.data.uid == request.auth.uid;
+      allow read, update, delete: if false;
+    }
+
   }
 }

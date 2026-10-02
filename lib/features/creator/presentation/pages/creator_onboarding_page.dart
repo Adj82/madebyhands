@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:madebyhands/core/constants/product_categories.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
@@ -34,30 +35,9 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
   final _storyController = TextEditingController();
 
   File? _profileImage;
-  File? _panCardFile;
-  File? _aadhaarCardFile;
-  String? _existingPanCardUrl;
-  String? _existingAadhaarCardUrl;
   final List<File> _portfolioImages = [];
   final List<String> _existingPortfolioUrls = [];
   final List<String> _socialLinks = [];
-  bool _isRefreshing = false;
-
-  Future<void> _handleRefresh() async {
-    if (_isRefreshing) return;
-    setState(() => _isRefreshing = true);
-
-    try {
-      context.read<CreatorBloc>().add(CreatorCheckProfileExists(widget.user.uid));
-      context.read<AdminBloc>().add(AdminLoadDataRequested());
-      await Future.delayed(const Duration(milliseconds: 600));
-    } finally {
-      if (mounted) {
-        setState(() => _isRefreshing = false);
-      }
-    }
-  }
-
   @override
   void initState() {
     super.initState();
@@ -71,8 +51,10 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
     if (p != null) {
       _socialLinks.addAll(p.socialLinks);
       _existingPortfolioUrls.addAll(p.portfolio);
-      if (p.panCard.isNotEmpty) _existingPanCardUrl = p.panCard;
-      if (p.aadhaarCard.isNotEmpty) _existingAadhaarCardUrl = p.aadhaarCard;
+    }
+    final adminBloc = context.read<AdminBloc>();
+    if (adminBloc.state.categories.isEmpty) {
+      adminBloc.add(AdminCategoriesRequested());
     }
   }
 
@@ -104,81 +86,17 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
   }
 
   void _addSocialLink() {
-    if (_socialController.text.trim().isNotEmpty) {
-      setState(() {
-        _socialLinks.add(_socialController.text.trim());
-        _socialController.clear();
-      });
-    }
-  }
-
-  Future<void> _pickDocument({
-    required String docName,
-    required Function(File file) onFilePicked,
-  }) async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-    );
-
-    if (pickedFile != null) {
-      final ext = pickedFile.path.contains('.')
-          ? pickedFile.path.split('.').last.toLowerCase()
-          : '';
-      final validExtensions = ['pdf', 'png', 'jpg', 'jpeg'];
-      if (ext.isNotEmpty && !validExtensions.contains(ext)) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Invalid file format for $docName. Only PDF or Image (JPG, PNG) files are allowed.',
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-
-      setState(() {
-        onFilePicked(File(pickedFile.path));
-      });
-    }
-  }
-
-  bool _validateDocuments() {
-    final hasPan = _panCardFile != null ||
-        (_existingPanCardUrl != null && _existingPanCardUrl!.isNotEmpty);
-    final hasAadhaar = _aadhaarCardFile != null ||
-        (_existingAadhaarCardUrl != null &&
-            _existingAadhaarCardUrl!.isNotEmpty);
-
-    if (!hasPan) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('PAN Card document is required to proceed.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return false;
-    }
-
-    if (!hasAadhaar) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Aadhaar Card document is required to proceed.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return false;
-    }
-
-    return true;
+    final link = _socialController.text.trim();
+    if (link.isEmpty || _socialLinks.contains(link)) return;
+    setState(() {
+      _socialLinks.add(link);
+      _socialController.clear();
+    });
   }
 
   void _submit() {
-    if (_formKey.currentState!.validate() && _validateDocuments()) {
+    FocusScope.of(context).unfocus();
+    if (_formKey.currentState!.validate()) {
       context.read<CreatorBloc>().add(
             CreatorSubmitOnboarding(
               uid: widget.user.uid,
@@ -187,15 +105,11 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
               bio: _bioController.text.trim(),
               category: _categoryController.text.trim(),
               location: _locationController.text.trim(),
-              socialLinks: _socialLinks,
-              portfolioImageFiles: _portfolioImages,
+              socialLinks: List.of(_socialLinks),
+              portfolioImageFiles: List.of(_portfolioImages),
               story: _storyController.text.trim(),
               existingProfileImageUrl: widget.existingProfile?.profileImage,
-              existingPortfolioUrls: _existingPortfolioUrls,
-              panCardFile: _panCardFile,
-              aadhaarCardFile: _aadhaarCardFile,
-              existingPanCardUrl: _existingPanCardUrl,
-              existingAadhaarCardUrl: _existingAadhaarCardUrl,
+              existingPortfolioUrls: List.of(_existingPortfolioUrls),
             ),
           );
     }
@@ -254,39 +168,33 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
         ],
       ),
       body: BlocConsumer<CreatorBloc, CreatorState>(
+        listenWhen: (previous, current) =>
+            previous.actionId != current.actionId &&
+            current.action == CreatorAction.saveProfile &&
+            current.actionStatus != CreatorActionStatus.inProgress,
         listener: (context, state) {
-          if (state.action == CreatorAction.saveProfile &&
-              state.actionStatus == CreatorActionStatus.success) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  isEditMode
-                      ? 'Profile updated successfully!'
-                      : 'Profile created successfully!',
-                ),
-              ),
+          final messenger = ScaffoldMessenger.of(context);
+          if (state.actionStatus == CreatorActionStatus.failure) {
+            messenger.showSnackBar(
+              SnackBar(content: Text(state.actionMessage ?? 'Could not save your profile.')),
             );
-            context.read<CreatorBloc>().add(CreatorCheckProfileExists(widget.user.uid));
-            if (isEditMode) {
-              Navigator.pop(context);
-            }
-          } else if (state.action == CreatorAction.saveProfile &&
-              state.actionStatus == CreatorActionStatus.failure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.actionMessage ?? 'Failed to save profile')),
-            );
+            return;
           }
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text(isEditMode ? 'Profile updated.' : 'Welcome to MadeByHands!'),
+            ),
+          );
+          if (isEditMode) Navigator.pop(context);
         },
+        buildWhen: (previous, current) =>
+            previous.isRunning(CreatorAction.saveProfile) !=
+            current.isRunning(CreatorAction.saveProfile),
         builder: (context, state) {
-          if (state.status == CreatorSessionStatus.loading ||
-              state.isRunning(CreatorAction.saveProfile)) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
-          }
-
-          return RefreshIndicator(
-            onRefresh: _handleRefresh,
+          final saving = state.isRunning(CreatorAction.saveProfile);
+          return AbsorbPointer(
+            absorbing: saving,
             child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.fromLTRB(
                 24.0,
                 16.0,
@@ -296,7 +204,7 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
               child: Form(
                 key: _formKey,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _OnboardingHeader(isEditMode: isEditMode),
                     const SizedBox(height: 30),
@@ -304,15 +212,19 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
                     const SizedBox(height: 30),
                     _buildFormFields(),
                     const SizedBox(height: 30),
-                    _buildDocumentSection(),
-                    const SizedBox(height: 30),
                     _buildSocialLinksSection(),
                     const SizedBox(height: 30),
                     _buildPortfolioSection(),
                     const SizedBox(height: 50),
                     FilledButton(
-                      onPressed: _submit,
-                      child: Text(isEditMode ? 'Save Profile Changes' : 'Launch My Studio'),
+                      onPressed: saving ? null : _submit,
+                      child: saving
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(isEditMode ? 'Save profile changes' : 'Launch my studio'),
                     ),
                     const SizedBox(height: 30),
                   ],
@@ -376,21 +288,33 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
         ),
         const SizedBox(height: 20),
         BlocBuilder<AdminBloc, AdminState>(
+          buildWhen: (previous, current) => previous.categories != current.categories,
           builder: (context, state) {
-            final categories = state.categories;
             final currentVal = _categoryController.text.trim();
+            final categories = [
+              ...(state.categories.isEmpty ? kProductCategories : state.categories),
+            ];
+            if (currentVal.isNotEmpty && !categories.contains(currentVal)) {
+              categories.insert(0, currentVal);
+            }
 
             return DropdownButtonFormField<String>(
-              initialValue: categories.contains(currentVal) ? currentVal : null,
+              initialValue: currentVal.isEmpty ? null : currentVal,
+              isExpanded: true,
               decoration: const InputDecoration(
-                labelText: 'Primary Craft Category *',
+                labelText: 'Primary craft category *',
                 prefixIcon: Icon(Icons.category_outlined),
               ),
               items: categories
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                  .map(
+                    (c) => DropdownMenuItem(
+                      value: c,
+                      child: Text(c, overflow: TextOverflow.ellipsis),
+                    ),
+                  )
                   .toList(),
               onChanged: (val) {
-                if (val != null) setState(() => _categoryController.text = val);
+                if (val != null) _categoryController.text = val;
               },
               validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
             );
@@ -420,143 +344,6 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
     );
   }
 
-  Widget _buildDocumentSection() {
-    final hasPan = _panCardFile != null ||
-        (_existingPanCardUrl != null && _existingPanCardUrl!.isNotEmpty);
-    final hasAadhaar = _aadhaarCardFile != null ||
-        (_existingAadhaarCardUrl != null &&
-            _existingAadhaarCardUrl!.isNotEmpty);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Required Identity & Tax Documents *',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppColors.primary,
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Upload official PAN Card and Aadhaar Card (PDF or Image format required)',
-          style: TextStyle(fontSize: 12, color: AppColors.mutedText),
-        ),
-        const SizedBox(height: 16),
-        _buildDocUploadCard(
-          title: 'PAN Card *',
-          subtitle: 'Upload clear copy of PAN Card (PDF, PNG, JPG)',
-          file: _panCardFile,
-          existingUrl: _existingPanCardUrl,
-          hasDoc: hasPan,
-          onTap: () => _pickDocument(
-            docName: 'PAN Card',
-            onFilePicked: (f) => _panCardFile = f,
-          ),
-        ),
-        const SizedBox(height: 12),
-        _buildDocUploadCard(
-          title: 'Aadhaar Card *',
-          subtitle: 'Upload clear copy of Aadhaar Card (PDF, PNG, JPG)',
-          file: _aadhaarCardFile,
-          existingUrl: _existingAadhaarCardUrl,
-          hasDoc: hasAadhaar,
-          onTap: () => _pickDocument(
-            docName: 'Aadhaar Card',
-            onFilePicked: (f) => _aadhaarCardFile = f,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDocUploadCard({
-    required String title,
-    required String subtitle,
-    required File? file,
-    required String? existingUrl,
-    required bool hasDoc,
-    required VoidCallback onTap,
-  }) {
-    String statusText = subtitle;
-    if (file != null) {
-      final fileName = file.path.split('/').last.split('\\').last;
-      statusText = 'Selected: $fileName';
-    } else if (existingUrl != null && existingUrl.isNotEmpty) {
-      statusText = 'Uploaded document on file';
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: hasDoc
-            ? AppColors.primary.withValues(alpha: 0.05)
-            : AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: hasDoc ? AppColors.primary : Colors.red.shade300,
-          width: hasDoc ? 1.5 : 1.0,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color:
-                  (hasDoc ? Colors.green : Colors.red).withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              hasDoc ? Icons.check_circle_outline : Icons.upload_file,
-              color: hasDoc ? Colors.green : Colors.red,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: hasDoc ? AppColors.text : Colors.red.shade900,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  statusText,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: hasDoc ? AppColors.mutedText : Colors.red.shade700,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          OutlinedButton(
-            onPressed: onTap,
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              minimumSize: const Size(0, 36),
-            ),
-            child: Text(
-              hasDoc ? 'Replace' : 'Upload',
-              style: const TextStyle(fontSize: 12),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSocialLinksSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -582,8 +369,12 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,
+          runSpacing: 4,
           children: _socialLinks.map((link) => Chip(
-            label: Text(link, style: const TextStyle(fontSize: 12)),
+            label: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 220),
+              child: Text(link, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+            ),
             onDeleted: () => setState(() => _socialLinks.remove(link)),
             deleteIconColor: Colors.red,
           )).toList(),
@@ -596,7 +387,7 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Showcase Portfolio (Recommended: 16:9)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
+        const Text('Portfolio', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
         const SizedBox(height: 10),
         SizedBox(
           height: 120,
@@ -645,6 +436,13 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
               width: 120,
               height: 120,
               fit: BoxFit.cover,
+              cacheWidth: 360,
+              errorBuilder: (_, _, _) => Container(
+                width: 120,
+                height: 120,
+                color: AppColors.outline,
+                child: const Icon(Icons.broken_image, color: Colors.grey),
+              ),
             ),
           ),
         ),

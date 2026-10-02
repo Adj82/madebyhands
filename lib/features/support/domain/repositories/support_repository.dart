@@ -21,23 +21,4 @@ abstract class SupportRepository {
   });
 
   Future<void> resolveTicket(String ticketId);
-
-  Future<String> createAccountDeletionRequest({
-    required String userId,
-    required String userName,
-    required String reason,
-  });
-
-  Future<void> approveAccountDeletion({
-    required String ticketId,
-    required String creatorUid,
-  });
-
-  Future<void> rejectAccountDeletion({
-    required String ticketId,
-    required String creatorUid,
-    required String rejectionReason,
-  });
-
-  Stream<SupportTicket?> watchLatestDeletionRequest(String userId);
 }

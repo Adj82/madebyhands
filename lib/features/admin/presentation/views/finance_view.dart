@@ -582,14 +582,31 @@ Future<void> _showReleaseSheet(BuildContext context, _PayoutOrder order) async {
                   : () async {
                       Navigator.pop(sheetContext);
                       try {
-                        await FirebaseFirestore.instance
-                            .collection('orders')
-                            .doc(order.id)
-                            .update({
-                              'payoutStatus': 'paid',
-                              'payoutReleasedAt': FieldValue.serverTimestamp(),
-                              'updatedAt': FieldValue.serverTimestamp(),
-                            });
+                        final batch = FirebaseFirestore.instance.batch();
+                        batch.update(
+                          FirebaseFirestore.instance.collection('orders').doc(order.id),
+                          {
+                            'payoutStatus': 'paid',
+                            'payoutReleasedAt': FieldValue.serverTimestamp(),
+                            'updatedAt': FieldValue.serverTimestamp(),
+                          },
+                        );
+                        if (order.creatorId.isNotEmpty) {
+                          batch.set(
+                            FirebaseFirestore.instance.collection('notifications').doc(),
+                            {
+                              'creatorUid': order.creatorId,
+                              'title': 'Payout released',
+                              'message':
+                                  '₹${order.amount} for Order #${order.shortId} has been paid out to your account.',
+                              'type': 'payout',
+                              'targetId': order.id,
+                              'createdAt': FieldValue.serverTimestamp(),
+                              'isRead': false,
+                            },
+                          );
+                        }
+                        await batch.commit();
                         messenger.showSnackBar(
                           SnackBar(
                             content: Text(

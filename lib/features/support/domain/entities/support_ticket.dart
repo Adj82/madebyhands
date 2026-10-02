@@ -5,9 +5,6 @@ class SupportTicket {
   final String userName;
   final String subject;
   final String status;
-  final String requestStatus; // 'Pending', 'Approved', 'Rejected', 'none'
-  final String reason;
-  final String type; // 'general', 'account_deletion'
   final String lastMessage;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -19,18 +16,12 @@ class SupportTicket {
     required this.userName,
     required this.subject,
     required this.status,
-    this.requestStatus = 'none',
-    this.reason = '',
-    this.type = 'general',
     required this.lastMessage,
     required this.createdAt,
     required this.updatedAt,
   });
 
   bool get isOpen => status == 'open';
-  bool get isAccountDeletionRequest =>
-      type == 'account_deletion' || subject == 'Account Deletion Request';
-  bool get isAccountDeletion => isAccountDeletionRequest;
 }
 
 class SupportMessage {

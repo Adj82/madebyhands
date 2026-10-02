@@ -92,20 +92,18 @@ void _initAuth() {
 
 void _initCreator() {
   // Data Source
-  serviceLocator.registerFactory<CreatorRemoteDataSourceImpl>(
+  serviceLocator.registerFactory<CreatorRemoteDataSource>(
     () => CreatorRemoteDataSourceImpl(
       firestore: serviceLocator(),
       firebaseStorage: serviceLocator(),
     ),
   );
-  serviceLocator.registerFactory<CreatorRemoteDataSource>(
-    () => serviceLocator<CreatorRemoteDataSourceImpl>(),
-  );
 
   // Repository
   serviceLocator.registerFactory<CreatorRepository>(
     () => CreatorRepositoryImpl(
-      serviceLocator<CreatorRemoteDataSourceImpl>(),
+      serviceLocator(),
+      orderActionsApi: serviceLocator(),
     ),
   );
 

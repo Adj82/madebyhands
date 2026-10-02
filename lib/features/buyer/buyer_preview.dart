@@ -58,7 +58,7 @@ class FakeAuthRepository implements AuthRepository {
     required String phone,
   }) async => throw UnimplementedError();
   @override
-  Future<Either<Failure, void>> deleteAccount(String uid) async =>
+  Future<Either<Failure, void>> deleteAccount(String uid, String reason) async =>
       throw UnimplementedError();
   @override
   Future<Either<Failure, UserEntity>> signInWithGoogle() async =>

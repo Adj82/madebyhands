@@ -12,35 +12,15 @@ class CreatorProfileModel extends CreatorProfile {
     required super.portfolio,
     required super.story,
     super.verificationStatus,
+    super.verificationNote,
     super.businessName,
     super.address,
     super.latestPhoto,
     super.idCard,
-    super.panCard,
-    super.aadhaarCard,
   });
 
-  Map<String, dynamic> toJson() {
-    return {
-      'uid': uid,
-      'name': name,
-      'profileImage': profileImage,
-      'bio': bio,
-      'category': category,
-      'location': location,
-      'socialLinks': socialLinks,
-      'portfolio': portfolio,
-      'story': story,
-      'verificationStatus': verificationStatus,
-      'businessName': businessName,
-      'address': address,
-      'latestPhoto': latestPhoto,
-      'idCard': idCard,
-      'panCard': panCard,
-      'aadhaarCard': aadhaarCard,
-    };
-  }
-
+  /// The public, creator-editable fields. Verification status and documents
+  /// are written separately so a profile edit can never reset them.
   Map<String, dynamic> toEditableJson() {
     return {
       'uid': uid,
@@ -52,61 +32,38 @@ class CreatorProfileModel extends CreatorProfile {
       'socialLinks': socialLinks,
       'portfolio': portfolio,
       'story': story,
-      'verificationStatus': verificationStatus,
-      'businessName': businessName,
-      'address': address,
-      'latestPhoto': latestPhoto,
-      'idCard': idCard,
-      'panCard': panCard,
-      'aadhaarCard': aadhaarCard,
     };
   }
+
+  static String _string(Object? value) => value is String ? value : '';
+
+  static List<String> _strings(Object? value) => value is List
+      ? value.whereType<String>().where((item) => item.trim().isNotEmpty).toList()
+      : const [];
 
   factory CreatorProfileModel.fromJson(
     Map<String, dynamic> json, [
     String? docId,
   ]) {
-    final uidVal = (json['uid'] as String?)?.trim();
+    final uid = _string(json['uid']).trim();
     return CreatorProfileModel(
-      uid: (uidVal != null && uidVal.isNotEmpty)
-          ? uidVal
-          : (docId ?? ''),
-      name: json['name'] ?? '',
-      profileImage: json['profileImage'] ?? '',
-      bio: json['bio'] ?? '',
-      category: json['category'] ?? '',
-      location: json['location'] ?? '',
-      socialLinks: List<String>.from(json['socialLinks'] ?? []),
-      portfolio: List<String>.from(json['portfolio'] ?? []),
-      story: json['story'] ?? '',
-      verificationStatus: json['verificationStatus'] ?? 'Unverified',
-      businessName: json['businessName'] ?? '',
-      address: json['address'] ?? '',
-      latestPhoto: json['latestPhoto'] ?? '',
-      idCard: json['idCard'] ?? '',
-      panCard: json['panCard'] ?? '',
-      aadhaarCard: json['aadhaarCard'] ?? '',
-    );
-  }
-
-  factory CreatorProfileModel.fromEntity(CreatorProfile entity) {
-    return CreatorProfileModel(
-      uid: entity.uid,
-      name: entity.name,
-      profileImage: entity.profileImage,
-      bio: entity.bio,
-      category: entity.category,
-      location: entity.location,
-      socialLinks: entity.socialLinks,
-      portfolio: entity.portfolio,
-      story: entity.story,
-      verificationStatus: entity.verificationStatus,
-      businessName: entity.businessName,
-      address: entity.address,
-      latestPhoto: entity.latestPhoto,
-      idCard: entity.idCard,
-      panCard: entity.panCard,
-      aadhaarCard: entity.aadhaarCard,
+      uid: uid.isNotEmpty ? uid : (docId ?? ''),
+      name: _string(json['name']),
+      profileImage: _string(json['profileImage']),
+      bio: _string(json['bio']),
+      category: _string(json['category']),
+      location: _string(json['location']),
+      socialLinks: _strings(json['socialLinks']),
+      portfolio: _strings(json['portfolio']),
+      story: _string(json['story']),
+      verificationStatus: _string(json['verificationStatus']).isEmpty
+          ? 'Unverified'
+          : _string(json['verificationStatus']),
+      verificationNote: _string(json['verificationNote']),
+      businessName: _string(json['businessName']),
+      address: _string(json['address']),
+      latestPhoto: _string(json['latestPhoto']),
+      idCard: _string(json['idCard']),
     );
   }
 }

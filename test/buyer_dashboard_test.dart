@@ -568,7 +568,7 @@ class _FakeAccountAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, void>> deleteAccount(String uid) async {
+  Future<Either<Failure, void>> deleteAccount(String uid, String reason) async {
     deletedUid = uid;
     return right(null);
   }

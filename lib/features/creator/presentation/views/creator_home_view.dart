@@ -269,7 +269,6 @@ class _VerificationStatusCard extends StatelessWidget {
         'Tap to submit your documents.',
       ),
     };
-
     return InkWell(
       onTap: () => Navigator.push(
         context,
@@ -317,12 +316,18 @@ class _PerformanceSummary extends StatelessWidget {
     return StreamBuilder<List<CreatorOrder>>(
       stream: orders,
       builder: (context, snapshot) {
-        final list = snapshot.data ?? const <CreatorOrder>[];
-        final pending = list.where((o) => OrderStatus.isNew(o.status)).length;
-        final inProgress = list.where((o) => OrderStatus.isInProgress(o.status)).length;
-        final totalEarned = list
-            .where((o) => OrderStatus.isDelivered(o.status))
-            .fold(0, (sum, o) => sum + o.creatorNetAmount);
+        if (snapshot.hasError) {
+          return const Text(
+            'Could not load your sales right now.',
+            style: TextStyle(color: AppColors.mutedText),
+          );
+        }
+        final all = snapshot.data ?? const <CreatorOrder>[];
+        final active = all.where((o) => !OrderStatus.isRejectedOrCancelled(o.status)).toList();
+        final pending = active.where((o) => OrderStatus.isNew(o.status)).length;
+        final inProgress = active.where((o) => OrderStatus.isInProgress(o.status)).length;
+        final counted = active.where((o) => o.countsTowardEarnings).toList();
+        final totalEarned = counted.fold<int>(0, (total, o) => total + o.creatorNetAmount);
 
         return GridView.count(
           crossAxisCount: 2,
@@ -346,7 +351,7 @@ class _PerformanceSummary extends StatelessWidget {
             ),
             _StatCard(
               title: 'Total orders',
-              value: '${list.length}',
+              value: '${active.length}',
               icon: Icons.shopping_bag_outlined,
               color: AppColors.primary,
             ),
@@ -392,15 +397,21 @@ class _StatCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+                ),
               ),
               Icon(icon, color: color, size: 20),
             ],
           ),
           Text(
             value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
         ],

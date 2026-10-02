@@ -23,6 +23,6 @@ abstract interface class AuthRepository {
     required String name,
     required String phone,
   });
-  Future<Either<Failure, void>> deleteAccount(String uid);
+  Future<Either<Failure, void>> deleteAccount(String uid, String reason);
   Future<Either<Failure, void>> signOut();
 }

@@ -25,7 +25,7 @@ abstract interface class AuthRemoteDataSource {
     required String name,
     required String phone,
   });
-  Future<void> deleteAccount(String uid);
+  Future<void> deleteAccount(String uid, String reason);
   Future<void> signOut();
 }
 
@@ -178,7 +178,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
-  Future<void> deleteAccount(String uid) async {
+  Future<void> deleteAccount(String uid, String reason) async {
     final currentUser = firebaseAuth.currentUser;
     if (currentUser == null || currentUser.uid != uid) {
       throw Exception('Please sign in again before deleting your account.');
@@ -195,6 +195,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
     final userDoc = await firestore.collection('users').doc(uid).get();
     final role = (userDoc.data()?['role'] as String? ?? '').toLowerCase();
+
+    // Record why they left before wiping their data. This is a one-way,
+    // write-only log for the platform's own records; the account itself is
+    // still deleted immediately rather than waiting on any review.
+    try {
+      await firestore.collection('account_deletions').add({
+        'uid': uid,
+        'email': userDoc.data()?['email'] ?? currentUser.email ?? '',
+        'role': role,
+        'reason': reason.trim(),
+        'deletedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      debugPrint('Could not record account-deletion reason: $error');
+    }
 
     if (role == 'creator' || role == 'seller') {
       await _deleteQuietly(firestore.collection('creator_profiles').doc(uid));

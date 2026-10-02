@@ -150,10 +150,6 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
       story: event.story,
       existingProfileImageUrl: event.existingProfileImageUrl,
       existingPortfolioUrls: event.existingPortfolioUrls,
-      panCardFile: event.panCardFile,
-      aadhaarCardFile: event.aadhaarCardFile,
-      existingPanCardUrl: event.existingPanCardUrl,
-      existingAadhaarCardUrl: event.existingAadhaarCardUrl,
     );
     if (result.isLeft()) {
       emit(
@@ -242,10 +238,14 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
           CreatorActionStatus.failure,
           message: failure.message,
         ),
-        (_) => state.withAction(
+        (outcome) => state.withAction(
           CreatorAction.rejectOrder,
           CreatorActionStatus.success,
-          message: 'Order rejected successfully.',
+          message:
+              outcome.warning ??
+              (outcome.refunded
+                  ? 'Order rejected. The buyer has been refunded.'
+                  : 'Order rejected.'),
         ),
       ),
     );

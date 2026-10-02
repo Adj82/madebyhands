@@ -1,4 +1,3 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -118,251 +117,256 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 ),
               ),
 
-              // Main Content
-              Column(
-                children: [
-                  const SafeArea(child: SizedBox(height: 20)),
-                  // Branding
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 30),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'MADEBYHANDS',
-                          style: GoogleFonts.montserrat(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 4,
-                          ),
-                        )
-                            .animate()
-                            .fadeIn(duration: 800.ms)
-                            .slideX(begin: -0.2),
-                        if (_currentPage < _onboardingPages.length - 1)
-                          TextButton(
-                            onPressed: () => _pageController.jumpToPage(
-                              _onboardingPages.length - 1,
-                            ),
-                            child: const Text(
-                              'Skip',
-                              style: TextStyle(color: Colors.white70),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  const Spacer(),
-
-                  // Animated Text Content
-                  SizedBox(
-                    height: 220,
-                    child: PageView.builder(
-                      controller: _pageController,
-                      onPageChanged: (index) =>
-                          setState(() => _currentPage = index),
-                      itemCount: _onboardingPages.length,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 40),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _onboardingPages[index].title,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .displayMedium
-                                    ?.copyWith(
-                                      color: index == _currentPage
-                                          ? AppColors.text
-                                          : Colors.white,
-                                      height: 1.1,
-                                    ),
-                              )
-                                  .animate(key: ValueKey('title_$index'))
-                                  .fadeIn(delay: 200.ms)
-                                  .slideY(begin: 0.2),
-                              const SizedBox(height: 20),
-                              Text(
-                                _onboardingPages[index].subtitle,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyLarge
-                                    ?.copyWith(
-                                      color: AppColors.mutedText,
-                                      fontSize: 16,
-                                      height: 1.5,
-                                    ),
-                              )
-                                  .animate(key: ValueKey('sub_$index'))
-                                  .fadeIn(delay: 400.ms)
-                                  .slideY(begin: 0.2),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  // Footer Actions
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(40, 0, 40, 50),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            SmoothPageIndicator(
-                              controller: _pageController,
-                              count: _onboardingPages.length,
-                              effect: const ExpandingDotsEffect(
-                                activeDotColor: AppColors.primary,
-                                dotColor: AppColors.outline,
-                                dotHeight: 8,
-                                dotWidth: 8,
-                                spacing: 10,
-                              ),
-                            ),
-
-                            // Action Button
-                            _currentPage == _onboardingPages.length - 1
-                                ? const SizedBox.shrink()
-                                : FloatingActionButton.large(
-                                    onPressed: () => _pageController.nextPage(
-                                      duration: 600.ms,
-                                      curve: Curves.easeInOut,
-                                    ),
-                                    backgroundColor: AppColors.primary,
-                                    elevation: 0,
-                                    child: const Icon(
-                                      Icons.arrow_forward_ios,
-                                      color: Colors.white,
-                                      size: 24,
-                                    ),
-                                  ).animate().scale().fadeIn(),
-                          ],
-                        ),
-
-                        if (_currentPage == _onboardingPages.length - 1)
+              // Main content scrolls on short screens instead of overflowing.
+              SafeArea(
+                child: LayoutBuilder(
+                  builder: (context, constraints) => SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildHeader(),
                           Column(
                             children: [
-                              const SizedBox(height: 20),
-                              FilledButton.icon(
-                                onPressed: state is AuthLoading ? null : _handleLogin,
-                                icon: state is AuthLoading
-                                    ? const SizedBox(
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : Image.asset(
-                                        'assets/images/icon_google.png',
-                                        height: 24,
-                                        errorBuilder:
-                                            (context, error, stackTrace) =>
-                                                const Icon(Icons.login),
-                                      ),
-                                label: const Text('Continue with Google'),
-                              ).animate().slideY(begin: 0.5).fadeIn(),
-                              const SizedBox(height: 16),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    height: 24,
-                                    width: 24,
-                                    child: Checkbox(
-                                      value: _termsAccepted,
-                                      activeColor: AppColors.primary,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      onChanged: (val) {
-                                        setState(() {
-                                          _termsAccepted = val ?? false;
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: RichText(
-                                      text: TextSpan(
-                                        style: TextStyle(
-                                          color: _termsAccepted
-                                              ? AppColors.mutedText
-                                              : Colors.red.shade700,
-                                          fontSize: 12,
-                                          fontWeight: _termsAccepted
-                                              ? FontWeight.normal
-                                              : FontWeight.w600,
-                                        ),
-                                        children: [
-                                          const TextSpan(
-                                            text: 'By joining, you agree to our ',
-                                          ),
-                                          TextSpan(
-                                            text: 'Terms and Conditions',
-                                            style: const TextStyle(
-                                              decoration: TextDecoration.underline,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppColors.primary,
-                                            ),
-                                            recognizer: TapGestureRecognizer()
-                                              ..onTap = () {
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (_) =>
-                                                        const BuyerTermsAndConditionsPage(),
-                                                  ),
-                                                );
-                                              },
-                                          ),
-                                          const TextSpan(
-                                            text: ' and ',
-                                          ),
-                                          TextSpan(
-                                            text: 'Privacy Policy',
-                                            style: const TextStyle(
-                                              decoration: TextDecoration.underline,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppColors.primary,
-                                            ),
-                                            recognizer: TapGestureRecognizer()
-                                              ..onTap = () {
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (_) =>
-                                                        const BuyerPrivacyPolicyPage(),
-                                                  ),
-                                                );
-                                              },
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              const SizedBox(height: 24),
+                              _buildPages(context),
+                              _buildFooter(state),
                             ],
                           ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ],
+                ),
               ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(30, 20, 30, 0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Flexible(
+            child: Text(
+              'MADEBYHANDS',
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.montserrat(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 4,
+              ),
+            ).animate().fadeIn(duration: 800.ms).slideX(begin: -0.2),
+          ),
+          if (_currentPage < _onboardingPages.length - 1)
+            TextButton(
+              onPressed: () =>
+                  _pageController.jumpToPage(_onboardingPages.length - 1),
+              child: const Text(
+                'Skip',
+                style: TextStyle(color: Colors.white70),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPages(BuildContext context) {
+    return SizedBox(
+      height: 230,
+      child: PageView.builder(
+        controller: _pageController,
+        onPageChanged: (index) => setState(() => _currentPage = index),
+        itemCount: _onboardingPages.length,
+        itemBuilder: (context, index) {
+          final page = _onboardingPages[index];
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  page.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    color: AppColors.text,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                  ),
+                )
+                    .animate(key: ValueKey('title_$index'))
+                    .fadeIn(delay: 200.ms)
+                    .slideY(begin: 0.2),
+                const SizedBox(height: 16),
+                Text(
+                  page.subtitle,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: AppColors.mutedText,
+                    fontSize: 16,
+                    height: 1.5,
+                  ),
+                )
+                    .animate(key: ValueKey('sub_$index'))
+                    .fadeIn(delay: 400.ms)
+                    .slideY(begin: 0.2),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFooter(AuthState state) {
+    final isLastPage = _currentPage == _onboardingPages.length - 1;
+    final isLoading = state is AuthLoading;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(40, 0, 40, 40),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              SmoothPageIndicator(
+                controller: _pageController,
+                count: _onboardingPages.length,
+                effect: const ExpandingDotsEffect(
+                  activeDotColor: AppColors.primary,
+                  dotColor: AppColors.outline,
+                  dotHeight: 8,
+                  dotWidth: 8,
+                  spacing: 10,
+                ),
+              ),
+              if (!isLastPage)
+                FloatingActionButton(
+                  heroTag: null,
+                  onPressed: () => _pageController.nextPage(
+                    duration: 600.ms,
+                    curve: Curves.easeInOut,
+                  ),
+                  backgroundColor: AppColors.primary,
+                  elevation: 0,
+                  child: const Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ).animate().scale().fadeIn(),
+            ],
+          ),
+          if (isLastPage) ...[
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: isLoading ? null : _handleLogin,
+              icon: isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Image.asset(
+                      'assets/images/icon_google.png',
+                      height: 24,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Icon(Icons.login),
+                    ),
+              label: const Text('Continue with Google'),
+            ).animate().slideY(begin: 0.5).fadeIn(),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: Checkbox(
+                    value: _termsAccepted,
+                    activeColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    onChanged: (val) =>
+                        setState(() => _termsAccepted = val ?? false),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        'By joining, you agree to our ',
+                        style: TextStyle(
+                          color: _termsAccepted
+                              ? AppColors.mutedText
+                              : Colors.red.shade700,
+                          fontSize: 12,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const BuyerTermsAndConditionsPage(),
+                          ),
+                        ),
+                        child: const Text(
+                          'Terms and Conditions',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        ' and ',
+                        style: TextStyle(
+                          color: _termsAccepted
+                              ? AppColors.mutedText
+                              : Colors.red.shade700,
+                          fontSize: 12,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const BuyerPrivacyPolicyPage(),
+                          ),
+                        ),
+                        child: const Text(
+                          'Privacy Policy',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }

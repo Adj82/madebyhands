@@ -1,13 +1,31 @@
 import 'dart:io';
+
 import 'package:fpdart/fpdart.dart';
 import 'package:madebyhands/core/error/failures.dart';
+import 'package:madebyhands/core/services/payment_api.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_bank_account.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_notification.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 
-abstract class CreatorRepository {
+/// Documents a creator submits for verification. They are stored privately
+/// (`creator_verifications/{uid}`), never on the public profile.
+class VerificationDocuments {
+  final String businessName;
+  final String address;
+  final String latestPhotoUrl;
+  final String idCardUrl;
+
+  const VerificationDocuments({
+    required this.businessName,
+    required this.address,
+    required this.latestPhotoUrl,
+    required this.idCardUrl,
+  });
+}
+
+abstract interface class CreatorRepository {
   Future<Either<Failure, CreatorProfile?>> getCreatorProfile(String uid);
 
   Future<Either<Failure, void>> saveCreatorProfile({
@@ -22,10 +40,6 @@ abstract class CreatorRepository {
     required String story,
     String? existingProfileImageUrl,
     List<String>? existingPortfolioUrls,
-    File? panCardFile,
-    File? aadhaarCardFile,
-    String? existingPanCardUrl,
-    String? existingAadhaarCardUrl,
   });
 
   Future<Either<Failure, VerificationDocuments?>> getVerificationDocuments(
@@ -43,72 +57,50 @@ abstract class CreatorRepository {
     required String existingIdCardUrl,
   });
 
-  Future<Either<Failure, List<CreatorProfile>>> getAllCreatorProfiles();
-
-  Future<Either<Failure, void>> updateVerificationStatus(
-    String uid,
-    String status,
-  );
-
   Future<Either<Failure, void>> addProduct(ProductInput input);
+
+  /// Saves edits to [productId]. The listing returns to admin review and is
+  /// hidden from buyers until approved again.
   Future<Either<Failure, void>> updateProduct(String productId, ProductInput input);
+
   Future<Either<Failure, void>> deleteProduct(String productId);
+
+  /// Publishes or unpublishes an approved listing.
   Future<Either<Failure, void>> setProductPublished(String productId, bool published);
+
+  /// Stock changes apply immediately without another admin review.
   Future<Either<Failure, void>> updateStock(String productId, int stock);
 
-  Future<Either<Failure, List<CreatorProduct>>> getPendingProducts();
-  Future<Either<Failure, List<CreatorProduct>>> getAdminAllProducts();
-  Future<Either<Failure, List<CreatorProduct>>> getCreatorProducts(String uid);
-
   Stream<List<CreatorProduct>> watchCreatorProducts(String uid);
+
   Stream<List<CreatorOrder>> watchCreatorOrders(String uid);
-
-  Future<Either<Failure, void>> updateProductStatus(
-    String productId,
-    String status, {
-    String? approvedBy,
-    String? approvedByEmail,
-    String? rejectionReason,
-  });
-
-  Future<Either<Failure, List<CreatorOrder>>> getCreatorOrders(String uid);
 
   Future<Either<Failure, void>> updateOrderStatus(
     String orderId,
     String status, {
-    String? rejectionReason,
     String? consignmentNumber,
     String? carrierName,
   });
 
-  Future<Either<Failure, void>> rejectOrder(String orderId, String reason);
+  /// Rejects a paid order through the payment API, which restores stock and
+  /// refunds the buyer.
+  Future<Either<Failure, RejectOrderResult>> rejectOrder(String orderId, String reason);
 
   Stream<List<CreatorNotification>> watchNotifications(String uid);
-  Future<Either<Failure, List<CreatorNotification>>> getCreatorNotifications(
-    String creatorUid,
-  );
-
   Future<Either<Failure, void>> markNotificationAsRead(String notificationId);
-  Future<Either<Failure, void>> markAllNotificationsAsRead(String creatorUid);
-  Future<Either<Failure, void>> deleteNotifications(
-    List<String> notificationIds,
-  );
+  Future<Either<Failure, void>> markAllNotificationsAsRead(String uid);
+  Future<Either<Failure, void>> deleteNotifications(List<String> notificationIds);
 
-  Future<Either<Failure, CreatorBankAccount?>> getCreatorBankAccount(
-    String uid,
-  );
-
-  Future<Either<Failure, void>> saveCreatorBankAccount(
-    CreatorBankAccount bankDetail,
-  );
+  Future<Either<Failure, CreatorBankAccount?>> getCreatorBankAccount(String uid);
+  Future<Either<Failure, void>> saveCreatorBankAccount(CreatorBankAccount bankDetail);
 }
 
+/// Everything a creator enters on the product form.
 class ProductInput {
   final String name;
   final String description;
   final List<File> newImageFiles;
   final List<String> existingImageUrls;
-  final String category;
   final List<String> categories;
   final double price;
   final int stock;
@@ -123,13 +115,12 @@ class ProductInput {
   final List<String> predefinedCustomizations;
   final List<CustomizationInput> customizations;
 
-  ProductInput({
+  const ProductInput({
     required this.name,
     required this.description,
     this.newImageFiles = const [],
     this.existingImageUrls = const [],
-    this.category = '',
-    this.categories = const [],
+    required this.categories,
     required this.price,
     required this.stock,
     required this.materials,
@@ -162,19 +153,5 @@ class CustomizationInput {
     this.imageFiles = const [],
     this.existingImageUrls = const [],
     this.options = const [],
-  });
-}
-
-class VerificationDocuments {
-  final String businessName;
-  final String address;
-  final String latestPhotoUrl;
-  final String idCardUrl;
-
-  VerificationDocuments({
-    required this.businessName,
-    required this.address,
-    required this.latestPhotoUrl,
-    required this.idCardUrl,
   });
 }

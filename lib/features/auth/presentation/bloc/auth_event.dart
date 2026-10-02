@@ -29,11 +29,12 @@ final class AuthIsUserLoggedIn extends AuthEvent {}
 
 final class AuthDeleteAccountRequested extends AuthEvent {
   final String uid;
+  final String reason;
 
-  const AuthDeleteAccountRequested(this.uid);
+  const AuthDeleteAccountRequested(this.uid, {required this.reason});
 
   @override
-  List<Object> get props => [uid];
+  List<Object> get props => [uid, reason];
 }
 
 final class AuthLogoutRequested extends AuthEvent {}

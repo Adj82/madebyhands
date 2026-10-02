@@ -55,10 +55,6 @@ abstract interface class CreatorRemoteDataSource {
     required VerificationDocumentsModel documents,
   });
 
-  Future<List<CreatorProfileModel>> getAllCreatorProfiles();
-
-  Future<void> updateVerificationStatus(String uid, String status);
-
   Future<void> addProduct(CreatorProductModel product);
   Future<void> updateProduct(CreatorProductModel product);
   Future<void> deleteProduct(String productId);
@@ -66,49 +62,24 @@ abstract interface class CreatorRemoteDataSource {
   Future<void> updateStock(String productId, int stock);
   Future<CreatorProductModel?> getProduct(String productId);
 
-  Future<List<CreatorProductModel>> getPendingProducts();
-  Future<List<CreatorProductModel>> getAdminAllProducts();
-  Future<List<CreatorProductModel>> getCreatorProducts(String uid);
-
-  Future<void> updateProductStatus(
-    String productId,
-    String status, {
-    String? approvedBy,
-    String? approvedByEmail,
-    String? rejectionReason,
-  });
-
   Future<List<String>> uploadProductImages({
     required List<File> images,
     required String uid,
     required String folder,
   });
 
-  Future<List<String>> uploadCustomizationImages({
-    required List<File> images,
-    required String uid,
-    required String productName,
-    required String customizationName,
-  });
-
   Stream<List<CreatorProductModel>> watchCreatorProducts(String uid);
   Stream<List<CreatorOrderModel>> watchCreatorOrders(String uid);
-
-  Future<List<CreatorOrderModel>> getCreatorOrders(String creatorUid);
 
   /// Moves an order forward in fulfilment. Rejections go through the API.
   Future<void> updateOrderStatus(
     String orderId,
     String status, {
-    String? rejectionReason,
     String? consignmentNumber,
     String? carrierName,
   });
 
   Stream<List<CreatorNotificationModel>> watchNotifications(String uid);
-  Future<List<CreatorNotificationModel>> getCreatorNotifications(
-    String creatorUid,
-  );
   Future<void> markNotificationAsRead(String notificationId);
   Future<void> markAllNotificationsAsRead(String uid);
   Future<void> deleteNotifications(List<String> notificationIds);
@@ -171,7 +142,7 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
     final ref = _profiles.doc(profile.uid);
     final exists = (await ref.get()).exists;
     await ref.set({
-      ...profile.toJson(),
+      ...profile.toEditableJson(),
       if (!exists) 'verificationStatus': 'Unverified',
       if (!exists) 'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
@@ -216,11 +187,8 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
   }
 
   @override
-  Future<VerificationDocumentsModel?> getVerificationDocuments(
-    String uid,
-  ) async {
-    final doc =
-        await firestore.collection('creator_verifications').doc(uid).get();
+  Future<VerificationDocumentsModel?> getVerificationDocuments(String uid) async {
+    final doc = await firestore.collection('creator_verifications').doc(uid).get();
     final data = doc.data();
     if (data == null) return null;
     return VerificationDocumentsModel(
@@ -250,6 +218,7 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
       'verificationStatus': 'In-Process',
       'businessName': documents.businessName,
       'verificationNote': FieldValue.delete(),
+      // Clear documents that older app versions stored publicly.
       'address': FieldValue.delete(),
       'latestPhoto': FieldValue.delete(),
       'idCard': FieldValue.delete(),
@@ -269,31 +238,27 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
   }
 
   @override
-  Future<List<CreatorProfileModel>> getAllCreatorProfiles() async {
-    final snapshot = await _profiles.get();
-    return snapshot.docs
-        .map((doc) => CreatorProfileModel.fromJson(doc.data(), doc.id))
-        .toList();
-  }
-
-  @override
-  Future<void> updateVerificationStatus(String uid, String status) async {
-    final isVerified = status == 'Verified';
-    await _profiles.doc(uid).update({'verificationStatus': status});
-    await firestore.collection('users').doc(uid).update({
-      'isVerified': isVerified,
-    });
-  }
-
-  @override
   Future<void> addProduct(CreatorProductModel product) async {
-    await _products.add({
+    final batch = firestore.batch();
+    final productRef = _products.doc();
+    batch.set(productRef, {
       ...product.toJson(),
       'orderCount': 0,
       'wishlistCount': 0,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+    batch.set(_notifications.doc(), {
+      'type': 'admin',
+      'category': 'product_submission',
+      'title': 'New product awaiting review',
+      'message':
+          '${product.creatorName.isEmpty ? 'A creator' : product.creatorName} submitted "${product.name}" for approval.',
+      'targetId': productRef.id,
+      'createdAt': FieldValue.serverTimestamp(),
+      'isRead': false,
+    });
+    await batch.commit();
   }
 
   @override
@@ -330,61 +295,6 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
   }
 
   @override
-  Future<List<CreatorProductModel>> getPendingProducts() async {
-    final snapshot = await _products
-        .where('status', isEqualTo: 'Pending Approval')
-        .get();
-    return snapshot.docs
-        .map((doc) => CreatorProductModel.fromJson(doc.data(), doc.id))
-        .toList();
-  }
-
-  @override
-  Future<List<CreatorProductModel>> getAdminAllProducts() async {
-    final snapshot = await _products.get();
-    return snapshot.docs
-        .map((doc) => CreatorProductModel.fromJson(doc.data(), doc.id))
-        .toList();
-  }
-
-  @override
-  Future<List<CreatorProductModel>> getCreatorProducts(String uid) async {
-    final snapshot =
-        await _products.where('creatorUid', isEqualTo: uid).get();
-    return snapshot.docs
-        .map((doc) => CreatorProductModel.fromJson(doc.data(), doc.id))
-        .toList();
-  }
-
-  @override
-  Future<void> updateProductStatus(
-    String productId,
-    String status, {
-    String? approvedBy,
-    String? approvedByEmail,
-    String? rejectionReason,
-  }) async {
-    final updateData = <String, dynamic>{
-      'status': status,
-      'isActive': status == 'Approved',
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-    if (approvedBy != null && approvedBy.isNotEmpty) {
-      updateData['approvedBy'] = approvedBy;
-    }
-    if (approvedByEmail != null && approvedByEmail.isNotEmpty) {
-      updateData['approvedByEmail'] = approvedByEmail;
-    }
-    if (rejectionReason != null && rejectionReason.isNotEmpty) {
-      updateData['rejectionReason'] = rejectionReason;
-    }
-    if (status == 'Approved') {
-      updateData['approvedAt'] = FieldValue.serverTimestamp();
-    }
-    await _products.doc(productId).update(updateData);
-  }
-
-  @override
   Future<List<String>> uploadProductImages({
     required List<File> images,
     required String uid,
@@ -392,22 +302,6 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
   }) async {
     final stamp = DateTime.now().millisecondsSinceEpoch;
     final path = 'products/$uid/${_segment(folder)}';
-    return [
-      for (var i = 0; i < images.length; i++)
-        await _upload(images[i], '$path/image_${stamp}_$i.jpg'),
-    ];
-  }
-
-  @override
-  Future<List<String>> uploadCustomizationImages({
-    required List<File> images,
-    required String uid,
-    required String productName,
-    required String customizationName,
-  }) async {
-    final stamp = DateTime.now().millisecondsSinceEpoch;
-    final path =
-        'products/$uid/${_segment(productName)}/customizations/${_segment(customizationName)}';
     return [
       for (var i = 0; i < images.length; i++)
         await _upload(images[i], '$path/image_${stamp}_$i.jpg'),
@@ -438,21 +332,9 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
       });
 
   @override
-  Future<List<CreatorOrderModel>> getCreatorOrders(String creatorUid) async {
-    final snapshot = await firestore
-        .collection('orders')
-        .where('creatorId', isEqualTo: creatorUid)
-        .get();
-    return snapshot.docs
-        .map((doc) => CreatorOrderModel.fromJson(doc.data(), doc.id))
-        .toList();
-  }
-
-  @override
   Future<void> updateOrderStatus(
     String orderId,
     String status, {
-    String? rejectionReason,
     String? consignmentNumber,
     String? carrierName,
   }) {
@@ -460,8 +342,6 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
     return firestore.collection('orders').doc(orderId).update({
       'status': stored,
       'updatedAt': FieldValue.serverTimestamp(),
-      if (rejectionReason != null && rejectionReason.trim().isNotEmpty)
-        'rejectionReason': rejectionReason.trim(),
       if (consignmentNumber != null && consignmentNumber.trim().isNotEmpty)
         'consignmentNumber': consignmentNumber.trim(),
       if (carrierName != null && carrierName.trim().isNotEmpty)
@@ -482,20 +362,6 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
         notifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         return notifications;
       });
-
-  @override
-  Future<List<CreatorNotificationModel>> getCreatorNotifications(
-    String creatorUid,
-  ) async {
-    final snapshot = await _notifications
-        .where('creatorUid', isEqualTo: creatorUid)
-        .get();
-    final notifications = snapshot.docs
-        .map((doc) => CreatorNotificationModel.fromJson(doc.data(), doc.id))
-        .toList();
-    notifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return notifications;
-  }
 
   @override
   Future<void> markNotificationAsRead(String notificationId) =>
@@ -526,18 +392,14 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
 
   @override
   Future<CreatorBankAccountModel?> getCreatorBankAccount(String uid) async {
-    final doc =
-        await firestore.collection('creator_bank_accounts').doc(uid).get();
+    final doc = await firestore.collection('creator_bank_accounts').doc(uid).get();
     final data = doc.data();
     return data == null ? null : CreatorBankAccountModel.fromJson(data, uid);
   }
 
   @override
-  Future<void> saveCreatorBankAccount(
-    CreatorBankAccountModel bankDetail,
-  ) async {
-    final ref =
-        firestore.collection('creator_bank_accounts').doc(bankDetail.uid);
+  Future<void> saveCreatorBankAccount(CreatorBankAccountModel bankDetail) async {
+    final ref = firestore.collection('creator_bank_accounts').doc(bankDetail.uid);
     final exists = (await ref.get()).exists;
     await ref.set({
       ...bankDetail.toJson(),

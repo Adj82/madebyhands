@@ -55,7 +55,9 @@ class _BuyerAccountPageState extends State<BuyerAccountPage> {
   }
 
   Future<void> _confirmAccountDeletion() async {
-    final confirmed = await showDialog<bool>(
+    final reasonController = TextEditingController();
+    final reasonFormKey = GlobalKey<FormState>();
+    final reason = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFFFAF6EE),
@@ -71,16 +73,40 @@ class _BuyerAccountPageState extends State<BuyerAccountPage> {
             ),
           ],
         ),
-        content: const Text(
-          'Are you sure you want to permanently delete your buyer account? Your saved addresses, favorite items, and account details will be immediately and permanently deleted. This action cannot be undone.',
+        content: Form(
+          key: reasonFormKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Are you sure you want to permanently delete your buyer account? Your saved addresses, favorite items, and account details will be immediately and permanently deleted. This action cannot be undone.',
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: reasonController,
+                autofocus: true,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Why are you leaving? *',
+                  hintText: 'Help us improve MadeByHands',
+                ),
+                validator: (v) =>
+                    (v?.trim().isEmpty ?? true) ? 'Please tell us why' : null,
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () {
+              if (!reasonFormKey.currentState!.validate()) return;
+              Navigator.pop(context, reasonController.text.trim());
+            },
             style: FilledButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
@@ -91,8 +117,10 @@ class _BuyerAccountPageState extends State<BuyerAccountPage> {
       ),
     );
 
-    if (confirmed == true && mounted) {
-      context.read<AuthBloc>().add(AuthDeleteAccountRequested(widget.user.uid));
+    if (reason != null && mounted) {
+      context.read<AuthBloc>().add(
+        AuthDeleteAccountRequested(widget.user.uid, reason: reason),
+      );
       Navigator.pop(context); // Close account settings page
     }
   }

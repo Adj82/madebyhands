@@ -74,7 +74,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     final previous = state;
     emit(AuthLoading());
-    final res = await _authRepository.deleteAccount(event.uid);
+    final res = await _authRepository.deleteAccount(event.uid, event.reason);
     res.fold((failure) {
       // Keep the user signed in and show why deletion did not happen.
       emit(AuthActionFailed(failure.message));
