@@ -76,11 +76,38 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
     }
   }
 
+  static final RegExp _domainPattern = RegExp(
+    r'^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$',
+  );
+
+  /// True only for something that is actually a link (a real domain, with or
+  /// without a scheme/path) — not arbitrary free text.
+  bool _isValidLink(String raw) {
+    if (raw.contains(' ')) return false;
+    final candidate = raw.contains('://') ? raw : 'https://$raw';
+    final uri = Uri.tryParse(candidate);
+    if (uri == null || uri.host.isEmpty) return false;
+    return _domainPattern.hasMatch(uri.host);
+  }
+
   void _addSocialLink() {
-    final link = _socialController.text.trim();
-    if (link.isEmpty || _socialLinks.contains(link)) return;
+    final raw = _socialController.text.trim();
+    if (raw.isEmpty) return;
+    if (!_isValidLink(raw)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter a valid link, e.g. instagram.com/yourshop'),
+        ),
+      );
+      return;
+    }
+    final normalized = raw.contains('://') ? raw : 'https://$raw';
+    if (_socialLinks.contains(normalized)) {
+      _socialController.clear();
+      return;
+    }
     setState(() {
-      _socialLinks.add(link);
+      _socialLinks.add(normalized);
       _socialController.clear();
     });
   }
@@ -311,7 +338,12 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
             Expanded(
               child: TextFormField(
                 controller: _socialController,
-                decoration: const InputDecoration(hintText: 'Instagram, Website, etc.', prefixIcon: Icon(Icons.link)),
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(
+                  hintText: 'e.g. instagram.com/yourshop',
+                  prefixIcon: Icon(Icons.link),
+                ),
+                onFieldSubmitted: (_) => _addSocialLink(),
               ),
             ),
             const SizedBox(width: 10),
