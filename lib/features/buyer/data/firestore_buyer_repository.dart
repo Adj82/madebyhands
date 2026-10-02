@@ -51,7 +51,6 @@ class FirestoreBuyerRepository implements BuyerRepository {
             businessName: data['businessName'] as String? ?? '',
             profileImage: data['profileImage'] as String? ?? '',
             bio: data['bio'] as String? ?? '',
-            category: data['category'] as String? ?? '',
             location: data['location'] as String? ?? '',
             socialLinks: List<String>.from(
               data['socialLinks'] as List? ?? const [],
@@ -512,9 +511,6 @@ class FirestoreBuyerRepository implements BuyerRepository {
       dimensions: data['dimensions'] as String? ?? '',
       shippingInfo: data['shippingInfo'] as String? ?? '',
       isCustomizable: data['isCustomizable'] as bool? ?? false,
-      predefinedCustomizations: List<String>.from(
-        data['predefinedCustomizations'] as List? ?? const [],
-      ).where((item) => item.trim().isNotEmpty).toList(),
       customizations: customizations,
       orderCount: math.max(0, (data['orderCount'] as num?)?.round() ?? 0),
       wishlistCount: math.max(0, (data['wishlistCount'] as num?)?.round() ?? 0),
@@ -562,6 +558,9 @@ class FirestoreBuyerRepository implements BuyerRepository {
           subtotal + platformFee,
       subtotal: subtotal,
       platformFee: platformFee,
+      buyerName: (data['buyerName'] as String?)?.trim().isNotEmpty == true
+          ? (data['buyerName'] as String).trim()
+          : 'Customer',
       refundStatus: data['refundStatus'] as String?,
       items: items,
       deliveryAddress: address is Map

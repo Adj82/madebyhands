@@ -35,6 +35,10 @@ class BuyerOrder {
   final int platformFee;
   final List<BuyerOrderItem> items;
   final String deliveryAddress;
+
+  /// The buyer's name as snapshotted on the order, for the invoice's
+  /// "Bill To" line. Falls back to 'Customer' when missing on old orders.
+  final String buyerName;
   final String? rejectionReason;
   final String? consignmentNumber;
   final String? carrierName;
@@ -56,6 +60,7 @@ class BuyerOrder {
     this.platformFee = 0,
     required this.items,
     required this.deliveryAddress,
+    this.buyerName = 'Customer',
     this.rejectionReason,
     this.consignmentNumber,
     this.carrierName,

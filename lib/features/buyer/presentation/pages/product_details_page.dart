@@ -273,8 +273,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 ),
             ],
             if (product.isCustomizable &&
-                (product.predefinedCustomizations.isNotEmpty ||
-                    product.customizations.isNotEmpty)) ...[
+                product.customizations.any((c) => c.options.isNotEmpty)) ...[
               const SizedBox(height: 24),
               _ProductCustomizationSection(
                 product: product,
@@ -480,53 +479,19 @@ class _ProductCustomizationSection extends StatelessWidget {
               'Selections are optional and will be shared with the creator.',
               style: TextStyle(color: AppColors.mutedText),
             ),
-            if (product.predefinedCustomizations.isNotEmpty) ...[
-              const SizedBox(height: 18),
-              ...product.predefinedCustomizations.map(
-                (name) => Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: TextFormField(
-                    key: ValueKey('predefined-${product.id}-$name'),
-                    initialValue: values[name]?.firstOrNull ?? '',
-                    onChanged: (value) => onChanged(name, [value]),
-                    decoration: InputDecoration(
-                      labelText: name,
-                      hintText: _hintFor(name),
-                      prefixIcon: Icon(_iconFor(name), color: const Color(0xFF8B261D)),
-                    ),
+            ...product.customizations
+                .where((customization) => customization.options.isNotEmpty)
+                .map(
+                  (customization) => _CustomizationChoice(
+                    customization: customization,
+                    selectedValues: values[customization.name] ?? const [],
+                    onChanged: (selection) =>
+                        onChanged(customization.name, selection),
                   ),
                 ),
-              ),
-            ],
-            ...product.customizations.map(
-              (customization) => _CustomizationChoice(
-                customization: customization,
-                selectedValues: values[customization.name] ?? const [],
-                onChanged: (selection) =>
-                    onChanged(customization.name, selection),
-              ),
-            ),
           ],
         ),
       );
-
-  static String _hintFor(String name) => switch (name.toLowerCase()) {
-        'name/text' => 'Enter the name or text you want',
-        'color' => 'Enter your preferred colour',
-        'size' => 'Enter your preferred size',
-        'design' => 'Describe your preferred design',
-        'material' => 'Enter your preferred material',
-        _ => 'Enter your preference',
-      };
-
-  static IconData _iconFor(String name) => switch (name.toLowerCase()) {
-        'name/text' => Icons.edit_note,
-        'color' => Icons.palette_outlined,
-        'size' => Icons.aspect_ratio,
-        'design' => Icons.brush_outlined,
-        'material' => Icons.texture,
-        _ => Icons.tune,
-      };
 }
 
 class _CustomizationChoice extends StatelessWidget {
@@ -600,17 +565,7 @@ class _CustomizationChoice extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 10),
-            if (customization.options.isEmpty)
-              TextFormField(
-                key: ValueKey('custom-${customization.name}'),
-                initialValue: selectedValues.firstOrNull ?? '',
-                onChanged: (value) => onChanged([value]),
-                decoration: InputDecoration(
-                  hintText: 'Enter your ${customization.name.toLowerCase()}',
-                ),
-              )
-            else
-              Wrap(
+            Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: customization.options.map((option) {

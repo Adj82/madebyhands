@@ -38,7 +38,6 @@ class CreatorRepositoryImpl implements CreatorRepository {
     required String name,
     required File? profileImageFile,
     required String bio,
-    required String category,
     required String location,
     required List<String> socialLinks,
     required List<File> portfolioImageFiles,
@@ -68,7 +67,6 @@ class CreatorRepositoryImpl implements CreatorRepository {
         name: name,
         profileImage: profileImageUrl,
         bio: bio,
-        category: category,
         location: location,
         socialLinks: socialLinks,
         portfolio: portfolioUrls,
@@ -193,9 +191,6 @@ class CreatorRepositoryImpl implements CreatorRepository {
       isActive: false,
       isCustomizable: input.isCustomizable,
       isFramed: input.isFramed,
-      predefinedCustomizations: input.isCustomizable
-          ? input.predefinedCustomizations
-          : const [],
       customizations: customizations,
       createdAt: existing?.createdAt ?? DateTime.now(),
       editHistory: existing == null

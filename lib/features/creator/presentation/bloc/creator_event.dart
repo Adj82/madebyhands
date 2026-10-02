@@ -18,7 +18,6 @@ final class CreatorSubmitOnboarding extends CreatorEvent {
   final String name;
   final File? profileImageFile;
   final String bio;
-  final String category;
   final String location;
   final List<String> socialLinks;
   final List<File> portfolioImageFiles;
@@ -31,7 +30,6 @@ final class CreatorSubmitOnboarding extends CreatorEvent {
     required this.name,
     this.profileImageFile,
     required this.bio,
-    required this.category,
     required this.location,
     required this.socialLinks,
     required this.portfolioImageFiles,

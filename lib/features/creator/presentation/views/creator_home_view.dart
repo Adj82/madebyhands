@@ -184,15 +184,16 @@ class _StorefrontCard extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Text(
-                      profile.category,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.8),
-                        fontSize: 14,
+                    if (profile.location.isNotEmpty)
+                      Text(
+                        profile.location,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          fontSize: 14,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -210,7 +211,6 @@ class _StorefrontCard extends StatelessWidget {
                     businessName: profile.businessName,
                     profileImage: profile.profileImage,
                     bio: profile.bio,
-                    category: profile.category,
                     location: profile.location,
                     socialLinks: profile.socialLinks,
                     portfolio: profile.portfolio,

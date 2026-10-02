@@ -225,7 +225,6 @@ class _CreatorHeader extends StatelessWidget {
                       ],
                     ],
                   ),
-                  if (creator.category.isNotEmpty) Text(creator.category),
                   if (creator.location.isNotEmpty)
                     Text(
                       creator.location,

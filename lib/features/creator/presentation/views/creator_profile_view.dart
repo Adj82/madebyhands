@@ -116,12 +116,14 @@ class _CreatorProfileViewState extends State<CreatorProfileView> {
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 2),
-          Text(
-            profile.category,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.mutedText, fontSize: 13),
-          ),
+          if (profile.location.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              profile.location,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.mutedText, fontSize: 13),
+            ),
+          ],
           const SizedBox(height: 6),
           _VerificationBadge(profile: profile),
         ],

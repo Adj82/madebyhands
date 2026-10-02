@@ -224,8 +224,13 @@ void main() {
         icon: Icons.menu_book_outlined,
         creatorUid: 'creator-paper',
         isCustomizable: true,
-        predefinedCustomizations: ['Color'],
         customizations: [
+          BuyerProductCustomization(
+            name: 'Color',
+            description: 'Choose the journal cover colour.',
+            additionalPrice: 0,
+            options: ['Forest green', 'Natural brown'],
+          ),
           BuyerProductCustomization(
             name: 'Engraving',
             description: 'Choose the engraving format.',
@@ -262,9 +267,12 @@ void main() {
         350,
         scrollable: find.byType(Scrollable).first,
       );
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Color'),
-        'Forest green',
+      await tester.tap(find.text('Forest green'));
+      await tester.pump();
+      await tester.scrollUntilVisible(
+        find.text('Full name'),
+        350,
+        scrollable: find.byType(Scrollable).first,
       );
       await tester.tap(find.text('Full name'));
       await tester.pump();

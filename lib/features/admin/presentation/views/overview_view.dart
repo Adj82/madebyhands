@@ -148,7 +148,7 @@ class _OverviewViewState extends State<OverviewView> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Text(
-                              application.category,
+                              application.location,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),

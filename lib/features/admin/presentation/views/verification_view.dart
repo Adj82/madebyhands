@@ -155,7 +155,7 @@ class _ProfileCard extends StatelessWidget {
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         Text(
-                          profile.category,
+                          profile.location,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(color: AppColors.mutedText, fontSize: 12),

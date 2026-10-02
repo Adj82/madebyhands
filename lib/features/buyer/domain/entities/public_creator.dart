@@ -4,7 +4,6 @@ class PublicCreator {
   final String businessName;
   final String profileImage;
   final String bio;
-  final String category;
   final String location;
   final List<String> socialLinks;
   final List<String> portfolio;
@@ -17,7 +16,6 @@ class PublicCreator {
     this.businessName = '',
     this.profileImage = '',
     this.bio = '',
-    this.category = '',
     this.location = '',
     this.socialLinks = const [],
     this.portfolio = const [],

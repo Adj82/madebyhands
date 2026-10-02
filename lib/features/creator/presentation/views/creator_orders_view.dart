@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:madebyhands/core/constants/couriers.dart';
 import 'package:madebyhands/core/error/failures.dart';
+import 'package:madebyhands/core/services/invoice_pdf_service.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
@@ -315,6 +316,45 @@ class OrderStatusBadge extends StatelessWidget {
   }
 }
 
+/// Builds the seller-copy invoice PDF for [order] — fee breakdown and the
+/// resulting payout — and hands it to the platform's share/download sheet.
+Future<void> _downloadSellerInvoice(BuildContext context, CreatorOrder order) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    final data = InvoiceData.sellerCopy(
+      orderId: order.id,
+      invoiceDate: order.createdAt,
+      billToName: order.buyerName,
+      billToAddressLines: order.deliveryAddress
+          .split(',')
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty)
+          .toList(),
+      items: order.items
+          .map(
+            (item) => InvoiceLineItem(
+              name: item.name,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+            ),
+          )
+          .toList(),
+      subtotal: order.totalAmount,
+      flatFee: order.flatFee,
+      commissionRate: order.commissionRate,
+      commissionAmount: order.commissionAmount,
+    );
+    await InvoicePdfService.downloadOrShare(data);
+  } catch (error) {
+    logInvoiceError(error);
+    if (context.mounted) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not generate the invoice. Please try again.')),
+      );
+    }
+  }
+}
+
 class _OrderDetailSheet extends StatelessWidget {
   final CreatorOrder order;
 
@@ -525,6 +565,16 @@ class _OrderDetailSheet extends StatelessWidget {
                   if (order.totalAmount > order.creatorNetAmount)
                     _amountRow('Commission', -(order.totalAmount - order.creatorNetAmount)),
                   _amountRow('Your earnings', order.creatorNetAmount, emphasize: true),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () => _downloadSellerInvoice(context, order),
+                    icon: const Icon(Icons.download_outlined, size: 18),
+                    label: const Text('Download invoice'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                    ),
+                  ),
                 ],
               ),
             ),

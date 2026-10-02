@@ -18,7 +18,6 @@ class Product {
   final String dimensions;
   final String shippingInfo;
   final bool isCustomizable;
-  final List<String> predefinedCustomizations;
   final List<BuyerProductCustomization> customizations;
 
   /// Up to two marketplace categories (see kProductCategories). Older
@@ -48,7 +47,6 @@ class Product {
     this.dimensions = '',
     this.shippingInfo = '',
     this.isCustomizable = false,
-    this.predefinedCustomizations = const [],
     this.customizations = const [],
     this.categories = const [],
     this.orderCount = 0,

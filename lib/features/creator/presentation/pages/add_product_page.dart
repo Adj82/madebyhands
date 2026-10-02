@@ -81,7 +81,6 @@ class _AddProductPageState extends State<AddProductPage> {
         controllers.descController.text = c.description;
         controllers.priceController.text = c.additionalPrice.round().toString();
         controllers.isMultipleSelection = c.isMultipleSelection;
-        controllers.hasSubOptions = c.options.isNotEmpty;
         controllers.existingImageUrls.addAll(c.images);
         if (c.options.isNotEmpty) {
           controllers.options.clear();
@@ -189,13 +188,11 @@ class _AddProductPageState extends State<AddProductPage> {
             additionalPrice: double.tryParse(c.priceController.text) ?? 0,
             imageFiles: List.of(c.imageFiles),
             existingImageUrls: List.of(c.existingImageUrls),
-            isMultipleSelection: c.hasSubOptions && c.isMultipleSelection,
-            options: c.hasSubOptions
-                ? c.options
-                      .map((option) => option.text.trim())
-                      .where((option) => option.isNotEmpty)
-                      .toList()
-                : const [],
+            isMultipleSelection: c.isMultipleSelection,
+            options: c.options
+                .map((option) => option.text.trim())
+                .where((option) => option.isNotEmpty)
+                .toList(),
           ),
     ];
     final isFramed = _selectedCategories.contains(kPaintingCategory) ? _isFramed : null;
@@ -1139,7 +1136,7 @@ class _CustomizationBlockState extends State<_CustomizationBlock> {
           ),
           const SizedBox(height: 20),
           const Text(
-            'Add options (subcustomizations) for this category?',
+            'Selection Type',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),
@@ -1147,107 +1144,83 @@ class _CustomizationBlockState extends State<_CustomizationBlock> {
             children: [
               Expanded(
                 child: _ChoiceChip(
-                  label: 'No',
-                  isSelected: !widget.controllers.hasSubOptions,
-                  onSelected: (v) =>
-                      setState(() => widget.controllers.hasSubOptions = false),
+                  label: 'Pick one',
+                  isSelected: !widget.controllers.isMultipleSelection,
+                  onSelected: (_) => setState(
+                    () => widget.controllers.isMultipleSelection = false,
+                  ),
                 ),
               ),
               const SizedBox(width: 15),
               Expanded(
                 child: _ChoiceChip(
-                  label: 'Yes',
-                  isSelected: widget.controllers.hasSubOptions,
-                  onSelected: (v) =>
-                      setState(() => widget.controllers.hasSubOptions = true),
+                  label: 'Pick several',
+                  isSelected: widget.controllers.isMultipleSelection,
+                  onSelected: (_) => setState(
+                    () => widget.controllers.isMultipleSelection = true,
+                  ),
                 ),
               ),
             ],
           ),
-          if (widget.controllers.hasSubOptions) ...[
-            const SizedBox(height: 20),
-            const Text(
-              'Selection Type',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _ChoiceChip(
-                    label: 'Pick one',
-                    isSelected: !widget.controllers.isMultipleSelection,
-                    onSelected: (_) => setState(
-                      () => widget.controllers.isMultipleSelection = false,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  child: _ChoiceChip(
-                    label: 'Pick several',
-                    isSelected: widget.controllers.isMultipleSelection,
-                    onSelected: (_) => setState(
-                      () => widget.controllers.isMultipleSelection = true,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 15),
-            const Text(
-              'Options (max 5)',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: widget.controllers.options.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                return Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: widget.controllers.options[index],
-                        validator: (value) {
-                          final anyFilled = widget.controllers.options.any(
-                            (option) => option.text.trim().isNotEmpty,
-                          );
-                          return index == 0 && !anyFilled ? 'Add at least one option' : null;
-                        },
-                        decoration: InputDecoration(
-                          labelText: 'Option ${index + 1}',
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 12,
-                          ),
+          const SizedBox(height: 15),
+          const Text(
+            'Options buyers can choose from (max 5) *',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Buyers pick from these — they can\'t type their own, e.g. A4, A5, Canvas.',
+            style: TextStyle(fontSize: 12, color: AppColors.mutedText),
+          ),
+          const SizedBox(height: 8),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: widget.controllers.options.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              return Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: widget.controllers.options[index],
+                      validator: (value) {
+                        final anyFilled = widget.controllers.options.any(
+                          (option) => option.text.trim().isNotEmpty,
+                        );
+                        return index == 0 && !anyFilled ? 'Add at least one option' : null;
+                      },
+                      decoration: InputDecoration(
+                        labelText: 'Option ${index + 1}',
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
                         ),
                       ),
                     ),
-                    IconButton(
-                      onPressed: widget.controllers.options.length == 1
-                          ? null
-                          : () => _removeOption(index),
-                      icon: const Icon(
-                        Icons.remove_circle_outline,
-                        color: Colors.red,
-                        size: 20,
-                      ),
+                  ),
+                  IconButton(
+                    onPressed: widget.controllers.options.length == 1
+                        ? null
+                        : () => _removeOption(index),
+                    icon: const Icon(
+                      Icons.remove_circle_outline,
+                      color: Colors.red,
+                      size: 20,
                     ),
-                  ],
-                );
-              },
+                  ),
+                ],
+              );
+            },
+          ),
+          if (widget.controllers.options.length < 5)
+            TextButton.icon(
+              onPressed: _addOption,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add Option'),
             ),
-            if (widget.controllers.options.length < 5)
-              TextButton.icon(
-                onPressed: _addOption,
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add Option'),
-              ),
-          ],
           const SizedBox(height: 15),
           const Text(
             'Category Images (Max 4, Optional)',
@@ -1387,7 +1360,6 @@ class _CustomizationControllers {
   final nameController = TextEditingController();
   final descController = TextEditingController();
   final priceController = TextEditingController();
-  bool hasSubOptions = false;
   bool isMultipleSelection = false;
   final List<TextEditingController> options = [];
   final List<File> imageFiles = [];

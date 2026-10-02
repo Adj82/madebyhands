@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:madebyhands/core/constants/couriers.dart';
+import 'package:madebyhands/core/services/invoice_pdf_service.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/buyer_order.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
@@ -28,6 +29,13 @@ class OrderDetailPage extends StatelessWidget {
             ),
           ),
           iconTheme: const IconThemeData(color: Color(0xFF8B261D)),
+          actions: [
+            IconButton(
+              tooltip: 'Download invoice',
+              icon: const Icon(Icons.download_outlined),
+              onPressed: () => _downloadInvoice(context, order),
+            ),
+          ],
         ),
         body: orderUpdates == null
             ? _OrderDetailBody(order: order)
@@ -46,6 +54,45 @@ class OrderDetailPage extends StatelessWidget {
               ),
       ),
     );
+  }
+}
+
+/// Builds the buyer-copy invoice PDF for [order] and hands it to the
+/// platform's share/download sheet.
+Future<void> _downloadInvoice(BuildContext context, BuyerOrder order) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    final data = InvoiceData.buyerCopy(
+      orderId: order.id,
+      invoiceDate: order.createdAt,
+      billToName: order.buyerName,
+      billToAddressLines: order.deliveryAddress
+          .split(',')
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty)
+          .toList(),
+      items: order.items
+          .map(
+            (item) => InvoiceLineItem(
+              name: item.name,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+            ),
+          )
+          .toList(),
+      subtotal: order.subtotal > 0
+          ? order.subtotal
+          : order.items.fold<int>(0, (total, item) => total + item.total),
+      buyerTotalPaid: order.total,
+    );
+    await InvoicePdfService.downloadOrShare(data);
+  } catch (error) {
+    logInvoiceError(error);
+    if (context.mounted) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not generate the invoice. Please try again.')),
+      );
+    }
   }
 }
 

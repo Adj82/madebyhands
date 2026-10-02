@@ -20,9 +20,13 @@ repository mappers and `firestore.rules` enforce these fields. All amounts are
 
 ## Creator profiles — `creator_profiles/{uid}` (public)
 
-`uid`, `name`, `businessName`, `profileImage`, `bio`, `category`, `location`,
+`uid`, `name`, `businessName`, `profileImage`, `bio`, `location`,
 `socialLinks[]`, `portfolio[]`, `story`, `verificationStatus`,
 `verificationNote`, `createdAt`, `updatedAt`.
+
+Profiles are not asked for a craft category at sign-up or anywhere else;
+older docs may still carry a stale `category` string from before this was
+removed, but nothing reads it.
 
 - `verificationStatus`: `Unverified` → `In-Process` (documents submitted) →
   `Verified` or `Rejected` (with `verificationNote`). Creators can only set

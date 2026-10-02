@@ -95,7 +95,6 @@ class MockBuyerRepository implements BuyerRepository {
       name: 'Asha Weaves',
       businessName: 'Asha Weaves',
       bio: 'Handwoven homeware made with natural fibres.',
-      category: 'Textile & Fiber Art',
       location: 'Jaipur, Rajasthan',
       story: 'A family weaving practice carried forward by local artisans.',
       isVerified: true,
@@ -103,7 +102,6 @@ class MockBuyerRepository implements BuyerRepository {
     PublicCreator(
       uid: 'creator-jaipur-clay',
       name: 'Jaipur Clay Studio',
-      category: 'Pottery, Ceramics & Clay',
       location: 'Jaipur, Rajasthan',
       isVerified: true,
     ),

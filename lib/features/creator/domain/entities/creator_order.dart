@@ -16,6 +16,13 @@ class CreatorOrder {
   final int totalAmount;
   final int platformFee;
   final int creatorNetAmount;
+
+  /// Fee breakdown snapshotted on the order at checkout time (see
+  /// `server/fees.js`), used by the seller-copy invoice. `flatFee` +
+  /// `commissionAmount` == `platformFee`.
+  final int flatFee;
+  final double commissionRate;
+  final int commissionAmount;
   final String paymentStatus;
   final String payoutStatus;
   final String? refundStatus;
@@ -37,6 +44,9 @@ class CreatorOrder {
     required this.status,
     required this.totalAmount,
     this.platformFee = 0,
+    this.flatFee = 0,
+    this.commissionRate = 0,
+    this.commissionAmount = 0,
     int? creatorNetAmount,
     this.paymentStatus = 'paid',
     this.payoutStatus = 'pending',

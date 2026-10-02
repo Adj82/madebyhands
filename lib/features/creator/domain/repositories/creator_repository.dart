@@ -33,7 +33,6 @@ abstract interface class CreatorRepository {
     required String name,
     required File? profileImageFile,
     required String bio,
-    required String category,
     required String location,
     required List<String> socialLinks,
     required List<File> portfolioImageFiles,
@@ -112,7 +111,6 @@ class ProductInput {
   final String creatorName;
   final bool isCustomizable;
   final bool? isFramed;
-  final List<String> predefinedCustomizations;
   final List<CustomizationInput> customizations;
 
   const ProductInput({
@@ -131,7 +129,6 @@ class ProductInput {
     required this.creatorName,
     this.isCustomizable = false,
     this.isFramed,
-    this.predefinedCustomizations = const [],
     this.customizations = const [],
   });
 }

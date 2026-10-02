@@ -3,9 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:madebyhands/core/constants/product_categories.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
-import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
@@ -29,7 +27,6 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _bioController = TextEditingController();
-  final _categoryController = TextEditingController();
   final _locationController = TextEditingController();
   final _socialController = TextEditingController();
   final _storyController = TextEditingController();
@@ -44,7 +41,6 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
     final p = widget.existingProfile;
     _nameController.text = p?.name ?? widget.user.name;
     _bioController.text = p?.bio ?? '';
-    _categoryController.text = p?.category ?? '';
     _locationController.text = p?.location ?? '';
     _storyController.text = p?.story ?? '';
 
@@ -52,17 +48,12 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
       _socialLinks.addAll(p.socialLinks);
       _existingPortfolioUrls.addAll(p.portfolio);
     }
-    final adminBloc = context.read<AdminBloc>();
-    if (adminBloc.state.categories.isEmpty) {
-      adminBloc.add(AdminCategoriesRequested());
-    }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _bioController.dispose();
-    _categoryController.dispose();
     _locationController.dispose();
     _socialController.dispose();
     _storyController.dispose();
@@ -103,7 +94,6 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
               name: _nameController.text.trim(),
               profileImageFile: _profileImage,
               bio: _bioController.text.trim(),
-              category: _categoryController.text.trim(),
               location: _locationController.text.trim(),
               socialLinks: List.of(_socialLinks),
               portfolioImageFiles: List.of(_portfolioImages),
@@ -285,40 +275,6 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
           controller: _nameController,
           decoration: const InputDecoration(labelText: 'Artisan/Studio Name *', prefixIcon: Icon(Icons.storefront)),
           validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-        ),
-        const SizedBox(height: 20),
-        BlocBuilder<AdminBloc, AdminState>(
-          buildWhen: (previous, current) => previous.categories != current.categories,
-          builder: (context, state) {
-            final currentVal = _categoryController.text.trim();
-            final categories = [
-              ...(state.categories.isEmpty ? kProductCategories : state.categories),
-            ];
-            if (currentVal.isNotEmpty && !categories.contains(currentVal)) {
-              categories.insert(0, currentVal);
-            }
-
-            return DropdownButtonFormField<String>(
-              initialValue: currentVal.isEmpty ? null : currentVal,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Primary craft category *',
-                prefixIcon: Icon(Icons.category_outlined),
-              ),
-              items: categories
-                  .map(
-                    (c) => DropdownMenuItem(
-                      value: c,
-                      child: Text(c, overflow: TextOverflow.ellipsis),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (val) {
-                if (val != null) _categoryController.text = val;
-              },
-              validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-            );
-          },
         ),
         const SizedBox(height: 20),
         TextFormField(

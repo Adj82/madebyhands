@@ -72,7 +72,6 @@ class _ExploreStorefrontsPageState extends State<ExploreStorefrontsPage> {
 
               return creator.displayName.toLowerCase().contains(query) ||
                   creator.name.toLowerCase().contains(query) ||
-                  creator.category.toLowerCase().contains(query) ||
                   creator.location.toLowerCase().contains(query) ||
                   creator.bio.toLowerCase().contains(query);
             }).toList();
@@ -88,7 +87,7 @@ class _ExploreStorefrontsPageState extends State<ExploreStorefrontsPage> {
                         Icons.search,
                         color: Color(0xFF8B261D),
                       ),
-                      hintText: 'Search by creator, studio or category...',
+                      hintText: 'Search by creator, studio or location...',
                       filled: true,
                       fillColor: const Color(0xFFFAF6EE).withValues(alpha: 0.9),
                     ),
@@ -99,8 +98,7 @@ class _ExploreStorefrontsPageState extends State<ExploreStorefrontsPage> {
                       ? const BuyerEmptyState(
                           icon: Icons.storefront_outlined,
                           title: 'No storefronts found',
-                          message:
-                              'Try searching for another creator or craft category.',
+                          message: 'Try searching for another creator or location.',
                         )
                       : RefreshIndicator(
                           onRefresh: () async {
@@ -212,31 +210,6 @@ class _StorefrontCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          if (creator.category.isNotEmpty) ...[
-                            Flexible(
-                              child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF2DEDD),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                creator.category,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF8B261D),
-                                ),
-                              ),
-                            ),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
                           if (creator.location.isNotEmpty)
                             Flexible(
                               child: Text(

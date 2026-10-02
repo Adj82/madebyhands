@@ -247,9 +247,6 @@ class _SearchTabState extends State<SearchTab> {
                         normalizedQuery,
                       ) ||
                       creator.name.toLowerCase().contains(normalizedQuery) ||
-                      creator.category.toLowerCase().contains(
-                        normalizedQuery,
-                      ) ||
                       creator.location.toLowerCase().contains(
                         normalizedQuery,
                       ) ||
@@ -451,9 +448,7 @@ class _SearchTabState extends State<SearchTab> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Text(
-                              [creator.category, creator.location]
-                                  .where((value) => value.trim().isNotEmpty)
-                                  .join(' · '),
+                              creator.location,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
