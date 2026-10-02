@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
-import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:madebyhands/features/admin/presentation/views/product_approval_view.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
-import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 
 class ProductReviewPage extends StatelessWidget {
   final CreatorProduct product;
@@ -25,7 +23,7 @@ class ProductReviewPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (product.approvedBy.isNotEmpty) ...[
+                  if (product.status == 'Approved' && product.approvedBy.isNotEmpty) ...[
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       margin: const EdgeInsets.only(bottom: 16),
@@ -48,7 +46,7 @@ class ProductReviewPage extends StatelessWidget {
                       ),
                     ),
                   ],
-                  if (product.rejectionReason.isNotEmpty) ...[
+                  if (product.status == 'Rejected' && product.rejectionReason.isNotEmpty) ...[
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       margin: const EdgeInsets.only(bottom: 16),
@@ -71,41 +69,48 @@ class ProductReviewPage extends StatelessWidget {
                       ),
                     ),
                   ],
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _EditableText(
-                          label: 'Product Name',
-                          value: product.name,
-                          previousValue: product.editHistory?['previousName'],
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      _EditableText(
-                        label: 'Price',
-                        value: '₹${product.price}',
-                        previousValue: product.editHistory != null ? '₹${product.editHistory!['previousPrice']}' : null,
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.primary),
-                      ),
-                    ],
+                  _EditableText(
+                    label: 'Product Name',
+                    value: product.name,
+                    previousValue: product.editHistory?['previousName'] as String?,
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  _EditableText(
+                    label: 'Price',
+                    value: '₹${product.price.round()}',
+                    previousValue: product.editHistory?['previousPrice'] == null
+                        ? null
+                        : '₹${(product.editHistory!['previousPrice'] as num).round()}',
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.primary),
                   ),
                   const SizedBox(height: 10),
-                  Chip(label: Text(product.category), backgroundColor: AppColors.background),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final category in product.categories.isNotEmpty
+                          ? product.categories
+                          : [product.category])
+                        Chip(label: Text(category), backgroundColor: AppColors.background),
+                    ],
+                  ),
                   if (product.editHistory?['previousCategory'] != null && product.editHistory?['previousCategory'] != product.category)
                     Padding(
                       padding: const EdgeInsets.only(top: 4.0),
                       child: Text('Changed from: ${product.editHistory!['previousCategory']}', style: const TextStyle(color: Colors.orange, fontSize: 10)),
                     ),
                   const SizedBox(height: 20),
+                  _InfoSection(title: 'Creator', value: product.creatorName),
                   _InfoSection(
-                    title: 'Creator', 
-                    value: product.creatorName,
+                    title: 'Stock',
+                    value: '${product.stock} units',
+                    previousValue: product.editHistory?['previousStock'] == null
+                        ? null
+                        : '${product.editHistory!['previousStock']} units',
                   ),
-                  _InfoSection(
-                    title: 'Stock', 
-                    value: '${product.stock} Units',
-                    previousValue: product.editHistory != null ? '${product.editHistory!['previousStock']} Units' : null,
-                  ),
+                  _InfoSection(title: 'Weight', value: product.weight),
+                  _InfoSection(title: 'Shipping', value: product.shippingInfo),
                   _InfoSection(title: 'Dimensions', value: product.dimensions),
                   _InfoSection(title: 'Materials', value: product.materials),
                   
@@ -115,7 +120,7 @@ class ProductReviewPage extends StatelessWidget {
                   _EditableText(
                     label: 'Description',
                     value: product.description,
-                    previousValue: product.editHistory?['previousDescription'],
+                    previousValue: product.editHistory?['previousDescription'] as String?,
                     style: const TextStyle(color: AppColors.mutedText, height: 1.5),
                   ),
 
@@ -128,13 +133,6 @@ class ProductReviewPage extends StatelessWidget {
                     ...product.customizations.map((c) => _buildCustomizationCard(c)),
                   ],
 
-                  const SizedBox(height: 40),
-                  const Divider(),
-                  const Text('Admin Quality Check', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  const SizedBox(height: 15),
-                  const _CheckItem(label: 'Images are clear and relevant'),
-                  const _CheckItem(label: 'Price falls within category norms'),
-                  const _CheckItem(label: 'Description is accurate and non-promotional'),
                   const SizedBox(height: 30),
                 ],
               ),
@@ -171,7 +169,7 @@ class ProductReviewPage extends StatelessWidget {
           Row(
             children: [
               Expanded(child: Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-              Text('+ ₹${c.additionalPrice}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+              Text('+ ₹${c.additionalPrice.round()}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
             ],
           ),
           const SizedBox(height: 5),
@@ -197,7 +195,19 @@ class ProductReviewPage extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 itemCount: c.images.length,
                 separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (context, i) => ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(c.images[i], width: 60, height: 60, fit: BoxFit.cover)),
+                itemBuilder: (context, i) => ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    c.images[i],
+                    width: 60,
+                    height: 60,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const SizedBox.square(
+                      dimension: 60,
+                      child: Icon(Icons.broken_image_outlined),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -206,120 +216,41 @@ class ProductReviewPage extends StatelessWidget {
     );
   }
 
-  Widget _buildActionButtons(BuildContext context) {
-    final authState = context.watch<AuthBloc>().state;
-    final currentUser = authState is AuthSuccess ? authState.user : null;
-    final adminName = currentUser?.name ?? 'Admin';
-    final adminEmail = currentUser?.email ?? '';
-
+  Widget? _buildActionButtons(BuildContext context) {
+    final canReject = product.status != 'Rejected';
+    final canApprove = product.status != 'Approved';
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(15.0),
         child: Row(
           children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => _showRejectionDialog(context, adminName, adminEmail),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  foregroundColor: Colors.redAccent,
-                  side: const BorderSide(color: Colors.redAccent),
+            if (canReject)
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () async {
+                    final rejected = await rejectProductWithReason(context, product);
+                    if (rejected && context.mounted) Navigator.pop(context);
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.redAccent,
+                    side: const BorderSide(color: Colors.redAccent),
+                  ),
+                  child: Text(product.status == 'Approved' ? 'Reject & unpublish' : 'Reject'),
                 ),
-                child: const Text('REJECT PRODUCT'),
               ),
-            ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: FilledButton(
-                onPressed: () {
-                  context.read<CreatorBloc>().add(CreatorUpdateProductStatus(
-                        productId: product.id,
-                        status: 'Approved',
-                        approvedBy: adminName,
-                        approvedByEmail: adminEmail,
-                      ));
-                  Navigator.pop(context);
-                },
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  backgroundColor: AppColors.primary,
+            if (canReject && canApprove) const SizedBox(width: 15),
+            if (canApprove)
+              Expanded(
+                child: FilledButton(
+                  onPressed: () {
+                    approveProduct(context, product);
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Approve & publish'),
                 ),
-                child: const Text('APPROVE & PUBLISH'),
               ),
-            ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showRejectionDialog(BuildContext context, String adminName, String adminEmail) {
-    final reasonController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    final creatorBloc = context.read<CreatorBloc>();
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Reject "${product.name}"'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Please provide a mandatory reason for rejecting this product. The seller will see this feedback in their dashboard.',
-                style: TextStyle(fontSize: 12, color: AppColors.mutedText),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: reasonController,
-                autofocus: true,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Rejection Reason *',
-                  hintText: 'e.g. Image resolution too low, inaccurate description',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (v) {
-                  final trimmed = v?.trim() ?? '';
-                  if (trimmed.isEmpty) {
-                    return 'Rejection reason is mandatory.';
-                  }
-                  if (trimmed.length < 3) {
-                    return 'Reason must be at least 3 characters long.';
-                  }
-                  return null;
-                },
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                final reason = reasonController.text.trim();
-                Navigator.pop(dialogContext);
-                creatorBloc.add(CreatorUpdateProductStatus(
-                  productId: product.id,
-                  status: 'Rejected',
-                  approvedBy: adminName,
-                  approvedByEmail: adminEmail,
-                  rejectionReason: reason,
-                ));
-                Navigator.pop(context);
-              }
-            },
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-            child: const Text('Confirm Rejection'),
-          ),
-        ],
       ),
     );
   }
@@ -394,25 +325,6 @@ class _EditableText extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-class _CheckItem extends StatelessWidget {
-  final String label;
-  const _CheckItem({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Row(
-        children: [
-          const Icon(Icons.check_circle_outline, size: 20, color: AppColors.primary),
-          const SizedBox(width: 10),
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
-        ],
-      ),
     );
   }
 }

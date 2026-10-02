@@ -9,9 +9,6 @@ class SupportTicketModel extends SupportTicket {
     required super.userName,
     required super.subject,
     required super.status,
-    super.requestStatus,
-    super.reason,
-    super.type,
     required super.lastMessage,
     required super.createdAt,
     required super.updatedAt,
@@ -21,19 +18,18 @@ class SupportTicketModel extends SupportTicket {
     DocumentSnapshot<Map<String, dynamic>> doc,
   ) {
     final data = doc.data() ?? {};
+    final createdAt =
+        (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
     return SupportTicketModel(
       id: doc.id,
       userId: data['userId'] as String? ?? '',
       userRole: data['userRole'] as String? ?? 'buyer',
       userName: data['userName'] as String? ?? 'User',
-      subject: data['subject'] as String? ?? 'Support Ticket',
+      subject: data['subject'] as String? ?? 'Support ticket',
       status: data['status'] as String? ?? 'open',
-      requestStatus: data['requestStatus'] as String? ?? 'none',
-      reason: data['reason'] as String? ?? '',
-      type: data['type'] as String? ?? 'general',
       lastMessage: data['lastMessage'] as String? ?? '',
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: createdAt,
+      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? createdAt,
     );
   }
 }

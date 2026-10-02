@@ -41,6 +41,27 @@ class CreatorProfileModel extends CreatorProfile {
     };
   }
 
+  Map<String, dynamic> toEditableJson() {
+    return {
+      'uid': uid,
+      'name': name,
+      'profileImage': profileImage,
+      'bio': bio,
+      'category': category,
+      'location': location,
+      'socialLinks': socialLinks,
+      'portfolio': portfolio,
+      'story': story,
+      'verificationStatus': verificationStatus,
+      'businessName': businessName,
+      'address': address,
+      'latestPhoto': latestPhoto,
+      'idCard': idCard,
+      'panCard': panCard,
+      'aadhaarCard': aadhaarCard,
+    };
+  }
+
   factory CreatorProfileModel.fromJson(
     Map<String, dynamic> json, [
     String? docId,

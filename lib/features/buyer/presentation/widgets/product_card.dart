@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/product_thumbnail.dart';
 
 class ProductCard extends StatelessWidget {
   final Product product;
   final bool isSaved;
-  final VoidCallback onTap;
-  final VoidCallback onSave;
+  final VoidCallback? onTap;
+
+  /// Hides the save button when null (e.g. a creator previewing their shop).
+  final VoidCallback? onSave;
 
   const ProductCard({
     super.key,
     required this.product,
     required this.isSaved,
-    required this.onTap,
-    required this.onSave,
+    this.onTap,
+    this.onSave,
   });
 
   @override
@@ -39,15 +42,9 @@ class ProductCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  ColoredBox(
-                    color: product.color,
-                    child: Icon(
-                      product.icon,
-                      size: 58,
-                      color: AppColors.text.withValues(alpha: 0.62),
-                    ),
-                  ),
-                  Positioned(
+                  ProductThumbnail(product: product, radius: 0, iconSize: 58),
+                  if (onSave != null)
+                    Positioned(
                     top: 8,
                     right: 8,
                     child: IconButton.filledTonal(
@@ -107,15 +104,17 @@ class ProductCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const Icon(
-                        Icons.star_rounded,
-                        size: 17,
-                        color: Color(0xFFE0A72F),
-                      ),
-                      Text(
-                        product.rating.toString(),
-                        style: const TextStyle(fontSize: 12),
-                      ),
+                      if (product.rating > 0) ...[
+                        const Icon(
+                          Icons.star_rounded,
+                          size: 17,
+                          color: Color(0xFFE0A72F),
+                        ),
+                        Text(
+                          product.rating.toStringAsFixed(1),
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ],
                     ],
                   ),
                 ],

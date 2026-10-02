@@ -15,6 +15,9 @@ abstract interface class BuyerRepository {
 
   Stream<List<PublicCreator>> watchPublicCreators();
 
+  /// Category names managed by admins, falling back to the defaults.
+  Stream<List<String>> watchCategories();
+
   Stream<Set<String>> watchFavoriteProductIds(String userId);
 
   Future<void> setFavorite({

@@ -1,5 +1,5 @@
+import 'package:madebyhands/core/services/payment_api.dart';
 import 'package:madebyhands/firebase_options.dart';
-import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -18,26 +18,25 @@ import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/buyer/data/firestore_buyer_repository.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
-import 'package:madebyhands/features/buyer/presentation/bloc/buyer_cubit.dart';
 import 'package:madebyhands/features/creator/data/datasources/creator_remote_data_source.dart';
 import 'package:madebyhands/features/creator/data/repositories/creator_repository_impl.dart';
 import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
-import 'package:madebyhands/features/orders/data/firestore_order_repository.dart';
-import 'package:madebyhands/features/orders/domain/repositories/order_repository.dart';
 import 'package:madebyhands/features/support/data/firestore_support_repository.dart';
 import 'package:madebyhands/features/support/domain/repositories/support_repository.dart';
 
 final serviceLocator = GetIt.instance;
 
+const _googleClientId = String.fromEnvironment('GOOGLE_CLIENT_ID');
+
 Future<void> initDependencies() async {
   try {
-    // Initialize Firebase with generated options
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-  } catch (e) {
-    debugPrint("Firebase initialization failed: $e");
+  } on FirebaseException catch (error) {
+    // Hot restarts on Android can report the default app as already created.
+    if (error.code != 'duplicate-app') rethrow;
   }
 
   // Core
@@ -46,7 +45,8 @@ Future<void> initDependencies() async {
   serviceLocator.registerLazySingleton(() => FirebaseStorage.instance);
   serviceLocator.registerLazySingleton(
     () => GoogleSignIn(
-      clientId: const String.fromEnvironment('GOOGLE_CLIENT_ID'),
+      // Only the web build needs an explicit OAuth client id.
+      clientId: _googleClientId.isEmpty ? null : _googleClientId,
     ),
   );
 
@@ -62,9 +62,7 @@ Future<void> initDependencies() async {
 }
 
 void _initSharedData() {
-  serviceLocator.registerLazySingleton<OrderRepository>(
-    () => FirestoreOrderRepository(firestore: serviceLocator()),
-  );
+  serviceLocator.registerLazySingleton(() => OrderActionsApi());
   serviceLocator.registerLazySingleton<SupportRepository>(
     () => FirestoreSupportRepository(firestore: serviceLocator()),
   );
@@ -77,6 +75,7 @@ void _initAuth() {
       firebaseAuth: serviceLocator(),
       firestore: serviceLocator(),
       googleSignIn: serviceLocator(),
+      storage: serviceLocator(),
     ),
   );
 
@@ -93,16 +92,21 @@ void _initAuth() {
 
 void _initCreator() {
   // Data Source
-  serviceLocator.registerFactory<CreatorRemoteDataSource>(
+  serviceLocator.registerFactory<CreatorRemoteDataSourceImpl>(
     () => CreatorRemoteDataSourceImpl(
       firestore: serviceLocator(),
       firebaseStorage: serviceLocator(),
     ),
   );
+  serviceLocator.registerFactory<CreatorRemoteDataSource>(
+    () => serviceLocator<CreatorRemoteDataSourceImpl>(),
+  );
 
   // Repository
   serviceLocator.registerFactory<CreatorRepository>(
-    () => CreatorRepositoryImpl(serviceLocator()),
+    () => CreatorRepositoryImpl(
+      serviceLocator<CreatorRemoteDataSourceImpl>(),
+    ),
   );
 
   // Bloc
@@ -116,9 +120,6 @@ void _initBuyer() {
   serviceLocator.registerLazySingleton<BuyerRepository>(
     () => FirestoreBuyerRepository(firestore: serviceLocator()),
   );
-
-  // Cubit/Bloc
-  serviceLocator.registerFactory(() => BuyerCubit());
 
   serviceLocator.registerLazySingleton(
     () => BuyerBloc(repository: serviceLocator()),

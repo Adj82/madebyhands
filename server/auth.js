@@ -1,39 +1,57 @@
 const admin = require('firebase-admin');
 
+/**
+ * Normalizes the service account's private key.
+ *
+ * Pasting the JSON into a hosting dashboard often leaves the PEM newlines
+ * double-escaped, which JSON.parse turns into a literal backslash-n rather
+ * than a line break. admin.credential.cert() then rejects the key.
+ */
+function normalizePrivateKey(serviceAccount) {
+  const key = serviceAccount.private_key;
+  if (typeof key === 'string' && !key.includes('\n') && key.includes('\\n')) {
+    return { ...serviceAccount, private_key: key.replace(/\\n/g, '\n') };
+  }
+  return serviceAccount;
+}
+
+/**
+ * Returns an initialized Firebase Admin app, or throws.
+ *
+ * This must never fall back to an unauthenticated app: requireUser relies on
+ * it to verify ID tokens, and every caller writes orders and payment records
+ * through the Admin SDK, which bypasses firestore.rules.
+ */
 function getFirebaseAdmin() {
   if (admin.apps.length) return admin;
+
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (serviceAccountJson) {
-    try {
-      const serviceAccount = JSON.parse(serviceAccountJson);
-      admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-      return admin;
-    } catch (e) {
-      console.warn('Firebase Admin cert parse error:', e.message);
-    }
+  if (!serviceAccountJson) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is not set on the payment server');
   }
-  // Initialize with project ID for serverless function execution
-  admin.initializeApp({
-    projectId: process.env.FIREBASE_PROJECT_ID || 'madebyhands-77f87',
-  });
+
+  let serviceAccount;
+  try {
+    serviceAccount = JSON.parse(serviceAccountJson);
+  } catch (error) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON (check for a truncated or re-wrapped paste)');
+  }
+
+  try {
+    admin.initializeApp({ credential: admin.credential.cert(normalizePrivateKey(serviceAccount)) });
+  } catch (error) {
+    throw new Error(`Firebase service account was rejected: ${error.message}`);
+  }
+
   return admin;
 }
 
-function parseJwtPayload(token) {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = Buffer.from(parts[1], 'base64').toString('utf8');
-    const parsed = JSON.parse(payload);
-    return {
-      uid: parsed.user_id || parsed.sub || parsed.uid,
-      email: parsed.email || '',
-    };
-  } catch (e) {
-    return null;
-  }
-}
-
+/**
+ * Resolves the authenticated caller, or responds and returns null.
+ *
+ * The returned uid decides whose cart is priced and whose orders are written,
+ * so it may only ever come from a verified ID token.
+ */
 async function requireUser(req, res) {
   const authorization = req.headers.authorization || '';
   const match = authorization.match(/^Bearer\s+(.+)$/i);
@@ -41,32 +59,25 @@ async function requireUser(req, res) {
     res.status(401).json({ error: 'Authentication required' });
     return null;
   }
-  const token = match[1];
 
   let firebaseAdmin;
   try {
     firebaseAdmin = getFirebaseAdmin();
   } catch (error) {
-    console.warn('Firebase Admin init warning:', error.message || error);
+    console.error('Firebase Admin configuration error:', error.message || error);
+    res.status(503).json({ error: 'Firebase authentication is not configured on the payment server' });
+    return null;
   }
 
-  if (firebaseAdmin && process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-    try {
-      const decoded = await firebaseAdmin.auth().verifyIdToken(token);
-      return decoded;
-    } catch (error) {
-      console.warn('Firebase ID token verification failed, falling back to JWT payload extraction:', error.message);
-    }
+  try {
+    return await firebaseAdmin.auth().verifyIdToken(match[1]);
+  } catch (error) {
+    console.error('Firebase ID token verification failed:', error.message || error);
+    res.status(401).json({
+      error: 'Your session could not be verified. Sign out, sign in again and retry.',
+    });
+    return null;
   }
-
-  // Fallback JWT payload extraction (works reliably when service account cert is not set)
-  const user = parseJwtPayload(token);
-  if (user && user.uid) {
-    return user;
-  }
-
-  res.status(401).json({ error: 'Invalid authentication token' });
-  return null;
 }
 
 module.exports = { getFirebaseAdmin, requireUser };

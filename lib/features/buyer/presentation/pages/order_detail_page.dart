@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:madebyhands/core/constants/couriers.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/buyer_order.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 import 'package:madebyhands/features/orders/domain/order_status.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class OrderDetailPage extends StatelessWidget {
   final BuyerOrder order;
@@ -19,7 +21,7 @@ class OrderDetailPage extends StatelessWidget {
           backgroundColor: Colors.transparent,
           elevation: 0,
           title: Text(
-            'Order #${order.id}',
+            'Order #${order.id.length > 8 ? order.id.substring(order.id.length - 8).toUpperCase() : order.id.toUpperCase()}',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: Color(0xFF8B261D),
@@ -153,9 +155,22 @@ class _OrderDetailBody extends StatelessWidget {
             ),
             margin: const EdgeInsets.only(bottom: 10),
             child: ListTile(
-              leading: const Icon(
-                Icons.inventory_2_outlined,
-                color: Color(0xFF8B261D),
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox.square(
+                  dimension: 44,
+                  child: item.image.isEmpty
+                      ? const Icon(Icons.inventory_2_outlined, color: Color(0xFF8B261D))
+                      : Image.network(
+                          item.image,
+                          fit: BoxFit.cover,
+                          cacheWidth: 132,
+                          errorBuilder: (_, _, _) => const Icon(
+                            Icons.inventory_2_outlined,
+                            color: Color(0xFF8B261D),
+                          ),
+                        ),
+                ),
               ),
               title: Text(
                 item.name,
@@ -165,7 +180,11 @@ class _OrderDetailBody extends StatelessWidget {
                 ),
               ),
               subtitle: Text(
-                'Quantity: ${item.quantity}  ·  ₹${item.unitPrice} each',
+                [
+                  'Quantity: ${item.quantity}  ·  ₹${item.unitPrice} each',
+                  for (final entry in item.customizations.entries)
+                    '${entry.key}: ${entry.value.join(', ')}',
+                ].join('\n'),
               ),
               trailing: Text(
                 '₹${item.total}',
@@ -218,21 +237,31 @@ class _OrderDetailBody extends StatelessWidget {
           ),
           child: Padding(
             padding: const EdgeInsets.all(18),
-            child: Row(
+            child: Column(
               children: [
-                const Expanded(
-                  child: Text(
-                    'Order total',
-                    style: TextStyle(fontSize: 17, color: Color(0xFF2C1810)),
-                  ),
-                ),
-                Text(
-                  '₹${order.total}',
-                  style: const TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF8B261D),
-                  ),
+                if (order.subtotal > 0 && order.platformFee > 0) ...[
+                  _AmountRow(label: 'Items', amount: order.subtotal),
+                  const SizedBox(height: 6),
+                  _AmountRow(label: 'Platform fee', amount: order.platformFee),
+                  const Divider(height: 20),
+                ],
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Order total',
+                        style: TextStyle(fontSize: 17, color: Color(0xFF2C1810)),
+                      ),
+                    ),
+                    Text(
+                      '₹${order.total}',
+                      style: const TextStyle(
+                        fontSize: 21,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF8B261D),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -403,8 +432,28 @@ class _TrackingCard extends StatelessWidget {
               ),
             if (_hasValue(order.lastLocation))
               _TrackingRow(label: 'Last location', value: order.lastLocation!),
-            if (_hasValue(order.trackingUrl))
-              _TrackingRow(label: 'Tracking link', value: order.trackingUrl!),
+            if (_trackingUri(order) != null) ...[
+              const SizedBox(height: 14),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final opened = await launchUrl(
+                    _trackingUri(order)!,
+                    mode: LaunchMode.externalApplication,
+                  );
+                  if (!opened && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Could not open the tracking page.')),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: const Text('Track shipment'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF8B261D),
+                  side: const BorderSide(color: Color(0xFF8B261D)),
+                ),
+              ),
+            ],
             if (order.trackingUpdatedAt != null)
               _TrackingRow(
                 label: 'Tracking updated',
@@ -418,6 +467,28 @@ class _TrackingCard extends StatelessWidget {
 
   static bool _hasValue(String? value) =>
       value != null && value.trim().isNotEmpty;
+
+  static Uri? _trackingUri(BuyerOrder order) {
+    final explicit = order.trackingUrl?.trim() ?? '';
+    final parsed = explicit.isEmpty ? null : Uri.tryParse(explicit);
+    if (parsed != null && parsed.hasScheme) return parsed;
+    return courierTrackingUri(order.carrierName, order.consignmentNumber);
+  }
+}
+
+class _AmountRow extends StatelessWidget {
+  final String label;
+  final int amount;
+
+  const _AmountRow({required this.label, required this.amount});
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(child: Text(label, style: const TextStyle(color: AppColors.mutedText))),
+      Text('₹$amount', style: const TextStyle(fontWeight: FontWeight.w700)),
+    ],
+  );
 }
 
 class _TrackingRow extends StatelessWidget {
@@ -491,6 +562,13 @@ class _StoppedOrderCard extends StatelessWidget {
                           ? order.rejectionReason!
                           : 'Please contact support if you need more information.',
                     ),
+                    if (order.refundStatus != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        refundStatusLabel(order.refundStatus!),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ],
                   ],
                 ),
               ),

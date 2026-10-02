@@ -25,33 +25,30 @@ class UserEntity {
     'reshob.rc12345@gmail.com',
   ];
 
-  bool get isSuperAdmin {
-    final lowerRole = role.toLowerCase().trim();
-    if (lowerRole == 'super_admin') return true;
-    final lowerEmail = email.toLowerCase().trim();
-    if ((lowerRole == 'admin' || lowerRole.isEmpty) &&
-        presetSuperAdminEmails.contains(lowerEmail)) {
-      return true;
-    }
-    return false;
-  }
+  String get _normalizedRole => role.toLowerCase().trim();
 
-  bool get isManager {
-    final lowerRole = role.toLowerCase().trim();
-    if (lowerRole == 'manager') return true;
-    if (lowerRole == 'admin' && !isSuperAdmin) return true;
-    return false;
-  }
+  bool get _isPresetAdminEmail =>
+      presetSuperAdminEmails.contains(email.toLowerCase().trim());
 
-  bool get isAdminOrManager {
-    final lowerRole = role.toLowerCase().trim();
-    return isSuperAdmin || isManager || lowerRole == 'admin';
-  }
+  /// Super admins have full access including payouts and platform fees.
+  bool get isSuperAdmin =>
+      _normalizedRole == 'super_admin' ||
+      (_normalizedRole == 'admin' && _isPresetAdminEmail);
+
+  /// Managers (and legacy 'admin' accounts) run day-to-day operations.
+  bool get isManager =>
+      _normalizedRole == 'manager' ||
+      (_normalizedRole == 'admin' && !_isPresetAdminEmail);
+
+  bool get isAdminOrManager => isSuperAdmin || isManager;
+
+  bool get isCreator =>
+      _normalizedRole == 'creator' || _normalizedRole == 'seller';
 
   String get roleDisplay {
     if (isSuperAdmin) return 'Super Admin';
-    if (isManager) return 'Manager (Operational)';
-    if (role.toLowerCase() == 'creator') return 'Creator / Seller';
+    if (isManager) return 'Manager';
+    if (isCreator) return 'Creator';
     return 'Buyer';
   }
 }

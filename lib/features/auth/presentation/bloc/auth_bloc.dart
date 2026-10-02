@@ -9,9 +9,11 @@ part 'auth_state.dart';
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository _authRepository;
 
+  /// Starts in [AuthLoading] so the app shows a spinner, not the welcome
+  /// screen, while the saved session is restored.
   AuthBloc({required AuthRepository authRepository})
     : _authRepository = authRepository,
-      super(AuthInitial()) {
+      super(AuthLoading()) {
     on<AuthGoogleSignInRequested>(_onGoogleSignInRequested);
     on<AuthSignUpWithRoleRequested>(_onSignUpWithRoleRequested);
     on<AuthIsUserLoggedIn>(_onIsUserLoggedIn);
@@ -19,23 +21,22 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthLogoutRequested>(_onLogoutRequested);
   }
 
-  void _onGoogleSignInRequested(
+  AuthState _stateFor(UserEntity user) =>
+      user.role.isEmpty ? AuthNeedsRoleSelection(user) : AuthSuccess(user);
+
+  Future<void> _onGoogleSignInRequested(
     AuthGoogleSignInRequested event,
     Emitter<AuthState> emit,
   ) async {
     emit(AuthLoading());
     final res = await _authRepository.signInWithGoogle();
-
-    res.fold((l) => emit(AuthFailure(l.message)), (r) {
-      if (r.role.isEmpty) {
-        emit(AuthNeedsRoleSelection(r));
-      } else {
-        emit(AuthSuccess(r));
-      }
-    });
+    res.fold(
+      (failure) => emit(AuthFailure(failure.message, canRetrySession: false)),
+      (user) => emit(_stateFor(user)),
+    );
   }
 
-  void _onSignUpWithRoleRequested(
+  Future<void> _onSignUpWithRoleRequested(
     AuthSignUpWithRoleRequested event,
     Emitter<AuthState> emit,
   ) async {
@@ -47,42 +48,46 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       phone: event.phone,
       role: event.role,
     );
-
-    res.fold((l) => emit(AuthFailure(l.message)), (r) => emit(AuthSuccess(r)));
+    res.fold(
+      (failure) => emit(AuthFailure(failure.message)),
+      (user) => emit(AuthSuccess(user)),
+    );
   }
 
-  void _onIsUserLoggedIn(
+  Future<void> _onIsUserLoggedIn(
     AuthIsUserLoggedIn event,
     Emitter<AuthState> emit,
   ) async {
+    emit(AuthLoading());
     final res = await _authRepository.getCurrentUser();
-
-    res.fold((l) => emit(AuthInitial()), (r) {
-      if (r.role.isEmpty) {
-        emit(AuthNeedsRoleSelection(r));
-      } else {
-        emit(AuthSuccess(r));
-      }
-    });
+    res.fold(
+      (failure) => emit(
+        failure is SignedOutFailure ? AuthInitial() : AuthFailure(failure.message),
+      ),
+      (user) => emit(_stateFor(user)),
+    );
   }
 
-  void _onDeleteAccountRequested(
+  Future<void> _onDeleteAccountRequested(
     AuthDeleteAccountRequested event,
     Emitter<AuthState> emit,
   ) async {
+    final previous = state;
     emit(AuthLoading());
     final res = await _authRepository.deleteAccount(event.uid);
-
-    res.fold((l) => emit(AuthFailure(l.message)), (r) => emit(AuthInitial()));
+    res.fold((failure) {
+      // Keep the user signed in and show why deletion did not happen.
+      emit(AuthActionFailed(failure.message));
+      if (previous is AuthSuccess) emit(previous);
+    }, (_) => emit(AuthInitial()));
   }
 
-  void _onLogoutRequested(
+  Future<void> _onLogoutRequested(
     AuthLogoutRequested event,
     Emitter<AuthState> emit,
   ) async {
     emit(AuthLoading());
-    final res = await _authRepository.signOut();
-
-    res.fold((l) => emit(AuthFailure(l.message)), (r) => emit(AuthInitial()));
+    await _authRepository.signOut();
+    emit(AuthInitial());
   }
 }

@@ -42,22 +42,27 @@ Toolchain notes:
 
 ### Routing lives in `main.dart`
 
-There is no route table or router package. `lib/main.dart` renders a `BlocBuilder<AuthBloc, AuthState>` and switches on `state.user.role` to pick the root widget: `AdminDashboardPage`, `CreatorFlowWrapper`, or `BuyerDashboardPage`. Navigation inside each panel is `Navigator.push` plus a nav-index cubit. Changing top-level entry conditions means editing `main.dart`.
+There is no route table or router package. `lib/main.dart` renders a `BlocConsumer<AuthBloc, AuthState>` and switches on the sealed auth state, then on `UserEntity.isAdminOrManager` / `isCreator` to pick the root widget: `AdminDashboardPage`, `CreatorFlowWrapper`, or `BuyerDashboardPage` (suspended users get a blocking screen). On sign-out the listener pops pushed routes and dispatches `BuyerSessionEnded` / `CreatorSessionEnded` so the lazy-singleton blocs drop the previous user's data. Navigation inside each panel is `Navigator.push` plus a nav index. Changing top-level entry conditions means editing `main.dart`.
 
-Roles: `buyer`, `creator` (`seller` is tolerated as an alias), `admin`. `firestore.rules` adds `super_admin` and `manager`, plus a hardcoded super-admin email allowlist.
+Roles: `buyer`, `creator` (`seller` is tolerated as an alias), `manager`, `super_admin`. Legacy `admin` counts as a manager unless the email is on the hardcoded super-admin allowlist (kept in sync between `UserEntity.presetSuperAdminEmails` and `firestore.rules`). Managers run operations; finance, platform fees and roles are super-admin only.
 
 ### Two repository conventions coexist — match the feature you are in
 
 - **`auth`, `creator`, `admin`** — full clean-architecture stack: `domain/repositories/` interface, `data/datasources/` (Firestore/Storage calls), `data/repositories/` impl. Returns `Either<Failure, T>` (fpdart).
-- **`buyer`, `orders`, `support`** — a single `data/firestore_*_repository.dart` implements the domain interface directly, with no datasource layer. Returns bare `Stream`/`Future` and **throws** on error instead of returning `Failure`.
+- **`buyer`, `support`** — a single `data/firestore_*_repository.dart` implements the domain interface directly, with no datasource layer. Returns bare `Stream`/`Future` and **throws** on error instead of returning `Failure`.
+- **`orders`** holds only shared domain code: `OrderStatus` (status normalisation) and the fee calculator. Orders are read by each panel's own repository.
 
-`lib/core/usecase/usecase.dart` declares a `UseCase` abstraction that **nothing implements**. Blocs call repositories directly. Do not add usecases assuming an existing pattern.
+There are no use cases; blocs call repositories directly.
+
+`CreatorBloc` holds only the creator's profile session plus the outcome of the latest write (`CreatorAction` + `actionId`), so a product or order write never replaces the dashboard. Lists (products, orders, notifications) are streamed straight from `CreatorRepository.watch*` by the views; each widget keeps its own stream in `State` (Firestore streams are broadcast without replay, so never share one stream between two `StreamBuilder`s).
 
 ### Dependency injection
 
-`get_it` via `serviceLocator` in `lib/init_dependencies.dart`, with a `_initX()` function per feature. Blocs are lazy singletons; auth/creator/admin datasources and repositories are factories, while buyer/orders/support repositories are lazy singletons. Every bloc is provided globally in `main.dart`'s `MultiBlocProvider`, so feature widgets assume they are already in scope.
+`get_it` via `serviceLocator` in `lib/init_dependencies.dart`, with a `_initX()` function per feature. Blocs are lazy singletons; auth/creator/admin datasources and repositories are factories, while buyer/support repositories and `OrderActionsApi` are lazy singletons. Every bloc is provided globally in `main.dart`'s `MultiBlocProvider`, so feature widgets assume they are already in scope.
 
-`AdminCubit` and `BuyerCubit` are both just `Cubit<int>` holding a bottom-nav index — not domain state.
+`AdminCubit` and `BuyerCubit` are both just `Cubit<int>` holding a bottom-nav index — not domain state. `BuyerCubit` is created by the buyer dashboard itself, not registered in `get_it`.
+
+Product categories live in `lib/core/constants/product_categories.dart` (`kProductCategories`, `productMatchesCategory`). Admins manage the `categories` collection; buyers and creators fall back to the constant list.
 
 ### Presentation layout
 
@@ -72,23 +77,23 @@ Cart contents and quantities are **buyer UI state backed by SharedPreferences**,
 This is the most intricate path in the codebase and spans Dart, Node, and Firestore rules. Entry point: `lib/features/buyer/presentation/pages/checkout_page.dart` driving `lib/core/services/razorpay_service.dart`.
 
 1. **Create order** — client POSTs `/api/create-order` with a Firebase ID token and cart lines of `{productId, quantity, customizations}`. **The client never sends prices.**
-2. **Server prices the cart** — `server/checkout.js` `priceCart()` re-reads each product from Firestore, rejects inactive/out-of-stock products and unknown customization options, and computes unit prices. `api/create-order.js` then adds a flat fee per *distinct creator*, creates the Razorpay order, and writes `paymentIntents/{razorpayOrderId}` with the priced snapshot.
+2. **Server prices the cart** — `server/checkout.js` `priceCart()` re-reads each product from Firestore, rejects inactive/out-of-stock products and unknown customization options (free-text customizations are accepted up to 200 chars), and computes unit prices. `api/create-order.js` then adds a flat fee per *distinct creator* (`server/fees.js`), creates the Razorpay order, and writes `paymentIntents/{razorpayOrderId}` with the priced snapshot. Shared handler plumbing (CORS, credentials, body parsing) is in `server/http.js`; Firebase Admin and ID-token verification in `server/auth.js`.
 3. **Checkout UI** — on web, `RazorpayService` calls `window.openMadeByHandsRazorpay` (defined in `web/razorpay_checkout.js`, loaded from `web/index.html`) through the conditional import `razorpay_checkout_stub.dart` / `razorpay_checkout_web.dart`. On Android/iOS it uses the `razorpay_flutter` SDK.
 4. **Finalize** — client POSTs `/api/finalize-payment`. The server verifies the HMAC-SHA256 signature with `crypto.timingSafeEqual`, re-fetches the order and payment from Razorpay's REST API (`server/razorpay.js`), and confirms status `captured`, matching amounts, and `notes.buyer_id == uid`. Then, in one Firestore transaction: decrement product stock, write **one `orders/{orderId}` document per creator** (all sharing `checkoutId`), mark the intent `paid`, and `create` `paymentReceipts/{paymentId}`. Creator/buyer notifications are a best-effort batch afterwards.
-5. **Failure after capture** — the handler refunds through Razorpay and returns HTTP 409 with `refunded: true`, which the client surfaces as a distinct error.
+5. **Failure after capture** — the handler refunds through Razorpay and returns HTTP 409 with `refunded: true`, which the client surfaces as a distinct error. If finalize cannot be reached after a captured payment, the checkout page keeps the payment and offers "Retry order confirmation".
+6. **Rejection** — creators and admins call `/api/reject-order` (`OrderActionsApi`). In a transaction it restores stock and `orderCount` and marks the order `Rejected`/`payoutStatus: cancelled`, then refunds `buyerPayableAmount`. A failed refund leaves `refundStatus: 'failed'`; calling the endpoint again retries the refund (admin "Retry refund").
 
 Key invariants:
 
 - **The idempotency key is `paymentReceipts/{paymentId}`.** A retry finds the existing receipt and returns the original `orderIds`. `RazorpayService.finalizePaidOrder` retries once on network timeouts, so finalize must stay idempotent.
-- **`/api/verify-payment` is currently unused by the client** — `finalize-payment` performs its own verification. Do not treat it as a required step in the flow.
-- Every handler repeats the same CORS preamble driven by `PAYMENT_ALLOWED_ORIGINS`; new endpoints should copy it.
+- New endpoints call `applyCors(req, res)` from `server/http.js` (driven by `PAYMENT_ALLOWED_ORIGINS`).
 
 ## Money and status conventions
 
 - **All Firestore amounts are integer rupees.** Paise exist only at the Razorpay boundary (`× 100`).
 - The buyer pays `subtotal + flatFee`. The percentage commission applies **only when `subtotal > 999`** and is deducted from the creator's subtotal, so `creatorNetAmount` can never go negative.
 - Rates come from `settings/platform_economics` (`flatFee`, `percentFee`), defaulting to 50 and 5.
-- This fee math is **duplicated**: `PlatformFeeCalculator` in `lib/features/orders/domain/entities/marketplace_order.dart` (covered by `test/platform_fee_calculator_test.dart`) and inline in `api/finalize-payment.js`. Change both together.
+- This fee math is **duplicated**: `PlatformFeeCalculator` in `lib/features/orders/domain/entities/marketplace_order.dart` (covered by `test/platform_fee_calculator_test.dart`) and `computeOrderFees` in `server/fees.js` (covered by `npm test`). Change both together.
 - Fees are snapshotted onto each order (`flatFee`, `commissionRate`, `commissionAmount`, `platformFee`, `creatorNetAmount`); Admin Finance derives balances from those stored values, so never recompute historical orders.
 - **Order status strings are mixed-case in the database** — the API writes `'Placed'`, and older records use `'Accepted'`, `'pending'`, `'Completed'`. Always compare through `OrderStatus.normalize()` / `.label()` / `.shipmentStep()` in `lib/features/orders/domain/order_status.dart` instead of raw string equality.
 
@@ -97,10 +102,13 @@ Key invariants:
 The rules are load-bearing, not advisory — deploy them alongside API changes.
 
 - `paymentIntents` and `paymentReceipts` are `allow read, write: if false` — Admin SDK only.
-- Clients cannot create paid orders: only a super admin may create an order document, and only when `paymentStatus != 'paid'`. **Any feature that produces a real order must go through the API**, not a client Firestore write.
-- Creators may update orders only via a key whitelist: `status`, `updatedAt`, `rejectionReason`, `consignmentNumber`, `carrierName`, `payoutStatus`. Adding a creator-editable order field requires a rules change.
-- Users may self-update only `name`, `phone`, `email`.
+- Clients can never create orders. **Any feature that produces a real order must go through the API**, not a client Firestore write.
+- Creators may update orders only via a key whitelist (`status`, `updatedAt`, `consignmentNumber`, `carrierName`, `deliveredAt`) and only to forward fulfilment statuses (`Confirmed` … `Delivered`). Rejection goes through the API. Payout/payment/refund fields are super-admin only. Adding a creator-editable order field requires a rules change.
+- Users may self-update only `name`, `phone`, `email`, `updatedAt`; only super admins change roles.
+- Products: only verified creators create them, always `Pending Approval` + inactive; creator edits go back to review; creators may toggle `isActive` (approved listings only) and `stock` directly.
+- `creator_verifications` (documents) and `creator_bank_accounts` (payout details) are private to the owner and admins / super admins.
 - Product ownership is checked against **either** `creatorUid` **or** `creatorId`; both spellings exist in the data, and `server/checkout.js` falls back the same way.
+- `storage.rules` covers uploads: `creator_profiles/{uid}/…` and `products/{uid}/…` are public images written only by the owner; `creator_profiles/{uid}/verification/…` is readable only by the owner and admins. Deploy with `firebase deploy --only storage`.
 
 ## Environment variables
 
@@ -112,7 +120,9 @@ Use Razorpay **test** credentials until checkout and verification have been exer
 
 ## Tests
 
-`test/` holds three files and does not initialize Firebase. Widget tests inject `MockBuyerRepository` (`lib/features/buyer/data/mock_buyer_repository.dart`) and call `SharedPreferences.setMockInitialValues({})` in `setUp`. Keep new tests off live Firebase by depending on repository interfaces.
+`test/` holds three Flutter test files and does not initialize Firebase. Widget tests inject `MockBuyerRepository` (`lib/features/buyer/data/mock_buyer_repository.dart`) and call `SharedPreferences.setMockInitialValues({})` in `setUp`. Keep new tests off live Firebase by depending on repository interfaces.
+
+`test/api/` holds Node tests for the payment API (`npm test`) using a fake Firestore and stubbed Razorpay/auth; they need no network or credentials.
 
 ## Docs conventions
 

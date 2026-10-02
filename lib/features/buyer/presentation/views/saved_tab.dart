@@ -22,6 +22,9 @@ class SavedTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return BuyerBackground(
       child: BlocBuilder<BuyerBloc, BuyerState>(
+        buildWhen: (previous, current) =>
+            previous.products != current.products ||
+            previous.favoriteIds != current.favoriteIds,
         builder: (context, state) {
           final products = state.products
               .where((product) => state.favoriteIds.contains(product.id))
@@ -52,8 +55,8 @@ class SavedTab extends StatelessWidget {
                     : GridView.builder(
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
                         gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 240,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                           childAspectRatio: 0.67,

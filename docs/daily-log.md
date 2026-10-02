@@ -65,3 +65,31 @@ Use one dated section per workday so the three role-based branches can be merged
 - No Firebase rules were deployed and no live sample records were created.
 - Sample seeding requires an explicit admin confirmation and is available only in debug builds.
 - Production payment processing should move financial calculation to a trusted backend.
+
+## 1 October 2026 — MVP hardening and cleanup
+
+### Payments and API
+
+- Server auth now verifies Firebase ID tokens only (no unverified fallback); Razorpay keys come from environment variables only.
+- Shared helpers in `server/` (`http.js`, `fees.js`, `checkout.js`, `razorpay.js`); the cart is always priced server-side, including free-text customizations.
+- `finalize-payment` stays idempotent and refunds automatically if order creation fails after capture. Web checkout no longer loses payments when the modal reports an interim failure.
+- New `/api/reject-order` for creators and admins: restores stock, marks the order Rejected and refunds the buyer; admins can retry failed refunds. `/api/verify-payment` was removed (unused).
+- Node unit tests: `npm test`.
+
+### Firebase
+
+- `firestore.rules` rewritten: no self role escalation, no client-created orders, creator order updates limited to forward fulfilment, product edits return to review, payout fields super-admin only, private `creator_verifications` and `creator_bank_accounts`.
+- Verification documents moved off the public creator profile; profile edits no longer reset verification status.
+- Product uploads fail loudly instead of falling back to placeholder images.
+
+### Panels
+
+- Buyer: Popular picks feed, category tiles and stories open filtered Shop, filters use the shared category list, product photo gallery, order cost breakdown, refund status and courier tracking links.
+- Creator: streamed products/orders/notifications, delete/publish/unpublish/stock actions, reject & refund, dispatch details, analytics (sales, earnings, new/in-progress orders, best seller) and storefront preview.
+- Admin: Finance shows payout details from the creator's bank record and releases only delivered orders; orders show correct totals and refund state; settings keep only working fee controls; the unused account-deletion request flow was removed (users delete their own accounts).
+
+### Deploy checklist
+
+- `firebase deploy --only firestore:rules`
+- Vercel env: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `FIREBASE_SERVICE_ACCOUNT_JSON`, `PAYMENT_ALLOWED_ORIGINS`
+- Rotate the Razorpay test key that previously appeared in git history.

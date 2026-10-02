@@ -6,6 +6,7 @@ class BuyerOrderItem {
   final int baseUnitPrice;
   final int customizationPrice;
   final Map<String, List<String>> customizations;
+  final String image;
 
   const BuyerOrderItem({
     required this.productId,
@@ -15,6 +16,7 @@ class BuyerOrderItem {
     this.baseUnitPrice = 0,
     this.customizationPrice = 0,
     this.customizations = const {},
+    this.image = '',
   });
 
   int get total => quantity * unitPrice;
@@ -26,7 +28,11 @@ class BuyerOrder {
   final DateTime? updatedAt;
   final DateTime? deliveredAt;
   final String status;
+
+  /// What the buyer paid for this order: items subtotal + platform fee.
   final int total;
+  final int subtotal;
+  final int platformFee;
   final List<BuyerOrderItem> items;
   final String deliveryAddress;
   final String? rejectionReason;
@@ -36,6 +42,9 @@ class BuyerOrder {
   final String? lastLocation;
   final DateTime? trackingUpdatedAt;
 
+  /// 'processing', 'refunded' or 'failed' once a paid order is rejected.
+  final String? refundStatus;
+
   const BuyerOrder({
     required this.id,
     required this.createdAt,
@@ -43,6 +52,8 @@ class BuyerOrder {
     this.deliveredAt,
     required this.status,
     required this.total,
+    this.subtotal = 0,
+    this.platformFee = 0,
     required this.items,
     required this.deliveryAddress,
     this.rejectionReason,
@@ -51,5 +62,13 @@ class BuyerOrder {
     this.trackingUrl,
     this.lastLocation,
     this.trackingUpdatedAt,
+    this.refundStatus,
   });
 }
+
+/// Buyer-facing text for a rejected order's refund state.
+String refundStatusLabel(String refundStatus) => switch (refundStatus) {
+  'refunded' => 'Refunded to your original payment method',
+  'failed' => 'Refund pending — our team is on it',
+  _ => 'Refund in progress',
+};

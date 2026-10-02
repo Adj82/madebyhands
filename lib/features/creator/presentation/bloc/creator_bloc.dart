@@ -1,10 +1,11 @@
 import 'dart:io';
+
+import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:fpdart/fpdart.dart';
+import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_bank_account.dart';
-import 'package:madebyhands/features/creator/domain/entities/creator_notification.dart';
-import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
-import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
 
@@ -12,53 +13,132 @@ part 'creator_event.dart';
 part 'creator_state.dart';
 
 class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
-  final CreatorRepository _creatorRepository;
+  final CreatorRepository _repository;
 
   CreatorBloc({required CreatorRepository creatorRepository})
-    : _creatorRepository = creatorRepository,
-      super(CreatorInitial()) {
-    on<CreatorCheckProfileExists>(_onCheckProfileExists);
+    : _repository = creatorRepository,
+      super(const CreatorState()) {
+    on<CreatorCheckProfileExists>(_onCheckProfile);
+    on<CreatorSessionEnded>((_, emit) => emit(const CreatorState()));
     on<CreatorSubmitOnboarding>(_onSubmitOnboarding);
     on<CreatorSubmitVerification>(_onSubmitVerification);
-    on<CreatorFetchAllProfiles>(_onFetchAllProfiles);
-    on<CreatorUpdateVerificationStatus>(_onUpdateVerificationStatus);
-    on<CreatorAddProduct>(_onAddProduct);
-    on<CreatorUpdateProduct>(_onUpdateProduct);
-    on<CreatorFetchPendingProducts>(_onFetchPendingProducts);
-    on<CreatorFetchAdminAllProducts>(_onFetchAdminAllProducts);
-    on<CreatorFetchCreatorProducts>(_onFetchCreatorProducts);
-    on<CreatorUpdateProductStatus>(_onUpdateProductStatus);
-    on<CreatorFetchOrders>(_onFetchOrders);
-    on<CreatorUpdateOrderStatus>(_onUpdateOrderStatus);
-    on<CreatorFetchNotifications>(_onFetchNotifications);
-    on<CreatorMarkNotificationAsRead>(_onMarkNotificationAsRead);
-    on<CreatorMarkAllNotificationsAsRead>(_onMarkAllNotificationsAsRead);
-    on<CreatorDeleteNotifications>(_onDeleteNotifications);
-    on<CreatorFetchBankAccount>(_onFetchBankAccount);
-    on<CreatorSaveBankAccount>(_onSaveBankAccount);
+    on<CreatorSaveProduct>(_onSaveProduct);
+    on<CreatorDeleteProduct>(
+      (event, emit) => _run(
+        emit,
+        CreatorAction.deleteProduct,
+        () => _repository.deleteProduct(event.productId),
+        success: 'Product deleted.',
+      ),
+    );
+    on<CreatorSetProductPublished>(
+      (event, emit) => _run(
+        emit,
+        CreatorAction.publishProduct,
+        () => _repository.setProductPublished(event.productId, event.published),
+        success: event.published
+            ? 'Product is live for buyers.'
+            : 'Product hidden from buyers.',
+      ),
+    );
+    on<CreatorUpdateStock>(
+      (event, emit) => _run(
+        emit,
+        CreatorAction.updateStock,
+        () => _repository.updateStock(event.productId, event.stock),
+        success: 'Stock updated.',
+      ),
+    );
+    on<CreatorUpdateOrderStatus>(
+      (event, emit) => _run(
+        emit,
+        CreatorAction.updateOrder,
+        () => _repository.updateOrderStatus(
+          event.orderId,
+          event.status,
+          consignmentNumber: event.consignmentNumber,
+          carrierName: event.carrierName,
+        ),
+        success: 'Order updated.',
+      ),
+    );
+    on<CreatorRejectOrder>(_onRejectOrder);
+    on<CreatorSaveBankAccount>(
+      (event, emit) => _run(
+        emit,
+        CreatorAction.saveBankAccount,
+        () => _repository.saveCreatorBankAccount(event.bankDetail),
+        success: 'Payout details saved.',
+      ),
+    );
   }
 
-  void _onCheckProfileExists(
+  Future<void> _run(
+    Emitter<CreatorState> emit,
+    CreatorAction action,
+    Future<Either<Failure, void>> Function() call, {
+    required String success,
+  }) async {
+    emit(state.withAction(action, CreatorActionStatus.inProgress));
+    final result = await call();
+    emit(
+      result.fold(
+        (failure) => state.withAction(
+          action,
+          CreatorActionStatus.failure,
+          message: failure.message,
+        ),
+        (_) => state.withAction(
+          action,
+          CreatorActionStatus.success,
+          message: success,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _loadProfile(
+    String uid,
+    Emitter<CreatorState> emit, {
+    bool silent = false,
+  }) async {
+    if (!silent || state.profile == null) {
+      emit(state.withSession(status: CreatorSessionStatus.loading, profile: state.profile));
+    }
+    final result = await _repository.getCreatorProfile(uid);
+    result.fold(
+      (failure) {
+        // A failed background refresh keeps the profile already on screen.
+        if (state.profile != null && silent) return;
+        emit(
+          state.withSession(
+            status: CreatorSessionStatus.failure,
+            sessionError: failure.message,
+          ),
+        );
+      },
+      (profile) => emit(
+        state.withSession(
+          status: profile == null
+              ? CreatorSessionStatus.notFound
+              : CreatorSessionStatus.ready,
+          profile: profile,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onCheckProfile(
     CreatorCheckProfileExists event,
     Emitter<CreatorState> emit,
-  ) async {
-    emit(CreatorLoading());
-    final res = await _creatorRepository.getCreatorProfile(event.uid);
-    res.fold((l) => emit(CreatorFailure(l.message)), (r) {
-      if (r == null) {
-        emit(CreatorProfileNotFound());
-      } else {
-        emit(CreatorProfileLoaded(r));
-      }
-    });
-  }
+  ) => _loadProfile(event.uid, emit, silent: event.silent);
 
-  void _onSubmitOnboarding(
+  Future<void> _onSubmitOnboarding(
     CreatorSubmitOnboarding event,
     Emitter<CreatorState> emit,
   ) async {
-    emit(CreatorLoading());
-    final res = await _creatorRepository.saveCreatorProfile(
+    emit(state.withAction(CreatorAction.saveProfile, CreatorActionStatus.inProgress));
+    final result = await _repository.saveCreatorProfile(
       uid: event.uid,
       name: event.name,
       profileImageFile: event.profileImageFile,
@@ -75,19 +155,34 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
       existingPanCardUrl: event.existingPanCardUrl,
       existingAadhaarCardUrl: event.existingAadhaarCardUrl,
     );
-
-    res.fold(
-      (l) => emit(CreatorFailure(l.message)),
-      (r) => emit(CreatorOnboardingSuccess()),
+    if (result.isLeft()) {
+      emit(
+        state.withAction(
+          CreatorAction.saveProfile,
+          CreatorActionStatus.failure,
+          message: result.getLeft().toNullable()!.message,
+        ),
+      );
+      return;
+    }
+    await _loadProfile(event.uid, emit, silent: true);
+    emit(
+      state.withAction(
+        CreatorAction.saveProfile,
+        CreatorActionStatus.success,
+        message: 'Profile saved.',
+      ),
     );
   }
 
-  void _onSubmitVerification(
+  Future<void> _onSubmitVerification(
     CreatorSubmitVerification event,
     Emitter<CreatorState> emit,
   ) async {
-    emit(CreatorLoading());
-    final res = await _creatorRepository.submitVerification(
+    emit(
+      state.withAction(CreatorAction.submitVerification, CreatorActionStatus.inProgress),
+    );
+    final result = await _repository.submitVerification(
       uid: event.uid,
       creatorName: event.creatorName,
       businessName: event.businessName,
@@ -97,289 +192,62 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
       existingLatestPhotoUrl: event.existingLatestPhotoUrl,
       existingIdCardUrl: event.existingIdCardUrl,
     );
-
-    res.fold(
-      (l) => emit(CreatorFailure(l.message)),
-      (r) => emit(CreatorVerificationSuccess()),
-    );
-  }
-
-  void _onFetchAllProfiles(
-    CreatorFetchAllProfiles event,
-    Emitter<CreatorState> emit,
-  ) async {
-    if (state is! CreatorAllProfilesLoaded) {
-      emit(CreatorLoading());
+    if (result.isLeft()) {
+      emit(
+        state.withAction(
+          CreatorAction.submitVerification,
+          CreatorActionStatus.failure,
+          message: result.getLeft().toNullable()!.message,
+        ),
+      );
+      return;
     }
-    final res = await _creatorRepository.getAllCreatorProfiles();
-    res.fold(
-      (l) => emit(CreatorFailure(l.message)),
-      (r) => emit(CreatorAllProfilesLoaded(r)),
+    await _loadProfile(event.uid, emit, silent: true);
+    emit(
+      state.withAction(
+        CreatorAction.submitVerification,
+        CreatorActionStatus.success,
+        message: 'Documents submitted. We will review them shortly.',
+      ),
     );
   }
 
-  void _onUpdateVerificationStatus(
-    CreatorUpdateVerificationStatus event,
+  Future<void> _onSaveProduct(
+    CreatorSaveProduct event,
     Emitter<CreatorState> emit,
-  ) async {
-    final currentState = state;
-    final List<CreatorProfile> previousProfiles =
-        currentState is CreatorAllProfilesLoaded ? currentState.profiles : [];
-
-    final res = await _creatorRepository.updateVerificationStatus(
-      event.uid,
-      event.status,
-    );
-    res.fold((l) => emit(CreatorFailure(l.message)), (r) {
-      if (previousProfiles.isNotEmpty) {
-        final updatedProfiles = previousProfiles.map((p) {
-          if (p.uid == event.uid) {
-            return CreatorProfile(
-              uid: p.uid,
-              name: p.name,
-              profileImage: p.profileImage,
-              bio: p.bio,
-              category: p.category,
-              location: p.location,
-              socialLinks: p.socialLinks,
-              portfolio: p.portfolio,
-              story: p.story,
-              verificationStatus: event.status,
-              businessName: p.businessName,
-              address: p.address,
-              latestPhoto: p.latestPhoto,
-              idCard: p.idCard,
-            );
-          }
-          return p;
-        }).toList();
-        emit(CreatorAllProfilesLoaded(updatedProfiles));
-      } else {
-        add(CreatorFetchAllProfiles());
-      }
-    });
-  }
-
-  void _onAddProduct(
-    CreatorAddProduct event,
-    Emitter<CreatorState> emit,
-  ) async {
-    emit(CreatorLoading());
-    final res = await _creatorRepository.addProduct(
-      name: event.name,
-      description: event.description,
-      imageFiles: event.imageFiles,
-      category: event.category,
-      categories: event.categories,
-      price: event.price,
-      stock: event.stock,
-      materials: event.materials,
-      dimensions: event.dimensions,
-      weight: event.weight,
-      shippingInfo: event.shippingInfo,
-      creatorUid: event.creatorUid,
-      creatorName: event.creatorName,
-      isCustomizable: event.isCustomizable,
-      isFramed: event.isFramed,
-      predefinedCustomizations: event.predefinedCustomizations,
-      customizations: event.customizations,
-    );
-
-    res.fold(
-      (l) => emit(CreatorFailure(l.message)),
-      (r) => emit(CreatorAddProductSuccess()),
+  ) {
+    final productId = event.productId;
+    return _run(
+      emit,
+      CreatorAction.saveProduct,
+      () => productId == null
+          ? _repository.addProduct(event.input)
+          : _repository.updateProduct(productId, event.input),
+      success: productId == null
+          ? 'Product submitted for admin approval.'
+          : 'Changes saved. The listing is back in admin review.',
     );
   }
 
-  void _onUpdateProduct(
-    CreatorUpdateProduct event,
+  Future<void> _onRejectOrder(
+    CreatorRejectOrder event,
     Emitter<CreatorState> emit,
   ) async {
-    emit(CreatorLoading());
-    final res = await _creatorRepository.updateProduct(
-      productId: event.productId,
-      name: event.name,
-      description: event.description,
-      newImageFiles: event.newImageFiles,
-      existingImageUrls: event.existingImageUrls,
-      category: event.category,
-      categories: event.categories,
-      price: event.price,
-      stock: event.stock,
-      materials: event.materials,
-      dimensions: event.dimensions,
-      weight: event.weight,
-      shippingInfo: event.shippingInfo,
-      creatorUid: event.creatorUid,
-      creatorName: event.creatorName,
-      isCustomizable: event.isCustomizable,
-      isFramed: event.isFramed,
-      predefinedCustomizations: event.predefinedCustomizations,
-      customizations: event.customizations,
-      hasChanges: event.hasChanges,
-    );
-
-    res.fold(
-      (l) => emit(CreatorFailure(l.message)),
-      (r) => emit(CreatorAddProductSuccess()),
-    );
-  }
-
-  void _onFetchPendingProducts(
-    CreatorFetchPendingProducts event,
-    Emitter<CreatorState> emit,
-  ) async {
-    if (state is! CreatorPendingProductsLoaded) {
-      emit(CreatorLoading());
-    }
-    final res = await _creatorRepository.getPendingProducts();
-    res.fold(
-      (l) => emit(CreatorFailure(l.message)),
-      (r) => emit(CreatorPendingProductsLoaded(r)),
-    );
-  }
-
-  void _onFetchAdminAllProducts(
-    CreatorFetchAdminAllProducts event,
-    Emitter<CreatorState> emit,
-  ) async {
-    if (state is! CreatorAdminAllProductsLoaded) {
-      emit(CreatorLoading());
-    }
-    final res = await _creatorRepository.getAdminAllProducts();
-    res.fold(
-      (l) => emit(CreatorFailure(l.message)),
-      (r) => emit(CreatorAdminAllProductsLoaded(r)),
-    );
-  }
-
-  void _onFetchCreatorProducts(
-    CreatorFetchCreatorProducts event,
-    Emitter<CreatorState> emit,
-  ) async {
-    if (state is! CreatorMyProductsLoaded) {
-      emit(CreatorLoading());
-    }
-    final res = await _creatorRepository.getCreatorProducts(event.uid);
-    res.fold(
-      (l) => emit(CreatorFailure(l.message)),
-      (r) => emit(CreatorMyProductsLoaded(r)),
-    );
-  }
-
-  void _onUpdateProductStatus(
-    CreatorUpdateProductStatus event,
-    Emitter<CreatorState> emit,
-  ) async {
-    final res = await _creatorRepository.updateProductStatus(
-      event.productId,
-      event.status,
-      approvedBy: event.approvedBy,
-      approvedByEmail: event.approvedByEmail,
-      rejectionReason: event.rejectionReason,
-    );
-    res.fold((l) => emit(CreatorFailure(l.message)), (r) {
-      add(CreatorFetchAdminAllProducts());
-    });
-  }
-
-  void _onFetchOrders(
-    CreatorFetchOrders event,
-    Emitter<CreatorState> emit,
-  ) async {
-    if (state is! CreatorOrdersLoaded) {
-      emit(CreatorLoading());
-    }
-    final res = await _creatorRepository.getCreatorOrders(event.uid);
-    res.fold(
-      (l) => emit(CreatorFailure(l.message)),
-      (r) => emit(CreatorOrdersLoaded(r)),
-    );
-  }
-
-  void _onUpdateOrderStatus(
-    CreatorUpdateOrderStatus event,
-    Emitter<CreatorState> emit,
-  ) async {
-    final res = await _creatorRepository.updateOrderStatus(
-      event.orderId,
-      event.status,
-      rejectionReason: event.rejectionReason,
-      consignmentNumber: event.consignmentNumber,
-      carrierName: event.carrierName,
-    );
-    res.fold((l) => emit(CreatorFailure(l.message)), (r) {
-      add(CreatorFetchOrders(event.uid));
-      add(CreatorFetchCreatorProducts(event.uid));
-    });
-  }
-
-  void _onFetchNotifications(
-    CreatorFetchNotifications event,
-    Emitter<CreatorState> emit,
-  ) async {
-    if (state is! CreatorNotificationsLoaded) {
-      emit(CreatorLoading());
-    }
-    final res = await _creatorRepository.getCreatorNotifications(event.uid);
-    res.fold(
-      (l) => emit(CreatorNotificationsLoaded(const [])),
-      (r) => emit(CreatorNotificationsLoaded(r)),
-    );
-  }
-
-  void _onMarkNotificationAsRead(
-    CreatorMarkNotificationAsRead event,
-    Emitter<CreatorState> emit,
-  ) async {
-    await _creatorRepository.markNotificationAsRead(event.notificationId);
-    add(CreatorFetchNotifications(event.uid));
-  }
-
-  void _onMarkAllNotificationsAsRead(
-    CreatorMarkAllNotificationsAsRead event,
-    Emitter<CreatorState> emit,
-  ) async {
-    await _creatorRepository.markAllNotificationsAsRead(event.uid);
-    add(CreatorFetchNotifications(event.uid));
-  }
-
-  void _onDeleteNotifications(
-    CreatorDeleteNotifications event,
-    Emitter<CreatorState> emit,
-  ) async {
-    final res = await _creatorRepository.deleteNotifications(
-      event.notificationIds,
-    );
-    res.fold(
-      (l) => emit(CreatorFailure(l.message)),
-      (r) => add(CreatorFetchNotifications(event.uid)),
-    );
-  }
-
-  void _onFetchBankAccount(
-    CreatorFetchBankAccount event,
-    Emitter<CreatorState> emit,
-  ) async {
-    emit(CreatorLoading());
-    final res = await _creatorRepository.getCreatorBankAccount(event.uid);
-    res.fold(
-      (l) => emit(CreatorFailure(l.message)),
-      (r) => emit(CreatorBankAccountLoaded(r)),
-    );
-  }
-
-  void _onSaveBankAccount(
-    CreatorSaveBankAccount event,
-    Emitter<CreatorState> emit,
-  ) async {
-    emit(CreatorLoading());
-    final res = await _creatorRepository.saveCreatorBankAccount(
-      event.bankDetail,
-    );
-    res.fold(
-      (l) => emit(CreatorFailure(l.message)),
-      (r) => emit(CreatorSaveBankAccountSuccess()),
+    emit(state.withAction(CreatorAction.rejectOrder, CreatorActionStatus.inProgress));
+    final result = await _repository.rejectOrder(event.orderId, event.reason);
+    emit(
+      result.fold(
+        (failure) => state.withAction(
+          CreatorAction.rejectOrder,
+          CreatorActionStatus.failure,
+          message: failure.message,
+        ),
+        (_) => state.withAction(
+          CreatorAction.rejectOrder,
+          CreatorActionStatus.success,
+          message: 'Order rejected successfully.',
+        ),
+      ),
     );
   }
 }

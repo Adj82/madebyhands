@@ -1,21 +1,24 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:madebyhands/features/auth/data/models/user_model.dart';
+import 'package:madebyhands/core/constants/product_categories.dart';
 import 'package:madebyhands/features/creator/data/models/creator_profile_model.dart';
 
 abstract interface class AdminRemoteDataSource {
-  Future<List<UserModel>> getUsers(String role);
-  Future<void> updateUserRole(String uid, String role);
-  Future<void> toggleUserStatus(String uid, bool isActive);
   Future<Map<String, dynamic>> getPlatformSettings();
   Future<void> updatePlatformSettings(double flatFee, double percentFee);
-  Future<List<Map<String, dynamic>>> getSupportTickets();
-  Future<List<CreatorProfileModel>> getPendingVerifications();
+  Future<List<CreatorProfileModel>> getCreatorProfiles();
   Future<void> approveCreator(String uid);
-  Future<void> rejectCreator(String uid);
-  Future<List<String>> getCategories();
+  Future<void> rejectCreator(String uid, String reason);
+  Future<List<String>> getCategories({bool seedDefaults = false});
   Future<void> addCategory(String name);
   Future<void> deleteCategory(String name);
   Future<void> suspendUser(String uid, bool isSuspended);
+  Future<void> reviewProduct({
+    required String productId,
+    required bool approve,
+    required String reviewerName,
+    required String reviewerEmail,
+    String? rejectionReason,
+  });
 }
 
 class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
@@ -24,176 +27,197 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   AdminRemoteDataSourceImpl(this.firestore);
 
   @override
-  Future<List<UserModel>> getUsers(String role) async {
-    try {
-      final snapshot = await firestore
-          .collection('users')
-          .where('role', isEqualTo: role)
-          .get();
-      return snapshot.docs.map((doc) => UserModel.fromJson(doc.data())).toList();
-    } catch (e) {
-      throw Exception(e.toString());
-    }
-  }
-
-  @override
-  Future<void> updateUserRole(String uid, String role) async {
-    try {
-      await firestore.collection('users').doc(uid).update({'role': role});
-    } catch (e) {
-      throw Exception(e.toString());
-    }
-  }
-
-  @override
-  Future<void> toggleUserStatus(String uid, bool isActive) async {
-    try {
-      await firestore.collection('users').doc(uid).update({'isActive': isActive});
-    } catch (e) {
-      throw Exception(e.toString());
-    }
-  }
-
-  @override
   Future<Map<String, dynamic>> getPlatformSettings() async {
-    try {
-      final doc = await firestore.collection('settings').doc('platform_economics').get();
-      if (doc.exists) {
-        return doc.data()!;
-      }
-      return {'flatFee': 50.0, 'percentFee': 5.0};
-    } catch (e) {
-      throw Exception(e.toString());
-    }
+    final doc = await firestore
+        .collection('settings')
+        .doc('platform_economics')
+        .get();
+    return doc.data() ?? const {'flatFee': 50.0, 'percentFee': 5.0};
   }
 
   @override
-  Future<void> updatePlatformSettings(double flatFee, double percentFee) async {
-    try {
-      await firestore.collection('settings').doc('platform_economics').set({
+  Future<void> updatePlatformSettings(double flatFee, double percentFee) =>
+      firestore.collection('settings').doc('platform_economics').set({
         'flatFee': flatFee,
         'percentFee': percentFee,
         'updatedAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      throw Exception(e.toString());
-    }
-  }
+      }, SetOptions(merge: true));
 
   @override
-  Future<List<Map<String, dynamic>>> getSupportTickets() async {
-    try {
-      final snapshot = await firestore.collection('support_tickets').get();
-      return snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList();
-    } catch (e) {
-      throw Exception(e.toString());
-    }
+  Future<List<CreatorProfileModel>> getCreatorProfiles() async {
+    final snapshot = await firestore.collection('creator_profiles').get();
+    return snapshot.docs
+        .map((doc) => CreatorProfileModel.fromJson(doc.data(), doc.id))
+        .toList();
   }
 
-  @override
-  Future<List<CreatorProfileModel>> getPendingVerifications() async {
-    try {
-      final snapshot = await firestore.collection('creator_profiles').get();
-      return snapshot.docs
-          .map((doc) => CreatorProfileModel.fromJson(doc.data(), doc.id))
-          .toList();
-    } catch (e) {
-      throw Exception(e.toString());
-    }
-  }
-
+  /// Verification is separate from product approval: verifying a creator
+  /// never publishes their products.
   @override
   Future<void> approveCreator(String uid) async {
-    try {
+    final batch = firestore.batch();
+    batch.set(firestore.collection('creator_profiles').doc(uid), {
+      'verificationStatus': 'Verified',
+      'verificationNote': FieldValue.delete(),
+      'verifiedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    batch.set(firestore.collection('users').doc(uid), {
+      'isVerified': true,
+    }, SetOptions(merge: true));
+    batch.set(firestore.collection('notifications').doc(), {
+      'creatorUid': uid,
+      'title': 'You are now a Verified Creator',
+      'message':
+          'Your verification was approved. You can now list products for review.',
+      'type': 'verification',
+      'createdAt': FieldValue.serverTimestamp(),
+      'isRead': false,
+    });
+    await batch.commit();
+  }
+
+  /// Rejects a pending request or revokes an existing verification. A
+  /// creator who is no longer verified cannot sell, so their live listings
+  /// are hidden; they can republish after being verified again.
+  @override
+  Future<void> rejectCreator(String uid, String reason) async {
+    final liveProducts = await firestore
+        .collection('products')
+        .where('creatorUid', isEqualTo: uid)
+        .where('isActive', isEqualTo: true)
+        .get();
+    final batch = firestore.batch();
+    for (final product in liveProducts.docs) {
+      batch.update(product.reference, {
+        'isActive': false,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+    batch.set(firestore.collection('creator_profiles').doc(uid), {
+      'verificationStatus': 'Rejected',
+      'verificationNote': reason,
+    }, SetOptions(merge: true));
+    batch.set(firestore.collection('users').doc(uid), {
+      'isVerified': false,
+    }, SetOptions(merge: true));
+    batch.set(firestore.collection('notifications').doc(), {
+      'creatorUid': uid,
+      'title': 'Verification needs attention',
+      'message': 'Your verification was not approved. Reason: $reason',
+      'type': 'verification',
+      'createdAt': FieldValue.serverTimestamp(),
+      'isRead': false,
+    });
+    await batch.commit();
+  }
+
+  @override
+  Future<List<String>> getCategories({bool seedDefaults = false}) async {
+    final snapshot = await firestore.collection('categories').get();
+    if (snapshot.docs.isNotEmpty) {
+      final names = snapshot.docs
+          .map((doc) => doc.data()['name'] as String? ?? doc.id)
+          .where((name) => name.trim().isNotEmpty)
+          .toList()
+        ..sort();
+      return names;
+    }
+    if (seedDefaults) {
       final batch = firestore.batch();
-      batch.set(
-        firestore.collection('creator_profiles').doc(uid),
-        {'verificationStatus': 'Verified', 'uid': uid},
-        SetOptions(merge: true),
-      );
-      batch.set(
-        firestore.collection('users').doc(uid),
-        {'isVerified': true},
-        SetOptions(merge: true),
-      );
-
-      // Also activate products
-      final products = await firestore
-          .collection('products')
-          .where('creatorUid', isEqualTo: uid)
-          .get();
-      for (var doc in products.docs) {
-        batch.update(doc.reference, {'isActive': true});
+      for (final name in kProductCategories) {
+        batch.set(firestore.collection('categories').doc(_categoryId(name)), {
+          'name': name,
+        });
       }
-
       await batch.commit();
-    } catch (e) {
-      throw Exception(e.toString());
     }
+    return List<String>.from(kProductCategories);
   }
 
   @override
-  Future<void> rejectCreator(String uid) async {
-    try {
-      final batch = firestore.batch();
-      batch.set(
-        firestore.collection('creator_profiles').doc(uid),
-        {'verificationStatus': 'Rejected', 'uid': uid},
-        SetOptions(merge: true),
-      );
-      batch.set(
-        firestore.collection('users').doc(uid),
-        {'isVerified': false},
-        SetOptions(merge: true),
-      );
-      await batch.commit();
-    } catch (e) {
-      throw Exception(e.toString());
-    }
-  }
-
-  @override
-  Future<List<String>> getCategories() async {
-    try {
-      final snapshot = await firestore.collection('categories').get();
-      if (snapshot.docs.isEmpty) {
-        // Seed initial categories if none exist
-        final defaultCategories = ['Pottery', 'Jewellery', 'Home Decor', 'Textiles', 'Gifts'];
-        for (var cat in defaultCategories) {
-          await addCategory(cat);
-        }
-        return defaultCategories;
-      }
-      return snapshot.docs.map((doc) => doc.id).toList();
-    } catch (e) {
-      throw Exception(e.toString());
-    }
-  }
-
-  @override
-  Future<void> addCategory(String name) async {
-    try {
-      await firestore.collection('categories').doc(name).set({'name': name});
-    } catch (e) {
-      throw Exception(e.toString());
-    }
-  }
+  Future<void> addCategory(String name) => firestore
+      .collection('categories')
+      .doc(_categoryId(name))
+      .set({'name': name.trim()});
 
   @override
   Future<void> deleteCategory(String name) async {
-    try {
-      await firestore.collection('categories').doc(name).delete();
-    } catch (e) {
-      throw Exception(e.toString());
+    // Older categories used the display name as the document id.
+    final snapshot = await firestore
+        .collection('categories')
+        .where('name', isEqualTo: name)
+        .get();
+    final batch = firestore.batch();
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
     }
+    batch.delete(firestore.collection('categories').doc(_categoryId(name)));
+    await batch.commit();
   }
 
   @override
-  Future<void> suspendUser(String uid, bool isSuspended) async {
-    try {
-      await firestore.collection('users').doc(uid).update({'isSuspended': isSuspended});
-    } catch (e) {
-      throw Exception(e.toString());
+  Future<void> suspendUser(String uid, bool isSuspended) => firestore
+      .collection('users')
+      .doc(uid)
+      .update({'isSuspended': isSuspended});
+
+  /// Approving publishes the listing; rejecting hides it with a reason the
+  /// creator sees. The creator is notified either way.
+  @override
+  Future<void> reviewProduct({
+    required String productId,
+    required bool approve,
+    required String reviewerName,
+    required String reviewerEmail,
+    String? rejectionReason,
+  }) async {
+    final productRef = firestore.collection('products').doc(productId);
+    final product = await productRef.get();
+    final data = product.data();
+    if (data == null) throw StateError('This product no longer exists.');
+    final creatorUid =
+        data['creatorUid'] as String? ?? data['creatorId'] as String? ?? '';
+    final name = data['name'] as String? ?? 'Your product';
+    // An approved listing only goes live while its creator is verified.
+    var creatorVerified = false;
+    if (approve && creatorUid.isNotEmpty) {
+      final creator = await firestore.collection('creator_profiles').doc(creatorUid).get();
+      creatorVerified = creator.data()?['verificationStatus'] == 'Verified';
     }
+
+    final batch = firestore.batch();
+    batch.update(productRef, {
+      'status': approve ? 'Approved' : 'Rejected',
+      'isActive': approve && creatorVerified,
+      'approvedBy': reviewerName,
+      'approvedByEmail': reviewerEmail,
+      'rejectionReason': approve ? '' : (rejectionReason ?? '').trim(),
+      if (approve) 'approvedAt': FieldValue.serverTimestamp(),
+      if (approve) 'editHistory': FieldValue.delete(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    if (creatorUid.isNotEmpty) {
+      batch.set(firestore.collection('notifications').doc(), {
+        'creatorUid': creatorUid,
+        'title': approve ? 'Product approved' : 'Product needs changes',
+        'message': approve
+            ? (creatorVerified
+                  ? '"$name" is now live in your storefront.'
+                  : '"$name" was approved and will go live once your account is verified.')
+            : '"$name" was not approved. Reason: ${(rejectionReason ?? '').trim()}',
+        'type': 'product',
+        'targetId': productId,
+        'createdAt': FieldValue.serverTimestamp(),
+        'isRead': false,
+      });
+    }
+    await batch.commit();
   }
+
+  /// Firestore ids cannot contain '/', which category names may.
+  static String _categoryId(String name) => name
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+      .replaceAll(RegExp(r'^-+|-+$'), '');
 }

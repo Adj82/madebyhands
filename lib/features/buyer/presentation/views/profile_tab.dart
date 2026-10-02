@@ -95,13 +95,13 @@ class ProfileTab extends StatelessWidget {
           _ProfileTile(
             icon: Icons.manage_accounts_outlined,
             title: 'Account settings',
-            subtitle: 'Update profile, recovery and deletion',
+            subtitle: 'Update your name, phone or delete your account',
             onTap: onAccount,
           ),
           _ProfileTile(
             icon: Icons.receipt_long_outlined,
             title: 'My orders',
-            subtitle: 'Track, return or buy again',
+            subtitle: 'Track your orders and refunds',
             onTap: onOrders,
           ),
           _ProfileTile(
@@ -113,7 +113,7 @@ class ProfileTab extends StatelessWidget {
           _ProfileTile(
             icon: Icons.support_agent_outlined,
             title: 'Help & support',
-            subtitle: 'FAQs and contact options',
+            subtitle: 'Raise a ticket and chat with our team',
             onTap: onSupport,
           ),
           _ProfileTile(

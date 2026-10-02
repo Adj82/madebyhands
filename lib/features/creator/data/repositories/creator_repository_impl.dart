@@ -13,16 +13,15 @@ import 'package:madebyhands/features/creator/domain/entities/creator_profile.dar
 import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
 
 class CreatorRepositoryImpl implements CreatorRepository {
-  final CreatorRemoteDataSource remoteDataSource;
+  final CreatorRemoteDataSourceImpl remoteDataSource;
 
   CreatorRepositoryImpl(this.remoteDataSource);
 
-  String _cleanExceptionMessage(Object e) {
-    var msg = e.toString();
-    while (msg.startsWith('Exception: ')) {
-      msg = msg.substring(11);
+  String _cleanExceptionMessage(dynamic error) {
+    if (error is Exception) {
+      return error.toString().replaceAll('Exception: ', '');
     }
-    return msg.trim();
+    return error.toString();
   }
 
   @override
@@ -54,7 +53,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
     String? existingAadhaarCardUrl,
   }) async {
     try {
-      String profileImageUrl = existingProfileImageUrl ?? '';
+      var profileImageUrl = existingProfileImageUrl ?? '';
       if (profileImageFile != null) {
         profileImageUrl = await remoteDataSource.uploadProfileImage(
           image: profileImageFile,
@@ -62,16 +61,19 @@ class CreatorRepositoryImpl implements CreatorRepository {
         );
       }
 
-      List<String> portfolioUrls = existingPortfolioUrls ?? [];
+      var portfolioUrls = <String>[];
+      if (existingPortfolioUrls != null) {
+        portfolioUrls.addAll(existingPortfolioUrls);
+      }
       if (portfolioImageFiles.isNotEmpty) {
-        final newUrls = await remoteDataSource.uploadPortfolioImages(
+        final uploaded = await remoteDataSource.uploadPortfolioImages(
           images: portfolioImageFiles,
           uid: uid,
         );
-        portfolioUrls.addAll(newUrls);
+        portfolioUrls.addAll(uploaded);
       }
 
-      String panCardUrl = existingPanCardUrl ?? '';
+      var panCardUrl = existingPanCardUrl ?? '';
       if (panCardFile != null) {
         final ext = panCardFile.path.contains('.')
             ? panCardFile.path.split('.').last.toLowerCase()
@@ -83,7 +85,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
         );
       }
 
-      String aadhaarCardUrl = existingAadhaarCardUrl ?? '';
+      var aadhaarCardUrl = existingAadhaarCardUrl ?? '';
       if (aadhaarCardFile != null) {
         final ext = aadhaarCardFile.path.contains('.')
             ? aadhaarCardFile.path.split('.').last.toLowerCase()
@@ -117,6 +119,24 @@ class CreatorRepositoryImpl implements CreatorRepository {
   }
 
   @override
+  Future<Either<Failure, VerificationDocuments?>> getVerificationDocuments(
+    String uid,
+  ) async {
+    try {
+      final docModel = await remoteDataSource.getVerificationDocuments(uid);
+      if (docModel == null) return right(null);
+      return right(VerificationDocuments(
+        businessName: docModel.businessName,
+        address: docModel.address,
+        latestPhotoUrl: docModel.latestPhoto,
+        idCardUrl: docModel.idCard,
+      ));
+    } catch (e) {
+      return left(Failure(_cleanExceptionMessage(e)));
+    }
+  }
+
+  @override
   Future<Either<Failure, void>> submitVerification({
     required String uid,
     required String creatorName,
@@ -128,16 +148,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
     required String existingIdCardUrl,
   }) async {
     try {
-      final existingProfile = await remoteDataSource.getCreatorProfile(uid);
-      if (existingProfile == null) {
-        return left(
-          Failure(
-            'Creator profile not found. Please complete onboarding first.',
-          ),
-        );
-      }
-
-      String latestPhotoUrl = existingLatestPhotoUrl;
+      var latestPhotoUrl = existingLatestPhotoUrl;
       if (latestPhotoFile != null) {
         latestPhotoUrl = await remoteDataSource.uploadVerificationFile(
           file: latestPhotoFile,
@@ -146,7 +157,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
         );
       }
 
-      String idCardUrl = existingIdCardUrl;
+      var idCardUrl = existingIdCardUrl;
       if (idCardFile != null) {
         idCardUrl = await remoteDataSource.uploadVerificationFile(
           file: idCardFile,
@@ -155,25 +166,26 @@ class CreatorRepositoryImpl implements CreatorRepository {
         );
       }
 
-      final updatedProfile = CreatorProfileModel(
-        uid: uid,
-        name: creatorName,
-        profileImage: existingProfile.profileImage,
-        bio: existingProfile.bio,
-        category: existingProfile.category,
-        location: existingProfile.location,
-        socialLinks: existingProfile.socialLinks,
-        portfolio: existingProfile.portfolio,
-        story: existingProfile.story,
-        verificationStatus: 'In-Process',
-        businessName: businessName,
-        address: address,
-        latestPhoto: latestPhotoUrl,
-        idCard: idCardUrl,
-      );
-
-      await remoteDataSource.saveCreatorProfile(updatedProfile);
-      await remoteDataSource.updateVerificationStatus(uid, 'In-Process');
+      final existingProfile = await remoteDataSource.getCreatorProfile(uid);
+      if (existingProfile != null) {
+        final updatedModel = CreatorProfileModel(
+          uid: existingProfile.uid,
+          name: creatorName.isNotEmpty ? creatorName : existingProfile.name,
+          profileImage: existingProfile.profileImage,
+          bio: existingProfile.bio,
+          category: existingProfile.category,
+          location: existingProfile.location,
+          socialLinks: existingProfile.socialLinks,
+          portfolio: existingProfile.portfolio,
+          story: existingProfile.story,
+          verificationStatus: 'In-Process',
+          businessName: businessName,
+          address: address,
+          latestPhoto: latestPhotoUrl,
+          idCard: idCardUrl,
+        );
+        await remoteDataSource.saveCreatorProfile(updatedModel);
+      }
       return right(null);
     } catch (e) {
       return left(Failure(_cleanExceptionMessage(e)));
@@ -204,90 +216,67 @@ class CreatorRepositoryImpl implements CreatorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> addProduct({
-    required String name,
-    required String description,
-    required List<File> imageFiles,
-    required String category,
-    List<String> categories = const [],
-    required double price,
-    required int stock,
-    required String materials,
-    required String dimensions,
-    required String weight,
-    required String shippingInfo,
-    required String creatorUid,
-    required String creatorName,
-    bool isCustomizable = false,
-    bool? isFramed,
-    List<String> predefinedCustomizations = const [],
-    List<CustomizationInput> customizations = const [],
-  }) async {
+  Future<Either<Failure, void>> addProduct(ProductInput input) async {
     try {
-      final profile = await remoteDataSource.getCreatorProfile(creatorUid);
-      if (profile == null || profile.verificationStatus != 'Verified') {
-        return left(Failure('You must be a Verified Creator to add products.'));
-      }
-
       final imageUrls = await remoteDataSource.uploadProductImages(
-        images: imageFiles,
-        uid: creatorUid,
-        productName: name,
+        images: input.newImageFiles,
+        uid: input.creatorUid,
+        folder: input.name,
       );
 
-      List<ProductCustomization> customizationEntities = [];
-      if (isCustomizable) {
-        for (final input in customizations) {
-          final custImageUrls = await remoteDataSource
-              .uploadCustomizationImages(
-                images: input.imageFiles,
-                uid: creatorUid,
-                productName: name,
-                customizationName: input.name,
-              );
-          customizationEntities.add(
+      final customizationModels = <ProductCustomization>[];
+      if (input.isCustomizable) {
+        for (var customInput in input.customizations) {
+          var custImageUrls = <String>[];
+          if (customInput.imageFiles.isNotEmpty) {
+            custImageUrls = await remoteDataSource.uploadCustomizationImages(
+              images: customInput.imageFiles,
+              uid: input.creatorUid,
+              productName: input.name,
+              customizationName: customInput.name,
+            );
+          }
+          customizationModels.add(
             ProductCustomization(
-              name: input.name,
-              description: input.description,
-              additionalPrice: input.additionalPrice,
+              name: customInput.name,
+              description: customInput.description,
+              additionalPrice: customInput.additionalPrice,
               images: custImageUrls,
-              isMultipleSelection: input.isMultipleSelection,
-              options: input.options,
+              isMultipleSelection: customInput.isMultipleSelection,
+              options: customInput.options,
             ),
           );
         }
       }
 
-      final categoriesList = categories.isNotEmpty
-          ? categories
-          : (category.isNotEmpty ? [category] : <String>[]);
+      final categoriesList = input.categories.isNotEmpty
+          ? input.categories
+          : (input.category.isNotEmpty ? [input.category] : <String>[]);
       final categoryStr = categoriesList.isNotEmpty
           ? categoriesList.join(', ')
-          : category;
+          : input.category;
 
       final newProduct = CreatorProductModel(
         id: '',
-        name: name,
-        description: description,
+        name: input.name,
+        description: input.description,
         images: imageUrls,
         category: categoryStr,
         categories: categoriesList,
-        price: price,
-        stock: stock,
-        materials: materials,
-        dimensions: dimensions,
-        weight: weight,
-        shippingInfo: shippingInfo,
-        creatorUid: creatorUid,
-        creatorName: creatorName,
+        price: input.price,
+        stock: input.stock,
+        materials: input.materials,
+        dimensions: input.dimensions,
+        weight: input.weight,
+        shippingInfo: input.shippingInfo,
+        creatorUid: input.creatorUid,
+        creatorName: input.creatorName,
         status: 'Pending Approval',
         isActive: false,
-        isCustomizable: isCustomizable,
-        isFramed: isFramed,
-        predefinedCustomizations: isCustomizable
-            ? predefinedCustomizations
-            : const [],
-        customizations: customizationEntities,
+        isCustomizable: input.isCustomizable,
+        isFramed: input.isFramed,
+        predefinedCustomizations: input.predefinedCustomizations,
+        customizations: customizationModels,
         createdAt: DateTime.now(),
       );
 
@@ -299,118 +288,111 @@ class CreatorRepositoryImpl implements CreatorRepository {
   }
 
   @override
-  Future<Either<Failure, void>> updateProduct({
-    required String productId,
-    required String name,
-    required String description,
-    required List<File> newImageFiles,
-    required List<String> existingImageUrls,
-    required String category,
-    List<String> categories = const [],
-    required double price,
-    required int stock,
-    required String materials,
-    required String dimensions,
-    required String weight,
-    required String shippingInfo,
-    required String creatorUid,
-    required String creatorName,
-    required bool isCustomizable,
-    bool? isFramed,
-    List<String> predefinedCustomizations = const [],
-    required List<CustomizationInput> customizations,
-    required bool hasChanges,
-  }) async {
+  Future<Either<Failure, void>> updateProduct(
+    String productId,
+    ProductInput input,
+  ) async {
     try {
-      if (!hasChanges) {
-        return right(null);
-      }
-
-      // 1. Upload New Images if any
-      List<String> finalImageUrls = List.from(existingImageUrls);
-      if (newImageFiles.isNotEmpty) {
-        final newUrls = await remoteDataSource.uploadProductImages(
-          images: newImageFiles,
-          uid: creatorUid,
-          productName: name,
+      var finalImageUrls = List<String>.from(input.existingImageUrls);
+      if (input.newImageFiles.isNotEmpty) {
+        final uploaded = await remoteDataSource.uploadProductImages(
+          images: input.newImageFiles,
+          uid: input.creatorUid,
+          folder: input.name,
         );
-        finalImageUrls.addAll(newUrls);
+        finalImageUrls.addAll(uploaded);
       }
 
-      // 2. Handle Customizations
-      List<ProductCustomization> customizationEntities = [];
-      if (isCustomizable) {
-        for (final input in customizations) {
-          final custImageUrls = await remoteDataSource
-              .uploadCustomizationImages(
-                images: input.imageFiles,
-                uid: creatorUid,
-                productName: name,
-                customizationName: input.name,
-              );
-          customizationEntities.add(
+      final customizationModels = <ProductCustomization>[];
+      if (input.isCustomizable) {
+        for (var customInput in input.customizations) {
+          var custImageUrls = List<String>.from(customInput.existingImageUrls);
+          if (customInput.imageFiles.isNotEmpty) {
+            final uploadedCust = await remoteDataSource.uploadCustomizationImages(
+              images: customInput.imageFiles,
+              uid: input.creatorUid,
+              productName: input.name,
+              customizationName: customInput.name,
+            );
+            custImageUrls.addAll(uploadedCust);
+          }
+          customizationModels.add(
             ProductCustomization(
-              name: input.name,
-              description: input.description,
-              additionalPrice: input.additionalPrice,
+              name: customInput.name,
+              description: customInput.description,
+              additionalPrice: customInput.additionalPrice,
               images: custImageUrls,
-              isMultipleSelection: input.isMultipleSelection,
-              options: input.options,
+              isMultipleSelection: customInput.isMultipleSelection,
+              options: customInput.options,
             ),
           );
         }
       }
 
-      // 3. Get existing product to store in history
-      final allCreatorProductsRes = await remoteDataSource.getCreatorProducts(
-        creatorUid,
-      );
-      final existingProduct = allCreatorProductsRes.firstWhere(
-        (p) => p.id == productId,
-      );
-
-      final categoriesList = categories.isNotEmpty
-          ? categories
-          : (category.isNotEmpty ? [category] : <String>[]);
+      final categoriesList = input.categories.isNotEmpty
+          ? input.categories
+          : (input.category.isNotEmpty ? [input.category] : <String>[]);
       final categoryStr = categoriesList.isNotEmpty
           ? categoriesList.join(', ')
-          : category;
+          : input.category;
 
       final updatedProduct = CreatorProductModel(
         id: productId,
-        name: name,
-        description: description,
+        name: input.name,
+        description: input.description,
         images: finalImageUrls,
         category: categoryStr,
         categories: categoriesList,
-        price: price,
-        stock: stock,
-        materials: materials,
-        dimensions: dimensions,
-        weight: weight,
-        shippingInfo: shippingInfo,
-        creatorUid: creatorUid,
-        creatorName: creatorName,
-        status: 'Pending Approval', // Reset status
-        isActive: false, // Hide from storefront
-        isCustomizable: isCustomizable,
-        isFramed: isFramed,
-        predefinedCustomizations: isCustomizable
-            ? predefinedCustomizations
+        price: input.price,
+        stock: input.stock,
+        materials: input.materials,
+        dimensions: input.dimensions,
+        weight: input.weight,
+        shippingInfo: input.shippingInfo,
+        creatorUid: input.creatorUid,
+        creatorName: input.creatorName,
+        status: 'Pending Approval',
+        isActive: false,
+        isCustomizable: input.isCustomizable,
+        isFramed: input.isFramed,
+        predefinedCustomizations: input.isCustomizable
+            ? input.predefinedCustomizations
             : const [],
-        customizations: customizationEntities,
-        createdAt: existingProduct.createdAt,
-        editHistory: {
-          'previousName': existingProduct.name,
-          'previousDescription': existingProduct.description,
-          'previousPrice': existingProduct.price,
-          'previousCategory': existingProduct.category,
-          'previousStock': existingProduct.stock,
-          'timestamp': DateTime.now().toIso8601String(),
-        },
+        customizations: customizationModels,
+        createdAt: DateTime.now(),
       );
 
       await remoteDataSource.updateProduct(updatedProduct);
+      return right(null);
+    } catch (e) {
+      return left(Failure(_cleanExceptionMessage(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteProduct(String productId) async {
+    try {
+      await remoteDataSource.deleteProduct(productId);
+      return right(null);
+    } catch (e) {
+      return left(Failure(_cleanExceptionMessage(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> setProductPublished(String productId, bool published) async {
+    try {
+      await remoteDataSource.setProductPublished(productId, published);
+      return right(null);
+    } catch (e) {
+      return left(Failure(_cleanExceptionMessage(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> updateStock(String productId, int stock) async {
+    try {
+      await remoteDataSource.updateStock(productId, stock);
       return right(null);
     } catch (e) {
       return left(Failure(_cleanExceptionMessage(e)));
@@ -448,6 +430,14 @@ class CreatorRepositoryImpl implements CreatorRepository {
       return left(Failure(_cleanExceptionMessage(e)));
     }
   }
+
+  @override
+  Stream<List<CreatorProduct>> watchCreatorProducts(String uid) =>
+      remoteDataSource.watchCreatorProducts(uid);
+
+  @override
+  Stream<List<CreatorOrder>> watchCreatorOrders(String uid) =>
+      remoteDataSource.watchCreatorOrders(uid);
 
   @override
   Future<Either<Failure, void>> updateProductStatus(
@@ -506,6 +496,24 @@ class CreatorRepositoryImpl implements CreatorRepository {
   }
 
   @override
+  Future<Either<Failure, void>> rejectOrder(String orderId, String reason) async {
+    try {
+      await remoteDataSource.updateOrderStatus(
+        orderId,
+        'Rejected',
+        rejectionReason: reason,
+      );
+      return right(null);
+    } catch (e) {
+      return left(Failure(_cleanExceptionMessage(e)));
+    }
+  }
+
+  @override
+  Stream<List<CreatorNotification>> watchNotifications(String uid) =>
+      remoteDataSource.watchNotifications(uid);
+
+  @override
   Future<Either<Failure, List<CreatorNotification>>> getCreatorNotifications(
     String creatorUid,
   ) async {
@@ -513,7 +521,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
       final notifications = await remoteDataSource.getCreatorNotifications(
         creatorUid,
       );
-      return right(notifications.cast<CreatorNotification>());
+      return right(notifications);
     } catch (e) {
       return left(Failure(_cleanExceptionMessage(e)));
     }
@@ -560,8 +568,8 @@ class CreatorRepositoryImpl implements CreatorRepository {
     String uid,
   ) async {
     try {
-      final bankDetail = await remoteDataSource.getCreatorBankAccount(uid);
-      return right(bankDetail);
+      final bankAccount = await remoteDataSource.getCreatorBankAccount(uid);
+      return right(bankAccount);
     } catch (e) {
       return left(Failure(_cleanExceptionMessage(e)));
     }

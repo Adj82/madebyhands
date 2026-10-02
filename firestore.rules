@@ -1,49 +1,82 @@
 rules_version = '2';
 
+// Security rules for MadeByHands. Deploy with:
+//   firebase deploy --only firestore:rules
+//
+// Anything financial (orders, payment intents, receipts, refunds, stock
+// decrements at purchase) is written by the payment API through the Admin
+// SDK, which bypasses these rules. Clients can never create orders.
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------- helpers
+
     function signedIn() {
       return request.auth != null;
     }
 
-    function userData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-
-    function isSuperAdmin() {
-      return signedIn() && (
-        userData().role == 'super_admin' ||
+    function isRootSuperAdminEmail() {
+      return signedIn() &&
+        request.auth.token.email_verified == true &&
         request.auth.token.email in [
           'adhirajjain364@gmail.com',
           'mayankjaisw8673@gmail.com',
           'suhanimahajan2810@gmail.com',
           'majumdarpayal50@gmail.com',
           'reshob.rc12345@gmail.com'
-        ]
-      );
+        ];
     }
 
-    function isManager() {
-      return signedIn() && (
-        userData().role == 'manager' ||
-        userData().role == 'admin' ||
-        isSuperAdmin()
-      );
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function role() {
+      return signedIn() && exists(userPath())
+        ? get(userPath()).data.get('role', '')
+        : '';
+    }
+
+    function isSuperAdmin() {
+      return isRootSuperAdminEmail() || role() == 'super_admin';
     }
 
     function isAdminOrManager() {
-      return isSuperAdmin() || isManager();
+      return isSuperAdmin() || role() in ['admin', 'manager'];
     }
 
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function isOwnProduct() {
+      return resource.data.get('creatorUid', '') == request.auth.uid ||
+        resource.data.get('creatorId', '') == request.auth.uid;
+    }
+
+    // ------------------------------------------------------------------ users
+
     match /users/{userId} {
-      allow create: if signedIn() && request.auth.uid == userId;
       allow read: if signedIn() && (request.auth.uid == userId || isAdminOrManager());
-      allow update: if isAdminOrManager() ||
+
+      // Self sign-up may only choose buyer or creator. The preset super-admin
+      // emails may bootstrap an admin profile.
+      allow create: if signedIn() &&
+        request.auth.uid == userId &&
+        request.resource.data.get('uid', userId) == userId &&
+        request.resource.data.get('isVerified', false) == false &&
+        request.resource.data.get('isSuspended', false) == false &&
+        (request.resource.data.role in ['buyer', 'creator'] ||
+          (request.resource.data.role == 'admin' && isRootSuperAdminEmail()));
+
+      // Super admins manage roles. Managers may moderate (verify, suspend)
+      // but never change anyone's role. Users edit only their contact info.
+      allow update: if isSuperAdmin() ||
+        (isAdminOrManager() && !changedKeys().hasAny(['role'])) ||
         (signedIn() && request.auth.uid == userId &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'name', 'phone', 'email'
-          ]));
-      allow delete: if isAdminOrManager();
+          changedKeys().hasOnly(['name', 'phone', 'email', 'updatedAt']));
+
+      allow delete: if signedIn() && (request.auth.uid == userId || isAdminOrManager());
 
       match /favorites/{productId} {
         allow read, write: if signedIn() && request.auth.uid == userId;
@@ -54,18 +87,42 @@ service cloud.firestore {
       }
     }
 
+    // --------------------------------------------------------------- products
+
     match /products/{productId} {
       allow read: if signedIn();
-      allow create: if signedIn() &&
-        (isAdminOrManager() || request.resource.data.creatorUid == request.auth.uid || request.resource.data.creatorId == request.auth.uid);
-      allow update: if signedIn() && (
-        isAdminOrManager() ||
-        resource.data.creatorUid == request.auth.uid ||
-        resource.data.creatorId == request.auth.uid ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock'])
-      );
-      allow delete: if signedIn() &&
-        (isAdminOrManager() || resource.data.creatorUid == request.auth.uid || resource.data.creatorId == request.auth.uid);
+
+      // New listings always start hidden and pending admin approval.
+      allow create: if isAdminOrManager() ||
+        (signedIn() &&
+          request.resource.data.creatorUid == request.auth.uid &&
+          request.resource.data.status == 'Pending Approval' &&
+          request.resource.data.isActive == false &&
+          get(/databases/$(database)/documents/creator_profiles/$(request.auth.uid)).data.get('verificationStatus', '') == 'Verified');
+
+      allow update: if isAdminOrManager() ||
+        // Creator edits go back to review and stay hidden until approved.
+        (signedIn() && isOwnProduct() &&
+          request.resource.data.get('creatorUid', '') == resource.data.get('creatorUid', '') &&
+          request.resource.data.status == 'Pending Approval' &&
+          request.resource.data.isActive == false &&
+          request.resource.data.get('orderCount', 0) == resource.data.get('orderCount', 0) &&
+          request.resource.data.get('wishlistCount', 0) == resource.data.get('wishlistCount', 0)) ||
+        // Creators may publish/unpublish approved listings and adjust stock.
+        (signedIn() && isOwnProduct() &&
+          changedKeys().hasOnly(['isActive', 'stock', 'updatedAt']) &&
+          (request.resource.data.isActive == false ||
+            (resource.data.status == 'Approved' &&
+              get(/databases/$(database)/documents/creator_profiles/$(request.auth.uid)).data.get('verificationStatus', '') == 'Verified')) &&
+          request.resource.data.stock is int &&
+          request.resource.data.stock >= 0) ||
+        // Any shopper can move the wishlist counter by exactly one.
+        (signedIn() &&
+          changedKeys().hasOnly(['wishlistCount']) &&
+          request.resource.data.wishlistCount is int &&
+          (request.resource.data.wishlistCount - resource.data.get('wishlistCount', 0)) in [1, -1]);
+
+      allow delete: if isAdminOrManager() || (signedIn() && isOwnProduct());
 
       match /reviews/{buyerId} {
         allow read: if signedIn();
@@ -83,39 +140,49 @@ service cloud.firestore {
       }
     }
 
+    // ----------------------------------------------------------------- orders
+
     match /orders/{orderId} {
-      allow create: if signedIn() &&
-        request.resource.data.buyerId == request.auth.uid &&
-        request.resource.data.creatorId is string &&
-        request.resource.data.creatorId.size() > 0 &&
-        (request.resource.data.paymentStatus == 'paid' || request.resource.data.paymentStatus == 'skipped') &&
-        request.resource.data.payoutStatus == 'pending';
+      // Orders are created only by /api/finalize-payment (Admin SDK).
+      allow create: if false;
+
       allow read: if signedIn() && (
         isAdminOrManager() ||
         resource.data.buyerId == request.auth.uid ||
         resource.data.creatorId == request.auth.uid
       );
-      allow update: if isAdminOrManager() ||
+
+      // Rejections and refunds go through /api/reject-order. Creators move a
+      // live order through fulfilment; payout fields are super-admin only.
+      allow update: if isSuperAdmin() ||
+        (isAdminOrManager() &&
+          !changedKeys().hasAny(['payoutStatus', 'payoutReleasedAt', 'paidAt', 'paymentStatus', 'refundStatus'])) ||
         (signedIn() &&
           resource.data.creatorId == request.auth.uid &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'status',
-            'updatedAt',
-            'rejectionReason',
-            'consignmentNumber',
-            'carrierName',
-            'payoutStatus'
-          ]));
-      allow delete: if isAdminOrManager();
+          !(resource.data.status in ['Rejected', 'Cancelled']) &&
+          changedKeys().hasOnly(['status', 'updatedAt', 'consignmentNumber', 'carrierName', 'deliveredAt']) &&
+          request.resource.data.status in ['Confirmed', 'Processing', 'In-Transit', 'Shipped', 'Out for Delivery', 'Delivered']);
+
+      allow delete: if isSuperAdmin();
     }
 
+    match /paymentIntents/{intentId} {
+      allow read, write: if false;
+    }
+
+    match /paymentReceipts/{paymentId} {
+      allow read, write: if false;
+    }
+
+    // ---------------------------------------------------------------- support
+
     match /support_tickets/{ticketId} {
-      allow create: if signedIn() &&
-        request.resource.data.userId == request.auth.uid;
-      allow read: if signedIn() &&
-        (isAdminOrManager() || resource.data.userId == request.auth.uid);
-      allow update: if signedIn() &&
-        (isAdminOrManager() || resource.data.userId == request.auth.uid);
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if signedIn() && (isAdminOrManager() || resource.data.userId == request.auth.uid);
+      allow update: if isAdminOrManager() ||
+        (signedIn() &&
+          resource.data.userId == request.auth.uid &&
+          changedKeys().hasOnly(['lastMessage', 'updatedAt']));
       allow delete: if isAdminOrManager();
 
       match /messages/{messageId} {
@@ -123,20 +190,20 @@ service cloud.firestore {
           isAdminOrManager() ||
           get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.userId == request.auth.uid
         );
-        allow create: if isAdminOrManager() ||
-          (signedIn() && request.resource.data.senderId == request.auth.uid);
+        // getAfter so the first message can be written in the same batch
+        // that creates the ticket.
+        allow create: if signedIn() &&
+          request.resource.data.senderId == request.auth.uid &&
+          (isAdminOrManager() ||
+            getAfter(/databases/$(database)/documents/support_tickets/$(ticketId)).data.userId == request.auth.uid);
       }
     }
 
+    // --------------------------------------------------------------- platform
+
     match /settings/{settingId} {
       allow read: if signedIn();
-      allow write: if isAdminOrManager();
-    }
-
-    match /creator_profiles/{creatorId} {
-      allow read: if signedIn();
-      allow write: if signedIn() &&
-        (isAdminOrManager() || request.auth.uid == creatorId);
+      allow write: if isSuperAdmin();
     }
 
     match /categories/{categoryId} {
@@ -144,26 +211,62 @@ service cloud.firestore {
       allow write: if isAdminOrManager();
     }
 
-    match /notifications/{notificationId} {
-      allow read: if signedIn() && (
-        isAdminOrManager() ||
-        resource.data.creatorUid == request.auth.uid ||
-        resource.data.userId == request.auth.uid ||
-        resource.data.buyerId == request.auth.uid
-      );
-      allow create: if signedIn();
-      allow update: if signedIn() && (
-        isAdminOrManager() ||
-        resource.data.creatorUid == request.auth.uid ||
-        resource.data.userId == request.auth.uid ||
-        resource.data.buyerId == request.auth.uid
-      );
-      allow delete: if signedIn() && (
-        isAdminOrManager() ||
-        resource.data.creatorUid == request.auth.uid ||
-        resource.data.userId == request.auth.uid ||
-        resource.data.buyerId == request.auth.uid
-      );
+    // --------------------------------------------------------------- creators
+
+    // Public studio profile. Creators cannot mark themselves verified.
+    match /creator_profiles/{creatorId} {
+      allow read: if signedIn();
+      allow create: if isAdminOrManager() ||
+        (signedIn() && request.auth.uid == creatorId &&
+          request.resource.data.get('verificationStatus', 'Unverified') in ['Unverified', 'In-Process']);
+      allow update: if isAdminOrManager() ||
+        (signedIn() && request.auth.uid == creatorId &&
+          (request.resource.data.get('verificationStatus', 'Unverified') == resource.data.get('verificationStatus', 'Unverified') ||
+            request.resource.data.get('verificationStatus', 'Unverified') in ['Unverified', 'In-Process']));
+      allow delete: if isAdminOrManager() || (signedIn() && request.auth.uid == creatorId);
     }
+
+    // Private verification documents (ID, photo, address).
+    match /creator_verifications/{creatorId} {
+      allow read, write: if isAdminOrManager() || (signedIn() && request.auth.uid == creatorId);
+    }
+
+    // Payout details are visible to the creator and to super admins only.
+    match /creator_bank_accounts/{creatorId} {
+      allow read: if isSuperAdmin() || (signedIn() && request.auth.uid == creatorId);
+      allow write: if signedIn() && request.auth.uid == creatorId;
+      allow delete: if isSuperAdmin() || (signedIn() && request.auth.uid == creatorId);
+    }
+
+    // ---------------------------------------------------------- notifications
+
+    match /notifications/{notificationId} {
+      // Owners are matched on the field their inbox query filters by
+      // (creatorUid for creators, userId for buyers) so list queries pass.
+      allow read: if signedIn() && (
+        resource.data.creatorUid == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        isAdminOrManager()
+      );
+
+      // Admins notify anyone. Other users may only raise an admin alert.
+      allow create: if isAdminOrManager() ||
+        (signedIn() &&
+          request.resource.data.type == 'admin' &&
+          !('creatorUid' in request.resource.data) &&
+          !('userId' in request.resource.data));
+
+      allow update: if isAdminOrManager() ||
+        (signedIn() &&
+          (resource.data.creatorUid == request.auth.uid ||
+            resource.data.userId == request.auth.uid) &&
+          changedKeys().hasOnly(['isRead']));
+
+      allow delete: if isAdminOrManager() ||
+        (signedIn() &&
+          (resource.data.creatorUid == request.auth.uid ||
+            resource.data.userId == request.auth.uid));
+    }
+
   }
 }

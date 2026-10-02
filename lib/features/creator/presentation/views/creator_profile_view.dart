@@ -6,160 +6,134 @@ import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 import 'package:madebyhands/features/creator/presentation/pages/creator_onboarding_page.dart';
+import 'package:madebyhands/features/creator/presentation/pages/creator_verification_page.dart';
 import 'package:madebyhands/features/creator/presentation/pages/manage_bank_account_page.dart';
 import 'package:madebyhands/features/creator/presentation/pages/privacy_policy_page.dart';
 import 'package:madebyhands/features/creator/presentation/pages/terms_and_conditions_page.dart';
 
 class CreatorProfileView extends StatefulWidget {
   final CreatorProfile profile;
-  const CreatorProfileView({super.key, required this.profile});
+  final UserEntity user;
+
+  const CreatorProfileView({super.key, required this.profile, required this.user});
 
   @override
   State<CreatorProfileView> createState() => _CreatorProfileViewState();
 }
 
 class _CreatorProfileViewState extends State<CreatorProfileView> {
-  bool _isRefreshing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkProfile();
-  }
-
-  void _checkProfile() {
-    context.read<CreatorBloc>().add(CreatorCheckProfileExists(widget.profile.uid));
-  }
-
-  Future<void> _handleRefresh() async {
-    if (_isRefreshing) return;
-    setState(() => _isRefreshing = true);
-
-    try {
-      _checkProfile();
-      context.read<CreatorBloc>().add(CreatorFetchCreatorProducts(widget.profile.uid));
-      context.read<CreatorBloc>().add(CreatorFetchOrders(widget.profile.uid));
-      await Future.delayed(const Duration(milliseconds: 600));
-    } finally {
-      if (mounted) {
-        setState(() => _isRefreshing = false);
-      }
-    }
+  void _push(Widget page) {
+    final bloc = context.read<CreatorBloc>();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: bloc,
+          child: page,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<CreatorBloc, CreatorState>(
-      buildWhen: (previous, current) =>
-          current is CreatorProfileLoaded ||
-          current is CreatorLoading ||
-          current is CreatorFailure,
       builder: (context, state) {
-        final profile = (state is CreatorProfileLoaded)
-            ? state.profile
-            : widget.profile;
-
-        return RefreshIndicator(
-          onRefresh: _handleRefresh,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              children: [
-                const SizedBox(height: 10),
-                _buildProfileCard(profile),
-                const SizedBox(height: 24),
-                _buildActionItem(
-                  icon: Icons.edit_outlined,
-                  title: 'Edit Creator Profile',
-                  subtitle: 'Update bio, craft category, story, and links',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CreatorOnboardingPage(
-                          user: UserEntity(
-                            uid: profile.uid,
-                            email: '',
-                            name: profile.name,
-                            role: 'creator',
-                          ),
-                          existingProfile: profile,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                _buildActionItem(
-                  icon: Icons.account_balance_outlined,
-                  title: 'Manage Bank Account',
-                  subtitle: 'Manage bank details, IFSC, and payout preferences',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ManageBankAccountPage(profile: profile),
-                      ),
-                    );
-                  },
-                ),
-                _buildActionItem(
-                  icon: Icons.description_outlined,
-                  title: 'Terms & Conditions',
-                  subtitle: 'Read artisan platform terms and rules',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const TermsAndConditionsPage(),
-                      ),
-                    );
-                  },
-                ),
-                _buildActionItem(
-                  icon: Icons.privacy_tip_outlined,
-                  title: 'Privacy Policy',
-                  subtitle: 'View data protection policies',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const PrivacyPolicyPage(),
-                      ),
-                    );
-                  },
-                ),
-                _buildActionItem(
-                  icon: Icons.delete_forever_outlined,
-                  title: 'Delete Account',
-                  subtitle:
-                      'Permanently delete your creator account, products, and studio data',
-                  badgeColor: Colors.red,
-                  onTap: () => _confirmAccountDeletion(profile),
-                ),
-                const SizedBox(height: 30),
-                OutlinedButton.icon(
-                  onPressed: () {
-                    context.read<AuthBloc>().add(AuthLogoutRequested());
-                  },
-                  icon: const Icon(Icons.logout, color: Colors.red),
-                  label:
-                      const Text('Log Out', style: TextStyle(color: Colors.red)),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.red),
-                    minimumSize: const Size(double.infinity, 52),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
+        final profile = state.profile ?? widget.profile;
+        return ListView(
+          padding: const EdgeInsets.all(20.0),
+          children: [
+            const SizedBox(height: 10),
+            _buildProfileCard(profile),
+            const SizedBox(height: 24),
+            _buildActionItem(
+              icon: Icons.edit_outlined,
+              title: 'Edit creator profile',
+              subtitle: 'Update bio, craft category, story, links and portfolio',
+              onTap: () => _push(
+                CreatorOnboardingPage(user: widget.user, existingProfile: profile),
+              ),
             ),
-          ),
+            _buildVerificationActionItem(profile),
+            _buildActionItem(
+              icon: Icons.account_balance_outlined,
+              title: 'Payout details',
+              subtitle: 'Bank account and UPI used for your earnings',
+              onTap: () => _push(ManageBankAccountPage(profile: profile)),
+            ),
+            _buildActionItem(
+              icon: Icons.description_outlined,
+              title: 'Terms & conditions',
+              subtitle: 'Read artisan platform terms and rules',
+              onTap: () => _push(const TermsAndConditionsPage()),
+            ),
+            _buildActionItem(
+              icon: Icons.privacy_tip_outlined,
+              title: 'Privacy policy',
+              subtitle: 'How we protect your data',
+              onTap: () => _push(const PrivacyPolicyPage()),
+            ),
+            _buildActionItem(
+              icon: Icons.delete_forever_outlined,
+              title: 'Delete account',
+              subtitle: 'Permanently delete your creator account, products and studio data',
+              badgeColor: Colors.red,
+              onTap: () => _confirmAccountDeletion(profile),
+            ),
+            const SizedBox(height: 30),
+            OutlinedButton.icon(
+              onPressed: () => context.read<AuthBloc>().add(AuthLogoutRequested()),
+              icon: const Icon(Icons.logout, color: Colors.red),
+              label: const Text('Log out', style: TextStyle(color: Colors.red)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.red),
+                minimumSize: const Size(double.infinity, 52),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
         );
       },
     );
+  }
+
+  Widget _buildVerificationActionItem(CreatorProfile profile) {
+    if (profile.isVerified) {
+      return _buildActionItem(
+        icon: Icons.verified_outlined,
+        title: 'Creator Verification',
+        subtitle: 'Verified Artisan Account Active',
+        badgeColor: Colors.green,
+        onTap: () => _push(CreatorVerificationPage(profile: profile)),
+      );
+    } else if (profile.isUnderReview) {
+      return _buildActionItem(
+        icon: Icons.hourglass_top_outlined,
+        title: 'Verification Under Review',
+        subtitle: 'Documents submitted. An admin is reviewing your application.',
+        badgeColor: Colors.orange,
+        onTap: () => _push(CreatorVerificationPage(profile: profile)),
+      );
+    } else if (profile.isVerificationRejected) {
+      return _buildActionItem(
+        icon: Icons.error_outline,
+        title: 'Verification Needs Attention',
+        subtitle: profile.verificationNote.isNotEmpty
+            ? 'Rejected: ${profile.verificationNote}'
+            : 'Tap to update documents and resubmit',
+        badgeColor: Colors.red,
+        onTap: () => _push(CreatorVerificationPage(profile: profile)),
+      );
+    } else {
+      return _buildActionItem(
+        icon: Icons.verified_user_outlined,
+        title: 'Get Verified',
+        subtitle: 'Submit government ID & photo to start listing products',
+        badgeColor: AppColors.primary,
+        onTap: () => _push(CreatorVerificationPage(profile: profile)),
+      );
+    }
   }
 
   Widget _buildProfileCard(CreatorProfile profile) {
@@ -186,38 +160,17 @@ class _CreatorProfileViewState extends State<CreatorProfileView> {
           const SizedBox(height: 12),
           Text(
             profile.name,
+            textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 2),
           Text(
             profile.category,
+            textAlign: TextAlign.center,
             style: const TextStyle(color: AppColors.mutedText, fontSize: 13),
           ),
           const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: (profile.verificationStatus == 'Verified'
-                      ? Colors.green
-                      : (profile.verificationStatus == 'In-Process'
-                          ? Colors.orange
-                          : Colors.red))
-                  .withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              profile.verificationStatus,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: profile.verificationStatus == 'Verified'
-                    ? Colors.green
-                    : (profile.verificationStatus == 'In-Process'
-                        ? Colors.orange.shade800
-                        : Colors.red),
-              ),
-            ),
-          ),
+          _VerificationBadge(profile: profile),
         ],
       ),
     );
@@ -261,7 +214,9 @@ class _CreatorProfileViewState extends State<CreatorProfileView> {
           ],
         ),
         content: const Text(
-          'Are you sure you want to permanently delete your creator account? Your studio profile, products, bank details, and all associated data will be immediately and permanently deleted. This action cannot be undone.',
+          'Your studio profile, products, payout details and notifications will be permanently deleted. '
+          'Finish or reject any open orders first. This cannot be undone.\n\n'
+          'For security you may be asked to sign in again before deleting.',
         ),
         actions: [
           TextButton(
@@ -283,5 +238,33 @@ class _CreatorProfileViewState extends State<CreatorProfileView> {
     if (confirmed == true && mounted) {
       context.read<AuthBloc>().add(AuthDeleteAccountRequested(profile.uid));
     }
+  }
+}
+
+class _VerificationBadge extends StatelessWidget {
+  final CreatorProfile profile;
+
+  const _VerificationBadge({required this.profile});
+
+  @override
+  Widget build(BuildContext context) {
+    final (String label, Color color) = profile.isVerified
+        ? ('Verified', Colors.green.shade700)
+        : profile.isUnderReview
+        ? ('Under review', Colors.orange.shade800)
+        : profile.isVerificationRejected
+        ? ('Verification rejected', Colors.red)
+        : ('Not verified', Colors.red);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
+      ),
+    );
   }
 }

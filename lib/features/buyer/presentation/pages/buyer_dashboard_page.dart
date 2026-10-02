@@ -50,16 +50,21 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
   StreamSubscription<List<SavedAddress>>? _addressSubscription;
   StreamSubscription<List<BuyerProductNotification>>? _notificationSubscription;
 
+  /// Category the Shop tab should filter by when opened from Home.
+  final ValueNotifier<String?> _shopCategory = ValueNotifier(null);
+
   @override
   void initState() {
     super.initState();
     _currentUser = widget.user;
     _navigationCubit = BuyerCubit();
     // Initialize data streaming
-    context.read<BuyerBloc>().add(BuyerWatchProducts());
-    context.read<BuyerBloc>().add(BuyerWatchCreators());
-    context.read<BuyerBloc>().add(BuyerWatchFavorites(_currentUser.uid));
-    context.read<BuyerBloc>().add(BuyerLoadCart(_currentUser.uid));
+    context.read<BuyerBloc>()
+      ..add(BuyerWatchProducts())
+      ..add(BuyerWatchCreators())
+      ..add(BuyerWatchCategories())
+      ..add(BuyerWatchFavorites(_currentUser.uid))
+      ..add(BuyerLoadCart(_currentUser.uid));
     _restoreReadNotifications();
     final repository = context.read<BuyerBloc>().repository;
     _addressSubscription = repository.watchAddresses(_currentUser.uid).listen((
@@ -74,7 +79,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
             ? addresses.first
             : null;
       });
-    });
+    }, onError: (_) {});
     _notificationSubscription = repository
         .watchBuyerNotifications(_currentUser.uid)
         .listen((notifications) {
@@ -120,20 +125,32 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
 
   @override
   void dispose() {
+    _shopCategory.dispose();
     _navigationCubit.close();
     _addressSubscription?.cancel();
     _notificationSubscription?.cancel();
     super.dispose();
   }
 
-  void _openProduct(Product product) {
+  void _openProduct(Product initialProduct) {
     final buyerBloc = context.read<BuyerBloc>();
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => BlocProvider.value(
           value: buyerBloc,
           child: BlocBuilder<BuyerBloc, BuyerState>(
+            buildWhen: (previous, current) =>
+                previous.products != current.products ||
+                previous.favoriteIds != current.favoriteIds ||
+                previous.cartQuantities != current.cartQuantities ||
+                previous.cartCustomizations != current.cartCustomizations ||
+                previous.creators != current.creators,
             builder: (context, state) {
+              // Show live stock and price when the listing changes.
+              final product = state.products
+                      .where((item) => item.id == initialProduct.id)
+                      .firstOrNull ??
+                  initialProduct;
               return ProductDetailsPage(
                 product: product,
                 isSaved: state.favoriteIds.contains(product.id),
@@ -202,6 +219,11 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
   }
 
   void _openShop() {
+    _navigationCubit.changePage(1);
+  }
+
+  void _openShopCategory(String category) {
+    _shopCategory.value = category;
     _navigationCubit.changePage(1);
   }
 
@@ -296,9 +318,21 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
   Widget build(BuildContext context) {
     return BlocProvider.value(
       value: _navigationCubit,
-      child: BlocBuilder<BuyerCubit, int>(
+      child: BlocListener<BuyerBloc, BuyerState>(
+        listenWhen: (previous, current) =>
+            current.errorMessage != null &&
+            current.errorMessage != previous.errorMessage &&
+            current.products.isNotEmpty,
+        listener: (context, state) => ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(state.errorMessage!))),
+        child: BlocBuilder<BuyerCubit, int>(
         builder: (context, selectedIndex) {
           return BlocBuilder<BuyerBloc, BuyerState>(
+            // The tabs listen to the bloc themselves; the shell only swaps
+            // between loading, error and content.
+            buildWhen: (previous, current) =>
+                _shellMode(previous) != _shellMode(current),
             builder: (context, buyerState) {
               if (buyerState.isLoadingProducts && buyerState.products.isEmpty) {
                 return const Scaffold(
@@ -332,6 +366,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                   ),
                   onProductTap: _openProduct,
                   onBrowseAll: _openShop,
+                  onCategoryTap: _openShopCategory,
                   unreadNotificationCount: _notifications
                       .where(
                         (notification) =>
@@ -345,6 +380,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                     userId: _currentUser.uid,
                     onProductTap: _openProduct,
                     onCreatorTap: _openCreator,
+                    categoryRequest: _shopCategory,
                   ),
                 ),
                 SafeArea(
@@ -406,11 +442,6 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
 
               final safeIndex = selectedIndex.clamp(0, pages.length - 1);
 
-              final cartCount = buyerState.cartQuantities.values.fold(
-                0,
-                (total, quantity) => total + quantity,
-              );
-
               return Scaffold(
                 backgroundColor: const Color(0xFFFAF6EE),
                 body: IndexedStack(index: safeIndex, children: pages),
@@ -459,36 +490,28 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                         height: 78,
                         selectedIndex: safeIndex,
                         onDestinationSelected: _navigationCubit.changePage,
-                        destinations: [
-                          const NavigationDestination(
+                        destinations: const [
+                          NavigationDestination(
                             icon: Icon(Icons.home_outlined),
                             selectedIcon: Icon(Icons.home),
                             label: 'Home',
                           ),
-                          const NavigationDestination(
+                          NavigationDestination(
                             icon: Icon(Icons.search),
                             selectedIcon: Icon(Icons.search),
                             label: 'Shop',
                           ),
-                          const NavigationDestination(
+                          NavigationDestination(
                             icon: Icon(Icons.favorite_border),
                             selectedIcon: Icon(Icons.favorite),
                             label: 'Wishlist',
                           ),
                           NavigationDestination(
-                            icon: Badge(
-                              isLabelVisible: cartCount > 0,
-                              label: Text('$cartCount'),
-                              child: const Icon(Icons.shopping_bag_outlined),
-                            ),
-                            selectedIcon: Badge(
-                              isLabelVisible: cartCount > 0,
-                              label: Text('$cartCount'),
-                              child: const Icon(Icons.shopping_bag),
-                            ),
+                            icon: _CartBadge(icon: Icons.shopping_bag_outlined),
+                            selectedIcon: _CartBadge(icon: Icons.shopping_bag),
                             label: 'Cart',
                           ),
-                          const NavigationDestination(
+                          NavigationDestination(
                             icon: Icon(Icons.person_outline),
                             selectedIcon: Icon(Icons.person),
                             label: 'Account',
@@ -502,6 +525,33 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
             },
           );
         },
+      ),
+      ),
+    );
+  }
+
+  /// 0 = loading, 1 = error, 2 = content.
+  static int _shellMode(BuyerState state) {
+    if (state.isLoadingProducts && state.products.isEmpty) return 0;
+    if (state.errorMessage != null && state.products.isEmpty) return 1;
+    return 2;
+  }
+}
+
+class _CartBadge extends StatelessWidget {
+  final IconData icon;
+
+  const _CartBadge({required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocSelector<BuyerBloc, BuyerState, int>(
+      selector: (state) =>
+          state.cartQuantities.values.fold(0, (total, quantity) => total + quantity),
+      builder: (context, count) => Badge(
+        isLabelVisible: count > 0,
+        label: Text('$count'),
+        child: Icon(icon),
       ),
     );
   }

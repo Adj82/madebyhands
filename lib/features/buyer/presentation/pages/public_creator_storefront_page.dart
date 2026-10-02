@@ -1,95 +1,177 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/public_creator.dart';
+import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
+import 'package:madebyhands/init_dependencies.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class PublicCreatorStorefrontPage extends StatelessWidget {
   final PublicCreator creator;
   final String buyerId;
-  final ValueChanged<Product> onProductTap;
+  final ValueChanged<Product>? onProductTap;
+
+  /// Lets a creator see their shop as buyers do. Products are streamed
+  /// directly (the buyer session is not running) and cannot be saved.
+  final bool previewMode;
 
   const PublicCreatorStorefrontPage({
     super.key,
     required this.creator,
     required this.buyerId,
     required this.onProductTap,
-  });
+  }) : previewMode = false;
+
+  const PublicCreatorStorefrontPage.preview({super.key, required this.creator})
+    : buyerId = '',
+      onProductTap = null,
+      previewMode = true;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(creator.displayName)),
-      body: BlocBuilder<BuyerBloc, BuyerState>(
-        builder: (context, state) {
-          final products = state.products
-              .where((product) => product.creatorUid == creator.uid)
-              .toList();
-          return CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(child: _CreatorHeader(creator: creator)),
-              if (creator.portfolio.isNotEmpty)
-                SliverToBoxAdapter(
-                  child: _Portfolio(images: creator.portfolio),
-                ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-                sliver: SliverToBoxAdapter(
-                  child: Text(
-                    'Storefront · ${products.length} products',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
+      appBar: AppBar(
+        title: Text(previewMode ? 'Storefront preview' : creator.displayName),
+      ),
+      body: previewMode
+          ? _PreviewProducts(
+              creator: creator,
+              builder: (products) => _StorefrontBody(
+                creator: creator,
+                products: products,
+                favoriteIds: const {},
+              ),
+            )
+          : BlocBuilder<BuyerBloc, BuyerState>(
+              buildWhen: (previous, current) =>
+                  previous.products != current.products ||
+                  previous.favoriteIds != current.favoriteIds,
+              builder: (context, state) => _StorefrontBody(
+                creator: creator,
+                products: state.products
+                    .where((product) => product.creatorUid == creator.uid)
+                    .toList(),
+                favoriteIds: state.favoriteIds,
+                onProductTap: onProductTap,
+                onSave: (product) => context.read<BuyerBloc>().add(
+                  BuyerToggleFavorite(userId: buyerId, product: product),
                 ),
               ),
-              if (products.isEmpty)
-                const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.all(28),
-                    child: Center(
-                      child: Text('No available products from this creator.'),
-                    ),
-                  ),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                  sliver: SliverGrid(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 0.67,
-                        ),
-                    delegate: SliverChildBuilderDelegate(
-                      childCount: products.length,
-                      (context, index) {
-                        final product = products[index];
-                        return ProductCard(
-                          product: product,
-                          isSaved: state.favoriteIds.contains(product.id),
-                          onTap: () => onProductTap(product),
-                          onSave: () => context.read<BuyerBloc>().add(
-                            BuyerToggleFavorite(
-                              userId: buyerId,
-                              product: product,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+            ),
+    );
+  }
+}
+
+class _PreviewProducts extends StatefulWidget {
+  final PublicCreator creator;
+  final Widget Function(List<Product> products) builder;
+
+  const _PreviewProducts({required this.creator, required this.builder});
+
+  @override
+  State<_PreviewProducts> createState() => _PreviewProductsState();
+}
+
+class _PreviewProductsState extends State<_PreviewProducts> {
+  late final Stream<List<Product>> _products = serviceLocator<BuyerRepository>()
+      .watchProducts()
+      .map(
+        (products) => products
+            .where((product) => product.creatorUid == widget.creator.uid)
+            .toList(),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<Product>>(
+      stream: _products,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text(friendlyErrorMessage(snapshot.error!)));
+        }
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return widget.builder(snapshot.data!);
+      },
+    );
+  }
+}
+
+class _StorefrontBody extends StatelessWidget {
+  final PublicCreator creator;
+  final List<Product> products;
+  final Set<String> favoriteIds;
+  final ValueChanged<Product>? onProductTap;
+  final ValueChanged<Product>? onSave;
+
+  const _StorefrontBody({
+    required this.creator,
+    required this.products,
+    required this.favoriteIds,
+    this.onProductTap,
+    this.onSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final onProductTap = this.onProductTap;
+    final onSave = this.onSave;
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(child: _CreatorHeader(creator: creator)),
+        if (creator.portfolio.isNotEmpty)
+          SliverToBoxAdapter(child: _Portfolio(images: creator.portfolio)),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+          sliver: SliverToBoxAdapter(
+            child: Text(
+              'Storefront · ${products.length} ${products.length == 1 ? 'product' : 'products'}',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            ),
+          ),
+        ),
+        if (products.isEmpty)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.all(28),
+              child: Center(
+                child: Text(
+                  'No available products from this creator yet.',
+                  textAlign: TextAlign.center,
                 ),
-            ],
-          );
-        },
-      ),
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 240,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 0.67,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                childCount: products.length,
+                (context, index) {
+                  final product = products[index];
+                  return ProductCard(
+                    product: product,
+                    isSaved: favoriteIds.contains(product.id),
+                    onTap: onProductTap == null ? null : () => onProductTap(product),
+                    onSave: onSave == null ? null : () => onSave(product),
+                  );
+                },
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -171,10 +253,14 @@ class _CreatorHeader extends StatelessWidget {
           const SizedBox(height: 16),
           Wrap(
             spacing: 8,
+            runSpacing: 8,
             children: creator.socialLinks.map((link) {
               return ActionChip(
                 avatar: const Icon(Icons.link, size: 18),
-                label: const Text('Social link'),
+                label: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 200),
+                  child: Text(_linkLabel(link), overflow: TextOverflow.ellipsis),
+                ),
                 onPressed: () => _openLink(context, link),
               );
             }).toList(),
@@ -183,6 +269,12 @@ class _CreatorHeader extends StatelessWidget {
       ],
     ),
   );
+
+  static String _linkLabel(String raw) {
+    final uri = Uri.tryParse(raw.startsWith('http') ? raw : 'https://$raw');
+    final host = uri?.host.replaceFirst('www.', '') ?? '';
+    return host.isEmpty ? 'Link' : host;
+  }
 
   Future<void> _openLink(BuildContext context, String raw) async {
     final normalized = raw.startsWith('http') ? raw : 'https://$raw';
@@ -218,6 +310,8 @@ class _Portfolio extends StatelessWidget {
           child: Image.network(
             images[index],
             width: 150,
+            height: 150,
+            cacheWidth: 450,
             fit: BoxFit.cover,
             errorBuilder: (_, _, _) => const SizedBox(
               width: 150,

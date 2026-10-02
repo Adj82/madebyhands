@@ -3,7 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_bank_account.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
+import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
+import 'package:madebyhands/init_dependencies.dart';
 
 class ManageBankAccountPage extends StatefulWidget {
   final CreatorProfile profile;
@@ -27,7 +29,8 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
   late final TextEditingController _panNumberController;
 
   String _accountType = 'Savings';
-  bool _isInitialFetchDone = false;
+  bool _loading = true;
+  String? _loadError;
 
   final RegExp _ifscRegex = RegExp(r'^[A-Z]{4}0[A-Z0-9]{6}$');
   final RegExp _panRegex = RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$');
@@ -44,8 +47,27 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
     _upiIdController = TextEditingController();
     _panNumberController = TextEditingController();
 
-    // Fetch existing bank details for this creator
-    context.read<CreatorBloc>().add(CreatorFetchBankAccount(widget.profile.uid));
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    final result = await serviceLocator<CreatorRepository>().getCreatorBankAccount(
+      widget.profile.uid,
+    );
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      result.fold(
+        (failure) => _loadError = failure.message,
+        (bankDetail) {
+          if (bankDetail != null) _prefillData(bankDetail);
+        },
+      );
+    });
   }
 
   @override
@@ -74,6 +96,7 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
   }
 
   void _submit() {
+    FocusScope.of(context).unfocus();
     if (_formKey.currentState!.validate()) {
       final bankDetail = CreatorBankAccount(
         uid: widget.profile.uid,
@@ -100,39 +123,50 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Manage Bank Account',
+          'Payout details',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
       body: BlocConsumer<CreatorBloc, CreatorState>(
+        listenWhen: (previous, current) =>
+            previous.actionId != current.actionId &&
+            current.action == CreatorAction.saveBankAccount &&
+            current.actionStatus != CreatorActionStatus.inProgress,
         listener: (context, state) {
-          if (state is CreatorBankAccountLoaded) {
-            if (!_isInitialFetchDone) {
-              _isInitialFetchDone = true;
-              if (state.bankDetail != null) {
-                _prefillData(state.bankDetail!);
-              }
-            }
-          } else if (state is CreatorSaveBankAccountSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Bank account details saved successfully!'),
-                backgroundColor: Colors.green,
+          final success = state.actionStatus == CreatorActionStatus.success;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                state.actionMessage ??
+                    (success ? 'Payout details saved.' : 'Could not save. Please try again.'),
               ),
-            );
-            Navigator.pop(context);
-          } else if (state is CreatorFailure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
+              backgroundColor: success ? Colors.green : Colors.red,
+            ),
+          );
+          if (success) Navigator.pop(context);
         },
+        buildWhen: (previous, current) =>
+            previous.isRunning(CreatorAction.saveBankAccount) !=
+            current.isRunning(CreatorAction.saveBankAccount),
         builder: (context, state) {
-          if (state is CreatorLoading && !_isInitialFetchDone) {
+          final saving = state.isRunning(CreatorAction.saveBankAccount);
+          if (_loading) {
             return const Center(child: CircularProgressIndicator());
+          }
+          if (_loadError != null) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_loadError!, textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    FilledButton(onPressed: _load, child: const Text('Retry')),
+                  ],
+                ),
+              ),
+            );
           }
 
           return SingleChildScrollView(
@@ -237,7 +271,7 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
 
                   _buildFieldTitle('Account Type *'),
                   DropdownButtonFormField<String>(
-                    value: _accountType,
+                    initialValue: _accountType,
                     decoration: const InputDecoration(
                       prefixIcon: Icon(Icons.account_balance_wallet_outlined),
                     ),
@@ -349,10 +383,14 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
                     width: double.infinity,
                     height: 50,
                     child: FilledButton(
-                      onPressed: state is CreatorLoading ? null : _submit,
-                      child: state is CreatorLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('Save Bank Details'),
+                      onPressed: saving ? null : _submit,
+                      child: saving
+                          ? const SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Save payout details'),
                     ),
                   ),
                   const SizedBox(height: 20),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/buyer_order.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
@@ -6,7 +7,7 @@ import 'package:madebyhands/features/buyer/presentation/pages/order_detail_page.
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 import 'package:madebyhands/features/orders/domain/order_status.dart';
 
-class OrderHistoryPage extends StatelessWidget {
+class OrderHistoryPage extends StatefulWidget {
   final String userId;
   final BuyerRepository repository;
 
@@ -17,7 +18,18 @@ class OrderHistoryPage extends StatelessWidget {
   });
 
   @override
+  State<OrderHistoryPage> createState() => _OrderHistoryPageState();
+}
+
+class _OrderHistoryPageState extends State<OrderHistoryPage> {
+  late final Stream<List<BuyerOrder>> _orders = widget.repository.watchOrders(
+    widget.userId,
+  );
+
+  @override
   Widget build(BuildContext context) {
+    final repository = widget.repository;
+    final userId = widget.userId;
     return BuyerBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -34,13 +46,13 @@ class OrderHistoryPage extends StatelessWidget {
           iconTheme: const IconThemeData(color: Color(0xFF8B261D)),
         ),
         body: StreamBuilder<List<BuyerOrder>>(
-          stream: repository.watchOrders(userId),
+          stream: _orders,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return _OrderMessage(
                 icon: Icons.cloud_off_outlined,
                 title: 'Could not load orders',
-                message: snapshot.error.toString(),
+                message: friendlyErrorMessage(snapshot.error!),
               );
             }
             if (!snapshot.hasData) {
@@ -98,7 +110,9 @@ class OrderHistoryPage extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: Text(
-                                  'Order #${order.id}',
+                                  'Order #${order.id.length > 8 ? order.id.substring(order.id.length - 8).toUpperCase() : order.id.toUpperCase()}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w800,
                                     color: Color(0xFF8B261D),
@@ -113,6 +127,19 @@ class OrderHistoryPage extends StatelessWidget {
                             _date(order.createdAt),
                             style: const TextStyle(color: AppColors.mutedText),
                           ),
+                          if (order.refundStatus != null) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              refundStatusLabel(order.refundStatus!),
+                              style: TextStyle(
+                                color: order.refundStatus == 'refunded'
+                                    ? Colors.green.shade800
+                                    : Colors.orange.shade900,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                           if (order.updatedAt != null) ...[
                             const SizedBox(height: 3),
                             Text(

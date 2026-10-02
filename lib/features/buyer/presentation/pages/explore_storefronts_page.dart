@@ -60,6 +60,7 @@ class _ExploreStorefrontsPageState extends State<ExploreStorefrontsPage> {
           centerTitle: true,
         ),
         body: BlocBuilder<BuyerBloc, BuyerState>(
+          buildWhen: (previous, current) => previous.creators != current.creators,
           builder: (context, state) {
             final query = _searchQuery.trim().toLowerCase();
 
@@ -108,7 +109,7 @@ class _ExploreStorefrontsPageState extends State<ExploreStorefrontsPage> {
                           child: ListView.separated(
                             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                             itemCount: eligibleCreators.length,
-                            separatorBuilder: (_, __) =>
+                            separatorBuilder: (_, _) =>
                                 const SizedBox(height: 14),
                             itemBuilder: (context, index) {
                               final creator = eligibleCreators[index];
@@ -212,7 +213,8 @@ class _StorefrontCard extends StatelessWidget {
                       Row(
                         children: [
                           if (creator.category.isNotEmpty) ...[
-                            Container(
+                            Flexible(
+                              child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
                                 vertical: 2,
@@ -223,6 +225,8 @@ class _StorefrontCard extends StatelessWidget {
                               ),
                               child: Text(
                                 creator.category,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
@@ -230,10 +234,11 @@ class _StorefrontCard extends StatelessWidget {
                                 ),
                               ),
                             ),
+                            ),
                             const SizedBox(width: 8),
                           ],
                           if (creator.location.isNotEmpty)
-                            Expanded(
+                            Flexible(
                               child: Text(
                                 creator.location,
                                 style: const TextStyle(
@@ -272,7 +277,7 @@ class _StorefrontCard extends StatelessWidget {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: creator.portfolio.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
                     return ClipRRect(
                       borderRadius: BorderRadius.circular(10),
@@ -280,8 +285,9 @@ class _StorefrontCard extends StatelessWidget {
                         creator.portfolio[index],
                         width: 64,
                         height: 64,
+                        cacheWidth: 192,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                        errorBuilder: (_, _, _) => Container(
                           width: 64,
                           height: 64,
                           color: AppColors.outline,

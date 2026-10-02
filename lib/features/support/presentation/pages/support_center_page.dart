@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:madebyhands/core/error/failures.dart';
+import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/support/domain/entities/support_ticket.dart';
 import 'package:madebyhands/features/support/domain/repositories/support_repository.dart';
 
-class SupportCenterPage extends StatelessWidget {
+class SupportCenterPage extends StatefulWidget {
   final UserEntity user;
   final SupportRepository repository;
 
@@ -14,20 +17,35 @@ class SupportCenterPage extends StatelessWidget {
   });
 
   @override
+  State<SupportCenterPage> createState() => _SupportCenterPageState();
+}
+
+class _SupportCenterPageState extends State<SupportCenterPage> {
+  late final Stream<List<SupportTicket>> _tickets = widget.repository
+      .watchUserTickets(widget.user.uid);
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Help & support')),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _newTicket(context),
+        heroTag: null,
+        onPressed: _newTicket,
         icon: const Icon(Icons.add),
         label: const Text('Raise ticket'),
       ),
       body: StreamBuilder<List<SupportTicket>>(
-        stream: repository.watchUserTickets(user.uid),
+        stream: _tickets,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(
-              child: Text('Could not load tickets: ${snapshot.error}'),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'Could not load tickets: ${friendlyErrorMessage(snapshot.error!)}',
+                  textAlign: TextAlign.center,
+                ),
+              ),
             );
           }
           if (!snapshot.hasData) {
@@ -36,73 +54,76 @@ class SupportCenterPage extends StatelessWidget {
           final tickets = snapshot.data!;
           if (tickets.isEmpty) {
             return const Center(
-              child: Text(
-                'No support tickets yet. Tap “Raise ticket” to begin.',
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'No support tickets yet. Tap “Raise ticket” to get help.',
+                  textAlign: TextAlign.center,
+                ),
               ),
             );
           }
           return ListView.separated(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
             itemCount: tickets.length,
             separatorBuilder: (_, _) => const SizedBox(height: 10),
-            itemBuilder: (context, index) {
-              final ticket = tickets[index];
-              return Card(
-                child: ListTile(
-                  leading: Icon(
-                    ticket.isOpen ? Icons.help_outline : Icons.check_circle,
-                    color: ticket.isOpen ? Colors.orange : Colors.green,
-                  ),
-                  title: Text(ticket.subject),
-                  subtitle: Text(
-                    ticket.lastMessage,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: Text(ticket.isOpen ? 'Open' : 'Resolved'),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => SupportConversationPage(
-                        ticket: ticket,
-                        repository: repository,
-                        senderId: user.uid,
-                        senderRole: user.role,
-                      ),
-                    ),
+            itemBuilder: (context, index) => SupportTicketTile(
+              ticket: tickets[index],
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SupportConversationPage(
+                    ticket: tickets[index],
+                    repository: widget.repository,
+                    senderId: widget.user.uid,
+                    senderRole: widget.user.role,
                   ),
                 ),
-              );
-            },
+              ),
+            ),
           );
         },
       ),
     );
   }
 
-  Future<void> _newTicket(BuildContext context) async {
+  Future<void> _newTicket() async {
     final subject = TextEditingController();
     final message = TextEditingController();
+    final formKey = GlobalKey<FormState>();
     final submitted = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Raise a support ticket'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: subject,
-              decoration: const InputDecoration(labelText: 'Subject'),
+        content: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: subject,
+                  maxLength: 80,
+                  decoration: const InputDecoration(labelText: 'Subject'),
+                  validator: (value) => (value?.trim().isEmpty ?? true)
+                      ? 'Enter a subject.'
+                      : null,
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: message,
+                  minLines: 3,
+                  maxLines: 5,
+                  maxLength: 1000,
+                  decoration: const InputDecoration(
+                    labelText: 'Describe the issue',
+                  ),
+                  validator: (value) => (value?.trim().isEmpty ?? true)
+                      ? 'Describe the issue.'
+                      : null,
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: message,
-              minLines: 3,
-              maxLines: 5,
-              decoration: const InputDecoration(
-                labelText: 'Describe the issue',
-              ),
-            ),
-          ],
+          ),
         ),
         actions: [
           TextButton(
@@ -111,8 +132,7 @@ class SupportCenterPage extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () {
-              if (subject.text.trim().isNotEmpty &&
-                  message.text.trim().isNotEmpty) {
+              if (formKey.currentState!.validate()) {
                 Navigator.pop(dialogContext, true);
               }
             },
@@ -121,27 +141,78 @@ class SupportCenterPage extends StatelessWidget {
         ],
       ),
     );
-    if (submitted != true || !context.mounted) return;
+    if (submitted != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
     try {
-      await repository.createTicket(
-        userId: user.uid,
-        userRole: user.role,
-        userName: user.name,
+      await widget.repository.createTicket(
+        userId: widget.user.uid,
+        userRole: widget.user.role,
+        userName: widget.user.name,
         subject: subject.text.trim(),
         message: message.text.trim(),
       );
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Support ticket created.')),
-        );
-      }
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Support ticket created.')),
+      );
     } catch (error) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not create ticket: $error')),
-        );
-      }
+      messenger.showSnackBar(
+        SnackBar(content: Text(friendlyErrorMessage(error))),
+      );
     }
+  }
+}
+
+/// A ticket row shared by the user and admin ticket lists.
+class SupportTicketTile extends StatelessWidget {
+  final SupportTicket ticket;
+  final VoidCallback onTap;
+  final bool showRequester;
+
+  const SupportTicketTile({
+    super.key,
+    required this.ticket,
+    required this.onTap,
+    this.showRequester = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = ticket.isOpen ? Colors.orange : Colors.green;
+    final requester = '${ticket.userName} (${ticket.userRole})';
+    return Card(
+      margin: EdgeInsets.zero,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        onTap: onTap,
+        leading: CircleAvatar(
+          backgroundColor: color.withValues(alpha: 0.15),
+          child: Icon(
+            ticket.isOpen ? Icons.help_outline : Icons.check_circle_outline,
+            color: color,
+          ),
+        ),
+        title: Text(
+          ticket.subject,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          showRequester ? '$requester\n${ticket.lastMessage}' : ticket.lastMessage,
+          maxLines: showRequester ? 2 : 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+        ),
+        trailing: Text(
+          ticket.isOpen ? 'Open' : 'Resolved',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: color.shade800,
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -168,6 +239,10 @@ class SupportConversationPage extends StatefulWidget {
 
 class _SupportConversationPageState extends State<SupportConversationPage> {
   final _message = TextEditingController();
+  late final Stream<List<SupportMessage>> _messages = widget.repository
+      .watchMessages(widget.ticket.id);
+  late bool _isOpen = widget.ticket.isOpen;
+  bool _sending = false;
 
   @override
   void dispose() {
@@ -175,51 +250,125 @@ class _SupportConversationPageState extends State<SupportConversationPage> {
     super.dispose();
   }
 
+  bool _isMine(SupportMessage message) {
+    if (message.senderId == widget.senderId) return true;
+    // Older admin replies were stored with a placeholder sender id.
+    return widget.canResolve && message.senderRole == 'admin';
+  }
+
+  Future<void> _resolve() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await widget.repository.resolveTicket(widget.ticket.id);
+      if (!mounted) return;
+      setState(() => _isOpen = false);
+      messenger.showSnackBar(const SnackBar(content: Text('Ticket resolved.')));
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
+    }
+  }
+
+  Future<void> _send() async {
+    final text = _message.text.trim();
+    if (text.isEmpty || _sending) return;
+    setState(() => _sending = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await widget.repository.sendMessage(
+        ticketId: widget.ticket.id,
+        senderId: widget.senderId,
+        senderRole: widget.senderRole,
+        message: text,
+      );
+      _message.clear();
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.ticket.subject),
+        title: Text(
+          widget.ticket.subject,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
-          if (widget.canResolve && widget.ticket.isOpen)
+          if (widget.canResolve && _isOpen)
             IconButton(
-              tooltip: 'Resolve ticket',
-              onPressed: () async {
-                await widget.repository.resolveTicket(widget.ticket.id);
-                if (context.mounted) Navigator.pop(context);
-              },
+              tooltip: 'Mark as resolved',
+              onPressed: _resolve,
               icon: const Icon(Icons.check_circle_outline),
             ),
         ],
       ),
       body: Column(
         children: [
-          if (widget.ticket.isAccountDeletionRequest)
-            _buildAccountDeletionHeader(),
           Expanded(
             child: StreamBuilder<List<SupportMessage>>(
-              stream: widget.repository.watchMessages(widget.ticket.id),
+              stream: _messages,
               builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(friendlyErrorMessage(snapshot.error!)),
+                  );
+                }
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
+                final messages = snapshot.data!;
                 return ListView.builder(
+                  reverse: true,
                   padding: const EdgeInsets.all(16),
-                  itemCount: snapshot.data!.length,
+                  itemCount: messages.length,
                   itemBuilder: (context, index) {
-                    final item = snapshot.data![index];
-                    final mine = item.senderRole == widget.senderRole;
+                    final item = messages[messages.length - 1 - index];
+                    final mine = _isMine(item);
                     return Align(
                       alignment: mine
                           ? Alignment.centerRight
                           : Alignment.centerLeft,
-                      child: Card(
-                        color: mine
-                            ? Theme.of(context).colorScheme.primaryContainer
-                            : null,
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Text(item.message),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.sizeOf(context).width * 0.78,
+                        ),
+                        child: Card(
+                          color: mine
+                              ? AppColors.primary.withValues(alpha: 0.12)
+                              : AppColors.surface,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (!mine)
+                                  Text(
+                                    item.senderRole == 'admin'
+                                        ? 'MadeByHands support'
+                                        : widget.ticket.userName,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                Text(item.message),
+                                const SizedBox(height: 4),
+                                Text(
+                                  DateFormat('dd MMM, hh:mm a')
+                                      .format(item.createdAt),
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: AppColors.mutedText,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     );
@@ -228,246 +377,46 @@ class _SupportConversationPageState extends State<SupportConversationPage> {
               },
             ),
           ),
-          if (widget.ticket.isOpen)
+          if (_isOpen)
             SafeArea(
               top: false,
               child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  12,
-                  12,
-                  12,
-                  MediaQuery.of(context).viewInsets.bottom + 12,
-                ),
+                padding: const EdgeInsets.all(12),
                 child: Row(
                   children: [
                     Expanded(
                       child: TextField(
                         controller: _message,
+                        minLines: 1,
+                        maxLines: 4,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _send(),
                         decoration: const InputDecoration(
                           hintText: 'Type a message',
                         ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     IconButton.filled(
-                      onPressed: _send,
+                      tooltip: 'Send',
+                      onPressed: _sending ? null : _send,
                       icon: const Icon(Icons.send),
                     ),
                   ],
                 ),
               ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _send() async {
-    final text = _message.text.trim();
-    if (text.isEmpty) return;
-    _message.clear();
-    await widget.repository.sendMessage(
-      ticketId: widget.ticket.id,
-      senderId: widget.senderId,
-      senderRole: widget.senderRole,
-      message: text,
-    );
-  }
-
-  Widget _buildAccountDeletionHeader() {
-    final ticket = widget.ticket;
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.red.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.warning_amber_rounded, color: Colors.red),
-              const SizedBox(width: 8),
-              const Text(
-                'Account Deletion Request',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: Colors.red,
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: (ticket.requestStatus == 'Approved'
-                          ? Colors.green
-                          : (ticket.requestStatus == 'Rejected'
-                              ? Colors.red
-                              : Colors.orange))
-                      .withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
+            )
+          else
+            const SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.all(16),
                 child: Text(
-                  ticket.requestStatus,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    color: ticket.requestStatus == 'Approved'
-                        ? Colors.green
-                        : (ticket.requestStatus == 'Rejected'
-                            ? Colors.red
-                            : Colors.orange.shade800),
-                  ),
+                  'This ticket is resolved.',
+                  style: TextStyle(color: AppColors.mutedText),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Creator: ${ticket.userName} (${ticket.userId})',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Reason for deletion:',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-              fontWeight: FontWeight.bold,
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            ticket.reason.isNotEmpty ? ticket.reason : ticket.lastMessage,
-            style: const TextStyle(fontSize: 14),
-          ),
-          if (widget.canResolve &&
-              widget.ticket.isOpen &&
-              ticket.requestStatus == 'Pending') ...[
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _rejectDeletion,
-                    icon: const Icon(Icons.close, color: Colors.red),
-                    label: const Text('Reject Request'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: const BorderSide(color: Colors.red),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _approveDeletion,
-                    icon: const Icon(Icons.delete_forever),
-                    label: const Text('Approve Deletion'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  void _approveDeletion() {
-    showDialog(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Confirm Account Deletion'),
-        content: Text(
-          'Are you sure you want to approve and execute account deletion for "${widget.ticket.userName}"?\n\nThis will deactivate their profile, user role, and all product listings.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(dialogCtx);
-              await widget.repository.approveAccountDeletion(
-                ticketId: widget.ticket.id,
-                creatorUid: widget.ticket.userId,
-              );
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Account deletion approved and executed.'),
-                  ),
-                );
-                Navigator.pop(context);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Approve & Deactivate'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _rejectDeletion() {
-    final reasonController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Reject Deletion Request'),
-        content: TextField(
-          controller: reasonController,
-          decoration: const InputDecoration(
-            hintText: 'Reason for rejecting account deletion *',
-          ),
-          maxLines: 2,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final text = reasonController.text.trim();
-              if (text.isEmpty) return;
-              Navigator.pop(dialogCtx);
-              await widget.repository.rejectAccountDeletion(
-                ticketId: widget.ticket.id,
-                creatorUid: widget.ticket.userId,
-                rejectionReason: text,
-              );
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Account deletion request rejected.'),
-                  ),
-                );
-                Navigator.pop(context);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Reject Request'),
-          ),
         ],
       ),
     );

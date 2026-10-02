@@ -1,187 +1,179 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
-import 'package:madebyhands/features/admin/presentation/pages/details/api_config_page.dart';
 import 'package:madebyhands/features/admin/presentation/pages/details/admin_management_page.dart';
+import 'package:madebyhands/features/admin/presentation/pages/details/api_config_page.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 
-class AdminSettingsView extends StatefulWidget {
+class AdminSettingsView extends StatelessWidget {
   const AdminSettingsView({super.key});
 
   @override
-  State<AdminSettingsView> createState() => _AdminSettingsViewState();
-}
-
-class _AdminSettingsViewState extends State<AdminSettingsView> {
-  bool _maintenanceMode = false;
-  bool _emailNotifications = true;
-
-  @override
   Widget build(BuildContext context) {
-    final authState = context.watch<AuthBloc>().state;
-    final currentUser = authState is AuthSuccess ? authState.user : null;
-    final isSuperAdmin = currentUser?.isSuperAdmin ?? true;
+    final isSuperAdmin = context.select<AuthBloc, bool>((bloc) {
+      final state = bloc.state;
+      return state is AuthSuccess && state.user.isSuperAdmin;
+    });
 
     return BlocBuilder<AdminBloc, AdminState>(
+      buildWhen: (previous, current) =>
+          previous.flatFee != current.flatFee ||
+          previous.percentFee != current.percentFee,
       builder: (context, state) {
-        return RefreshIndicator(
-          onRefresh: () async {
-            context.read<AdminBloc>().add(AdminLoadDataRequested());
-          },
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(20),
-            children: [
-            const _SettingsSection(title: 'Platform Economics'),
-            _buildConfigTile(
-              'Flat Platform Fee',
-              'Currently ₹${state.flatFee} charged per sale',
-              Icons.payments_outlined,
-              trailing: TextButton(
-                onPressed: () => _showUpdateFeeDialog(context, true, isSuperAdmin),
-                child: Text(isSuperAdmin ? 'Change' : 'Locked 🔒'),
+        return ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            const _SettingsSection(title: 'Platform economics'),
+            _ConfigTile(
+              title: 'Flat platform fee',
+              subtitle: '₹${state.flatFee.round()} added per creator in each checkout',
+              icon: Icons.payments_outlined,
+              trailing: isSuperAdmin
+                  ? TextButton(
+                      onPressed: () => _showUpdateFeeDialog(context, isFlat: true),
+                      child: const Text('Change'),
+                    )
+                  : const Icon(Icons.lock_outline, size: 20),
+            ),
+            _ConfigTile(
+              title: 'Commission',
+              subtitle:
+                  '${_formatPercent(state.percentFee)}% of the creator subtotal on orders above ₹999',
+              icon: Icons.percent,
+              trailing: isSuperAdmin
+                  ? TextButton(
+                      onPressed: () => _showUpdateFeeDialog(context, isFlat: false),
+                      child: const Text('Change'),
+                    )
+                  : const Icon(Icons.lock_outline, size: 20),
+            ),
+            if (!isSuperAdmin)
+              const Padding(
+                padding: EdgeInsets.only(top: 4, bottom: 8),
+                child: Text(
+                  'Only super admins can change platform fees.',
+                  style: TextStyle(fontSize: 12, color: AppColors.mutedText),
+                ),
               ),
-            ),
-            _buildConfigTile(
-              'Transaction Fee (%)',
-              'Currently ${state.percentFee}% for orders > ₹999',
-              Icons.percent,
-              trailing: TextButton(
-                onPressed: () => _showUpdateFeeDialog(context, false, isSuperAdmin),
-                child: Text(isSuperAdmin ? 'Change' : 'Locked 🔒'),
-              ),
-            ),
             const SizedBox(height: 20),
-            const _SettingsSection(title: 'System Control'),
-            SwitchListTile(
-              title: const Text('Maintenance Mode', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Block all user access while performing updates'),
-              value: _maintenanceMode,
-              activeTrackColor: AppColors.primary,
-              onChanged: isSuperAdmin
-                  ? (val) => setState(() => _maintenanceMode = val)
-                  : (val) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Only Super Admins can toggle maintenance mode.')),
-                      );
-                    },
-            ),
-            SwitchListTile(
-              title: const Text('Admin Email Alerts', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Get notified about new creator applications'),
-              value: _emailNotifications,
-              activeTrackColor: AppColors.primary,
-              onChanged: (val) => setState(() => _emailNotifications = val),
-            ),
-            const SizedBox(height: 20),
-            const _SettingsSection(title: 'Security'),
-            _buildConfigTile(
-              'Authorized Admins & Roles',
-              'Manage Super Admin & Manager access',
-              Icons.admin_panel_settings_outlined,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminManagementPage())),
+            const _SettingsSection(title: 'Access'),
+            _ConfigTile(
+              title: 'Admins & managers',
+              subtitle: 'See who has admin access',
+              icon: Icons.admin_panel_settings_outlined,
               trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AdminManagementPage()),
+              ),
             ),
-            _buildConfigTile(
-              'API Configuration',
-              'Manage Firebase & Google keys',
-              Icons.key_outlined,
-              onTap: () {
-                if (!isSuperAdmin) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('API Configuration requires Super Admin access.')),
-                  );
-                } else {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ApiConfigPage()));
-                }
-              },
-              trailing: Icon(isSuperAdmin ? Icons.chevron_right : Icons.lock_outline, size: 20),
-            ),
-            const SizedBox(height: 40),
-            FilledButton(
-              onPressed: () {
-                if (!isSuperAdmin) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Access Restricted: Operational Managers cannot modify global settings.')),
-                  );
-                  return;
-                }
-                context.read<AdminBloc>().add(AdminUpdateSettingsRequested(
-                  flatFee: state.flatFee,
-                  percentFee: state.percentFee,
-                ));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Settings saved successfully')),
-                );
-              },
-              child: const Text('Save Global Changes'),
+            _ConfigTile(
+              title: 'API configuration',
+              subtitle: 'Firebase & Google keys',
+              icon: Icons.key_outlined,
+              trailing: Icon(
+                isSuperAdmin ? Icons.chevron_right : Icons.lock_outline,
+                size: isSuperAdmin ? null : 20,
+              ),
+              onTap: isSuperAdmin
+                  ? () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ApiConfigPage()),
+                    )
+                  : () => ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('API configuration requires super admin access.'),
+                      ),
+                    ),
             ),
           ],
-        ),
-      );
+        );
       },
     );
   }
 
-  void _showUpdateFeeDialog(BuildContext context, bool isFlat, bool isSuperAdmin) {
-    if (!isSuperAdmin) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.lock_outline, color: Colors.orange),
-              SizedBox(width: 8),
-              Text('Access Restricted'),
-            ],
-          ),
-          content: const Text(
-            'Operational Managers cannot update platform fee parameters.\n\nOnly Super Admins have permission to modify platform economics.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
+  static String _formatPercent(double value) =>
+      value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
 
-    final controller = TextEditingController();
+  Future<void> _showUpdateFeeDialog(BuildContext context, {required bool isFlat}) async {
     final adminBloc = context.read<AdminBloc>();
-    showDialog(
+    final current = isFlat ? adminBloc.state.flatFee : adminBloc.state.percentFee;
+    final controller = TextEditingController(
+      text: isFlat ? current.round().toString() : _formatPercent(current),
+    );
+    final formKey = GlobalKey<FormState>();
+
+    final value = await showDialog<double>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(isFlat ? 'Update Flat Fee' : 'Update Percentage Fee'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(hintText: isFlat ? 'Enter amount (₹)' : 'Enter percentage (%)'),
+      builder: (dialogContext) => AlertDialog(
+        title: Text(isFlat ? 'Flat platform fee' : 'Commission'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: TextInputType.numberWithOptions(decimal: !isFlat),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(isFlat ? r'[0-9]' : r'[0-9.]')),
+            ],
+            decoration: InputDecoration(
+              prefixText: isFlat ? '₹ ' : null,
+              suffixText: isFlat ? null : '%',
+              helperText: isFlat ? 'Whole rupees, 0 – 1000' : '0 – 50',
+            ),
+            validator: (text) {
+              final parsed = double.tryParse(text?.trim() ?? '');
+              if (parsed == null) return 'Enter a number.';
+              if (isFlat && (parsed < 0 || parsed > 1000)) return 'Enter 0 – 1000.';
+              if (!isFlat && (parsed < 0 || parsed > 50)) return 'Enter 0 – 50.';
+              return null;
+            },
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () {
-              final val = double.tryParse(controller.text);
-              if (val != null) {
-                adminBloc.add(AdminUpdateSettingsRequested(
-                  flatFee: isFlat ? val : adminBloc.state.flatFee,
-                  percentFee: isFlat ? adminBloc.state.percentFee : val,
-                ));
-                Navigator.pop(context);
-              }
-            }, 
-            child: const Text('Update')
+              if (!formKey.currentState!.validate()) return;
+              Navigator.pop(dialogContext, double.parse(controller.text.trim()));
+            },
+            child: const Text('Save'),
           ),
         ],
       ),
     );
+    if (value == null) return;
+    adminBloc.add(
+      AdminUpdateSettingsRequested(
+        flatFee: isFlat ? value.roundToDouble() : adminBloc.state.flatFee,
+        percentFee: isFlat ? adminBloc.state.percentFee : value,
+      ),
+    );
   }
+}
 
-  Widget _buildConfigTile(String title, String subtitle, IconData icon, {Widget? trailing, VoidCallback? onTap}) {
+class _ConfigTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  const _ConfigTile({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    this.trailing,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
@@ -203,9 +195,16 @@ class _SettingsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Text(title.toUpperCase(),
-          style: const TextStyle(
-              color: AppColors.mutedText, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+      child: Text(
+        title.toUpperCase(),
+        style: const TextStyle(
+          color: AppColors.mutedText,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.1,
+        ),
+      ),
     );
   }
 }
+

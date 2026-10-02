@@ -28,6 +28,10 @@ abstract class CreatorRepository {
     String? existingAadhaarCardUrl,
   });
 
+  Future<Either<Failure, VerificationDocuments?>> getVerificationDocuments(
+    String uid,
+  );
+
   Future<Either<Failure, void>> submitVerification({
     required String uid,
     required String creatorName,
@@ -46,52 +50,18 @@ abstract class CreatorRepository {
     String status,
   );
 
-  Future<Either<Failure, void>> addProduct({
-    required String name,
-    required String description,
-    required List<File> imageFiles,
-    required String category,
-    List<String> categories = const [],
-    required double price,
-    required int stock,
-    required String materials,
-    required String dimensions,
-    required String weight,
-    required String shippingInfo,
-    required String creatorUid,
-    required String creatorName,
-    bool isCustomizable = false,
-    bool? isFramed,
-    List<String> predefinedCustomizations = const [],
-    List<CustomizationInput> customizations = const [],
-  });
-
-  Future<Either<Failure, void>> updateProduct({
-    required String productId,
-    required String name,
-    required String description,
-    required List<File> newImageFiles,
-    required List<String> existingImageUrls,
-    required String category,
-    List<String> categories = const [],
-    required double price,
-    required int stock,
-    required String materials,
-    required String dimensions,
-    required String weight,
-    required String shippingInfo,
-    required String creatorUid,
-    required String creatorName,
-    required bool isCustomizable,
-    bool? isFramed,
-    List<String> predefinedCustomizations = const [],
-    required List<CustomizationInput> customizations,
-    required bool hasChanges,
-  });
+  Future<Either<Failure, void>> addProduct(ProductInput input);
+  Future<Either<Failure, void>> updateProduct(String productId, ProductInput input);
+  Future<Either<Failure, void>> deleteProduct(String productId);
+  Future<Either<Failure, void>> setProductPublished(String productId, bool published);
+  Future<Either<Failure, void>> updateStock(String productId, int stock);
 
   Future<Either<Failure, List<CreatorProduct>>> getPendingProducts();
   Future<Either<Failure, List<CreatorProduct>>> getAdminAllProducts();
   Future<Either<Failure, List<CreatorProduct>>> getCreatorProducts(String uid);
+
+  Stream<List<CreatorProduct>> watchCreatorProducts(String uid);
+  Stream<List<CreatorOrder>> watchCreatorOrders(String uid);
 
   Future<Either<Failure, void>> updateProductStatus(
     String productId,
@@ -111,14 +81,15 @@ abstract class CreatorRepository {
     String? carrierName,
   });
 
+  Future<Either<Failure, void>> rejectOrder(String orderId, String reason);
+
+  Stream<List<CreatorNotification>> watchNotifications(String uid);
   Future<Either<Failure, List<CreatorNotification>>> getCreatorNotifications(
     String creatorUid,
   );
 
   Future<Either<Failure, void>> markNotificationAsRead(String notificationId);
-
   Future<Either<Failure, void>> markAllNotificationsAsRead(String creatorUid);
-
   Future<Either<Failure, void>> deleteNotifications(
     List<String> notificationIds,
   );
@@ -132,11 +103,54 @@ abstract class CreatorRepository {
   );
 }
 
+class ProductInput {
+  final String name;
+  final String description;
+  final List<File> newImageFiles;
+  final List<String> existingImageUrls;
+  final String category;
+  final List<String> categories;
+  final double price;
+  final int stock;
+  final String materials;
+  final String dimensions;
+  final String weight;
+  final String shippingInfo;
+  final String creatorUid;
+  final String creatorName;
+  final bool isCustomizable;
+  final bool? isFramed;
+  final List<String> predefinedCustomizations;
+  final List<CustomizationInput> customizations;
+
+  ProductInput({
+    required this.name,
+    required this.description,
+    this.newImageFiles = const [],
+    this.existingImageUrls = const [],
+    this.category = '',
+    this.categories = const [],
+    required this.price,
+    required this.stock,
+    required this.materials,
+    required this.dimensions,
+    required this.weight,
+    required this.shippingInfo,
+    required this.creatorUid,
+    required this.creatorName,
+    this.isCustomizable = false,
+    this.isFramed,
+    this.predefinedCustomizations = const [],
+    this.customizations = const [],
+  });
+}
+
 class CustomizationInput {
   final String name;
   final String description;
   final double additionalPrice;
   final List<File> imageFiles;
+  final List<String> existingImageUrls;
   final bool isMultipleSelection;
   final List<String> options;
 
@@ -146,6 +160,21 @@ class CustomizationInput {
     required this.additionalPrice,
     required this.isMultipleSelection,
     this.imageFiles = const [],
+    this.existingImageUrls = const [],
     this.options = const [],
+  });
+}
+
+class VerificationDocuments {
+  final String businessName;
+  final String address;
+  final String latestPhotoUrl;
+  final String idCardUrl;
+
+  VerificationDocuments({
+    required this.businessName,
+    required this.address,
+    required this.latestPhotoUrl,
+    required this.idCardUrl,
   });
 }

@@ -2,14 +2,22 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/admin/presentation/pages/details/product_review_page.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/creator/data/models/creator_product_model.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
-import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 
-class ProductApprovalView extends StatelessWidget {
+class ProductApprovalView extends StatefulWidget {
   const ProductApprovalView({super.key});
+
+  @override
+  State<ProductApprovalView> createState() => _ProductApprovalViewState();
+}
+
+class _ProductApprovalViewState extends State<ProductApprovalView> {
+  final Stream<QuerySnapshot<Map<String, dynamic>>> _products =
+      FirebaseFirestore.instance.collection('products').snapshots();
 
   @override
   Widget build(BuildContext context) {
@@ -28,38 +36,38 @@ class ProductApprovalView extends StatelessWidget {
           indicatorColor: AppColors.primary,
         ),
         body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance.collection('products').snapshots(),
+          stream: _products,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
-              return Center(
-                child: Text('Error loading products: ${snapshot.error}'),
+              return Center(child: Text('Could not load products: ${snapshot.error}'));
+            }
+            if (!snapshot.hasData) {
+              return const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
               );
             }
-
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator(color: AppColors.primary));
-            }
-
-            final docs = snapshot.data?.docs ?? [];
-            final allProducts = docs.map((doc) {
-              return CreatorProductModel.fromJson(doc.data(), doc.id);
-            }).toList();
-
-            final pending = allProducts
-                .where((p) => p.status == 'Pending Approval' || p.status == 'pending')
-                .toList();
-            final approved = allProducts
-                .where((p) => p.status == 'Approved' || p.status == 'approved')
-                .toList();
-            final rejected = allProducts
-                .where((p) => p.status == 'Rejected' || p.status == 'rejected')
+            final products = snapshot.data!.docs
+                .map((doc) => CreatorProductModel.fromJson(doc.data(), doc.id))
+                .toList()
+              ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            List<CreatorProduct> withStatus(String status) => products
+                .where((p) => p.status.toLowerCase() == status)
                 .toList();
 
             return TabBarView(
               children: [
-                _buildProductGrid(context, pending, 'No pending product approvals.'),
-                _buildProductGrid(context, approved, 'No approved products.'),
-                _buildProductGrid(context, rejected, 'No rejected products.'),
+                _ProductGrid(
+                  products: withStatus('pending approval'),
+                  emptyMessage: 'No products waiting for approval.',
+                ),
+                _ProductGrid(
+                  products: withStatus('approved'),
+                  emptyMessage: 'No approved products.',
+                ),
+                _ProductGrid(
+                  products: withStatus('rejected'),
+                  emptyMessage: 'No rejected products.',
+                ),
               ],
             );
           },
@@ -67,251 +75,214 @@ class ProductApprovalView extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildProductGrid(BuildContext context, List<CreatorProduct> products, String emptyMessage) {
-    final authState = context.watch<AuthBloc>().state;
-    final currentUser = authState is AuthSuccess ? authState.user : null;
-    final adminName = currentUser?.name ?? 'Admin';
-    final adminEmail = currentUser?.email ?? '';
+class _ProductGrid extends StatelessWidget {
+  final List<CreatorProduct> products;
+  final String emptyMessage;
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        context.read<CreatorBloc>().add(CreatorFetchAdminAllProducts());
-      },
-      child: products.isEmpty
-          ? Center(
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Container(
-                  height: 400,
-                  alignment: Alignment.center,
-                  child: Text(emptyMessage, style: const TextStyle(color: AppColors.mutedText)),
-                ),
-              ),
-            )
-          : GridView.builder(
-              padding: const EdgeInsets.all(16),
-              physics: const AlwaysScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.58,
-              ),
-              itemCount: products.length,
-              itemBuilder: (context, index) {
-                final product = products[index];
-                return Card(
-                  clipBehavior: Clip.antiAlias,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 2,
-                  child: InkWell(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => ProductReviewPage(product: product)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Container(
-                            width: double.infinity,
-                            color: AppColors.outline,
-                            child: product.images.isNotEmpty
-                                ? Image.network(
-                                    product.images.first,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (c, e, s) => const Icon(Icons.broken_image, color: Colors.grey),
-                                  )
-                                : const Icon(Icons.image, size: 40, color: Colors.grey),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(10),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                product.name,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                'by ${product.creatorName}',
-                                style: const TextStyle(fontSize: 11, color: AppColors.mutedText),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text('₹${product.price}', style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.primary)),
-                              if (product.approvedBy.isNotEmpty) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Approved by: ${product.approvedBy}',
-                                  style: const TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.w600),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                              if (product.rejectionReason.isNotEmpty) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Reason: ${product.rejectionReason}',
-                                  style: const TextStyle(fontSize: 10, color: Colors.redAccent, fontWeight: FontWeight.w600),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                              const SizedBox(height: 8),
-                              if (product.status == 'Pending Approval' || product.status == 'pending')
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: () => _showRejectionDialog(context, product, adminName, adminEmail),
-                                        style: OutlinedButton.styleFrom(
-                                          padding: EdgeInsets.zero,
-                                          foregroundColor: Colors.red,
-                                          minimumSize: const Size(0, 32),
-                                        ),
-                                        child: const Text('Reject', style: TextStyle(fontSize: 11)),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Expanded(
-                                      child: FilledButton(
-                                        onPressed: () {
-                                          context.read<CreatorBloc>().add(CreatorUpdateProductStatus(
-                                                productId: product.id,
-                                                status: 'Approved',
-                                                approvedBy: adminName,
-                                                approvedByEmail: adminEmail,
-                                              ));
-                                        },
-                                        style: FilledButton.styleFrom(
-                                          padding: EdgeInsets.zero,
-                                          backgroundColor: AppColors.primary,
-                                          minimumSize: const Size(0, 32),
-                                        ),
-                                        child: const Text('Approve', style: TextStyle(fontSize: 11)),
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              else
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: product.status == 'Approved' || product.status == 'approved'
-                                        ? Colors.green.withValues(alpha: 0.15)
-                                        : Colors.red.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    product.status.toUpperCase(),
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: product.status == 'Approved' || product.status == 'approved'
-                                          ? Colors.green
-                                          : Colors.red,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+  const _ProductGrid({required this.products, required this.emptyMessage});
+
+  @override
+  Widget build(BuildContext context) {
+    if (products.isEmpty) {
+      return Center(
+        child: Text(emptyMessage, style: const TextStyle(color: AppColors.mutedText)),
+      );
+    }
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 240,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        mainAxisExtent: 288,
+      ),
+      itemCount: products.length,
+      itemBuilder: (context, index) => _ProductTile(product: products[index]),
     );
   }
+}
 
-  void _showRejectionDialog(
-    BuildContext context,
-    CreatorProduct product,
-    String adminName,
-    String adminEmail,
-  ) {
-    final reasonController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    final creatorBloc = context.read<CreatorBloc>();
+class _ProductTile extends StatelessWidget {
+  final CreatorProduct product;
 
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Reject "${product.name}"'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Please provide a mandatory reason for rejecting this product. The seller will see this feedback in their dashboard.',
-                style: TextStyle(fontSize: 12, color: AppColors.mutedText),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: reasonController,
-                autofocus: true,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Rejection Reason *',
-                  hintText: 'e.g. Image resolution too low, inaccurate description',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (v) {
-                  final trimmed = v?.trim() ?? '';
-                  if (trimmed.isEmpty) {
-                    return 'Rejection reason is mandatory.';
-                  }
-                  if (trimmed.length < 3) {
-                    return 'Reason must be at least 3 characters long.';
-                  }
-                  return null;
-                },
-              ),
-            ],
-          ),
+  const _ProductTile({required this.product});
+
+  @override
+  Widget build(BuildContext context) {
+    final isPending = product.status == 'Pending Approval';
+    final isApproved = product.status == 'Approved';
+    final isRejected = product.status == 'Rejected';
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ProductReviewPage(product: product)),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                final reason = reasonController.text.trim();
-                Navigator.pop(dialogContext);
-                creatorBloc.add(CreatorUpdateProductStatus(
-                  productId: product.id,
-                  status: 'Rejected',
-                  approvedBy: adminName,
-                  approvedByEmail: adminEmail,
-                  rejectionReason: reason,
-                ));
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Rejected "${product.name}" with reason.'),
-                    backgroundColor: Colors.red,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                color: AppColors.outline,
+                child: product.images.isNotEmpty
+                    ? Image.network(
+                        product.images.first,
+                        fit: BoxFit.cover,
+                        cacheWidth: 480,
+                        errorBuilder: (_, _, _) =>
+                            const Icon(Icons.broken_image, color: Colors.grey),
+                      )
+                    : const Icon(Icons.image, size: 40, color: Colors.grey),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
-                );
-              }
-            },
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-            child: const Text('Confirm Rejection'),
-          ),
-        ],
+                  Text(
+                    'by ${product.creatorName}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: AppColors.mutedText),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '₹${product.price.round()} · Stock ${product.stock}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.primary),
+                  ),
+                  const SizedBox(height: 8),
+                  if (!isPending)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        isApproved
+                            ? (product.isActive ? 'LIVE' : 'APPROVED · NOT LIVE')
+                            : 'REJECTED',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: isApproved ? Colors.green.shade700 : Colors.red,
+                        ),
+                      ),
+                    ),
+                  Row(
+                    children: [
+                      if (!isRejected)
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => rejectProductWithReason(context, product),
+                            style: OutlinedButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              foregroundColor: Colors.red,
+                              minimumSize: const Size(0, 32),
+                            ),
+                            child: const Text('Reject', style: TextStyle(fontSize: 11)),
+                          ),
+                        ),
+                      if (isPending) const SizedBox(width: 4),
+                      if (!isApproved)
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () => approveProduct(context, product),
+                            style: FilledButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(0, 32),
+                            ),
+                            child: const Text('Approve', style: TextStyle(fontSize: 11)),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+}
+
+/// Approves and publishes [product], recording the reviewing admin.
+void approveProduct(BuildContext context, CreatorProduct product) {
+  final authState = context.read<AuthBloc>().state;
+  final admin = authState is AuthSuccess ? authState.user : null;
+  context.read<AdminBloc>().add(
+    AdminProductReviewRequested(
+      productId: product.id,
+      approve: true,
+      reviewerName: admin?.name ?? 'Admin',
+      reviewerEmail: admin?.email ?? '',
+    ),
+  );
+}
+
+/// Asks for a mandatory reason, then rejects [product]. Returns true when
+/// the rejection was submitted.
+Future<bool> rejectProductWithReason(BuildContext context, CreatorProduct product) async {
+  final authState = context.read<AuthBloc>().state;
+  final admin = authState is AuthSuccess ? authState.user : null;
+  final adminBloc = context.read<AdminBloc>();
+  final controller = TextEditingController();
+  final formKey = GlobalKey<FormState>();
+  final reason = await showDialog<String>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text('Reject "${product.name}"'),
+      content: Form(
+        key: formKey,
+        child: TextFormField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'Reason for the creator *',
+            hintText: 'e.g. Image resolution too low, inaccurate description',
+          ),
+          validator: (value) => (value?.trim().length ?? 0) < 3
+              ? 'Please give a reason of at least 3 characters.'
+              : null,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (formKey.currentState!.validate()) {
+              Navigator.pop(dialogContext, controller.text.trim());
+            }
+          },
+          style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+          child: const Text('Reject'),
+        ),
+      ],
+    ),
+  );
+  if (reason == null) return false;
+  adminBloc.add(
+    AdminProductReviewRequested(
+      productId: product.id,
+      approve: false,
+      reviewerName: admin?.name ?? 'Admin',
+      reviewerEmail: admin?.email ?? '',
+      rejectionReason: reason,
+    ),
+  );
+  return true;
 }

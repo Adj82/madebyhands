@@ -5,6 +5,7 @@ import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_empty_state.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/product_thumbnail.dart';
 
 class CartTab extends StatelessWidget {
   final VoidCallback onBrowse;
@@ -22,6 +23,10 @@ class CartTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return BuyerBackground(
       child: BlocBuilder<BuyerBloc, BuyerState>(
+        buildWhen: (previous, current) =>
+            previous.products != current.products ||
+            previous.cartQuantities != current.cartQuantities ||
+            previous.cartCustomizations != current.cartCustomizations,
         builder: (context, state) {
           final productsInCart = state.products
               .where((product) => state.cartQuantities.containsKey(product.id))
@@ -88,18 +93,7 @@ class CartTab extends StatelessWidget {
                                 padding: const EdgeInsets.all(12),
                                 child: Row(
                                   children: [
-                                    Container(
-                                      width: 76,
-                                      height: 76,
-                                      decoration: BoxDecoration(
-                                        color: product.color,
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      child: Icon(
-                                        product.icon,
-                                        color: AppColors.text.withAlpha(158),
-                                      ),
-                                    ),
+                                    ProductThumbnail(product: product, size: 76),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
@@ -147,6 +141,7 @@ class CartTab extends StatelessWidget {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         IconButton(
+                                          tooltip: quantity == 1 ? 'Remove from cart' : 'Decrease quantity',
                                           onPressed: () => context
                                               .read<BuyerBloc>()
                                               .add(
@@ -168,6 +163,7 @@ class CartTab extends StatelessWidget {
                                           ),
                                         ),
                                         IconButton(
+                                          tooltip: 'Increase quantity',
                                           onPressed: quantity >= product.stock
                                               ? null
                                               : () => context.read<BuyerBloc>().add(
@@ -223,7 +219,15 @@ class CartTab extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 4),
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'A platform fee per creator is added at checkout.',
+                            style: TextStyle(fontSize: 12, color: AppColors.mutedText),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         FilledButton(
                           onPressed: onCheckout,
                           style: FilledButton.styleFrom(

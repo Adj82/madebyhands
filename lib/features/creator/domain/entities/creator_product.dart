@@ -24,6 +24,8 @@ class CreatorProduct {
   final String approvedBy;
   final String approvedByEmail;
   final String rejectionReason;
+  final int orderCount;
+  final int wishlistCount;
 
   CreatorProduct({
     required this.id,
@@ -51,7 +53,16 @@ class CreatorProduct {
     this.approvedBy = '',
     this.approvedByEmail = '',
     this.rejectionReason = '',
+    this.orderCount = 0,
+    this.wishlistCount = 0,
   });
+
+  bool get isPendingApproval => status == 'Pending Approval';
+  bool get isApproved => status == 'Approved';
+  bool get isRejected => status == 'Rejected';
+
+  /// Approved and published, i.e. visible to buyers.
+  bool get isLive => isApproved && isActive;
 }
 
 class ProductCustomization {

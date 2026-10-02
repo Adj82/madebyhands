@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:madebyhands/core/constants/product_categories.dart';
 import 'package:madebyhands/features/buyer/domain/entities/buyer_order.dart';
 import 'package:madebyhands/features/buyer/domain/entities/buyer_product_notification.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
@@ -17,20 +19,15 @@ class FirestoreBuyerRepository implements BuyerRepository {
 
   const FirestoreBuyerRepository({required this.firestore});
 
+  /// Only published listings. `priceCart` in server/checkout.js rejects
+  /// anything that is not explicitly `isActive == true`.
+  Query<Map<String, dynamic>> get _liveProducts =>
+      firestore.collection('products').where('isActive', isEqualTo: true);
+
   @override
-  Stream<List<Product>> watchProducts() => firestore
-      .collection('products')
-      .snapshots()
-      .map(
-        (snapshot) => snapshot.docs
-            // `priceCart` in server/checkout.js rejects anything that is not
-            // explicitly `isActive == true`, so listing the looser
-            // `isActive != false` would let buyers cart products that the
-            // payment API then refuses to price.
-            .where((doc) => doc.data()['isActive'] == true)
-            .map((doc) => _productFromDocument(doc))
-            .toList(),
-      );
+  Stream<List<Product>> watchProducts() => _liveProducts.snapshots().map(
+    (snapshot) => snapshot.docs.map(_productFromDocument).toList(),
+  );
 
   @override
   Future<PlatformFeeSettings> getPlatformFeeSettings() async {
@@ -69,6 +66,18 @@ class FirestoreBuyerRepository implements BuyerRepository {
       );
 
   @override
+  Stream<List<String>> watchCategories() =>
+      firestore.collection('categories').snapshots().map((snapshot) {
+        final names = snapshot.docs
+            .map((doc) => (doc.data()['name'] as String? ?? '').trim())
+            .where((name) => name.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+        return names.isEmpty ? List<String>.of(kProductCategories) : names;
+      });
+
+  @override
   Stream<Set<String>> watchFavoriteProductIds(String userId) => firestore
       .collection('users')
       .doc(userId)
@@ -88,6 +97,8 @@ class FirestoreBuyerRepository implements BuyerRepository {
         .doc(userId)
         .collection('favorites')
         .doc(productId);
+    final existing = await reference.get();
+    if (existing.exists == isFavorite) return;
     if (isFavorite) {
       await reference.set({
         'productId': productId,
@@ -96,6 +107,13 @@ class FirestoreBuyerRepository implements BuyerRepository {
     } else {
       await reference.delete();
     }
+    // Wishlist saves feed the home "popular" ranking. Best effort: the
+    // favourite itself is already stored.
+    try {
+      await firestore.collection('products').doc(productId).update({
+        'wishlistCount': FieldValue.increment(isFavorite ? 1 : -1),
+      });
+    } catch (_) {}
   }
 
   @override
@@ -218,10 +236,7 @@ class FirestoreBuyerRepository implements BuyerRepository {
 
     controller = StreamController<List<BuyerProductNotification>>(
       onListen: () {
-        productSubscription = firestore
-            .collection('products')
-            .snapshots()
-            .listen((snapshot) {
+        productSubscription = _liveProducts.snapshots().listen((snapshot) {
               productSnapshot = snapshot;
               emitNotifications();
             }, onError: controller.addError);
@@ -434,8 +449,15 @@ class FirestoreBuyerRepository implements BuyerRepository {
     QueryDocumentSnapshot<Map<String, dynamic>> document,
   ) {
     final data = document.data();
-    final category = data['category'] as String? ?? 'Handmade';
-    final visual = _visualForCategory(category);
+    final categories = List<String>.from(
+      data['categories'] as List? ?? const [],
+    ).where((value) => value.trim().isNotEmpty).toList();
+    final category =
+        data['category'] as String? ??
+        (categories.isNotEmpty ? categories.join(', ') : 'Handmade');
+    final visual = _visualForCategory(
+      categories.isNotEmpty ? categories.first : category,
+    );
     final rawCustomizations =
         data['customizations'] as List<dynamic>? ?? const [];
     final customizations = rawCustomizations
@@ -459,15 +481,17 @@ class FirestoreBuyerRepository implements BuyerRepository {
         })
         .where((customization) => customization.name.trim().isNotEmpty)
         .toList();
+    final stock = (data['stock'] as num?)?.round() ?? 0;
     return Product(
       id: document.id,
       name: data['name'] as String? ?? 'Handmade piece',
       artisan:
+          data['creatorName'] as String? ??
           data['artisan'] as String? ??
           data['sellerName'] as String? ??
-          data['creatorName'] as String? ??
           'MadeByHands artisan',
       category: category,
+      categories: categories,
       description: data['description'] as String? ?? '',
       price: (data['price'] as num?)?.round() ?? 0,
       rating:
@@ -475,20 +499,15 @@ class FirestoreBuyerRepository implements BuyerRepository {
           (data['rating'] as num?)?.toDouble() ??
           0,
       color: Color((data['colorValue'] as num?)?.toInt() ?? visual.$1),
-      icon: IconData(
-        (data['iconCodePoint'] as num?)?.toInt() ?? visual.$2,
-        fontFamily: 'MaterialIcons',
-      ),
+      icon: visual.$2,
       // Products exist with either spelling; server/checkout.js and
-      // firestore.rules both accept creatorUid or creatorId. Without this
-      // fallback the creator would be blank, which collapses the per-creator
-      // flat fee and fails order placement.
+      // firestore.rules both accept creatorUid or creatorId.
       creatorUid: _creatorUid(data),
-      images: List<String>.from(data['images'] as List? ?? const []),
-      stock: (data['stock'] as num?)?.round() ?? 0,
-      isAvailable:
-          data['isActive'] == true &&
-          ((data['stock'] as num?)?.round() ?? 0) > 0,
+      images: List<String>.from(
+        data['images'] as List? ?? const [],
+      ).where((url) => url.trim().isNotEmpty).toList(),
+      stock: stock,
+      isAvailable: data['isActive'] == true && stock > 0,
       materials: data['materials'] as String? ?? '',
       dimensions: data['dimensions'] as String? ?? '',
       shippingInfo: data['shippingInfo'] as String? ?? '',
@@ -497,6 +516,8 @@ class FirestoreBuyerRepository implements BuyerRepository {
         data['predefinedCustomizations'] as List? ?? const [],
       ).where((item) => item.trim().isNotEmpty).toList(),
       customizations: customizations,
+      orderCount: math.max(0, (data['orderCount'] as num?)?.round() ?? 0),
+      wishlistCount: math.max(0, (data['wishlistCount'] as num?)?.round() ?? 0),
     );
   }
 
@@ -510,6 +531,7 @@ class FirestoreBuyerRepository implements BuyerRepository {
       return BuyerOrderItem(
         productId: item['productId'] as String? ?? '',
         name: item['name'] as String? ?? 'Handmade item',
+        image: item['image'] as String? ?? '',
         quantity: (item['quantity'] as num?)?.round() ?? 1,
         unitPrice: (item['unitPrice'] as num?)?.round() ?? 0,
         baseUnitPrice:
@@ -523,6 +545,12 @@ class FirestoreBuyerRepository implements BuyerRepository {
     final address = data['shippingAddress'] ?? data['deliveryAddress'];
     final createdAt =
         _timestamp(data['createdAt']) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final subtotal =
+        (data['subtotal'] as num?)?.round() ??
+        (data['totalAmount'] as num?)?.round() ??
+        (data['total'] as num?)?.round() ??
+        items.fold<int>(0, (total, item) => total + item.total);
+    final platformFee = (data['flatFee'] as num?)?.round() ?? 0;
     return BuyerOrder(
       id: document.id,
       createdAt: createdAt,
@@ -531,10 +559,10 @@ class FirestoreBuyerRepository implements BuyerRepository {
       status: OrderStatus.normalize(data['status'] as String? ?? 'Placed'),
       total:
           (data['buyerPayableAmount'] as num?)?.round() ??
-          (data['subtotal'] as num?)?.round() ??
-          (data['totalAmount'] as num?)?.round() ??
-          (data['total'] as num?)?.round() ??
-          items.fold(0, (total, item) => total + item.total),
+          subtotal + platformFee,
+      subtotal: subtotal,
+      platformFee: platformFee,
+      refundStatus: data['refundStatus'] as String?,
       items: items,
       deliveryAddress: address is Map
           ? [
@@ -624,13 +652,28 @@ class FirestoreBuyerRepository implements BuyerRepository {
     'updatedAt': FieldValue.serverTimestamp(),
   };
 
-  (int, int) _visualForCategory(String category) =>
-      switch (category.toLowerCase()) {
-        'pottery' => (0xFFAFC9D6, Icons.local_florist_outlined.codePoint),
-        'jewellery' => (0xFFD8D6D1, Icons.diamond_outlined.codePoint),
-        'textiles' => (0xFFE8AA91, Icons.shopping_bag_outlined.codePoint),
-        'wellness' => (0xFFD9A179, Icons.light_mode_outlined.codePoint),
-        'gifts' => (0xFFB8C99D, Icons.card_giftcard_outlined.codePoint),
-        _ => (0xFFD8BE8B, Icons.handyman_outlined.codePoint),
-      };
+  /// Placeholder colour and icon shown until the product photo loads. The
+  /// icons are constants so release builds can tree-shake the icon font.
+  (int, IconData) _visualForCategory(String category) {
+    final value = category.toLowerCase();
+    if (value.contains('paint') || value.contains('art')) {
+      return (0xFFE7C889, Icons.palette_outlined);
+    }
+    if (value.contains('pottery') || value.contains('ceramic') || value.contains('clay')) {
+      return (0xFFAFC9D6, Icons.local_florist_outlined);
+    }
+    if (value.contains('jewel') || value.contains('fashion')) {
+      return (0xFFD8D6D1, Icons.diamond_outlined);
+    }
+    if (value.contains('textile') || value.contains('fiber')) {
+      return (0xFFE8AA91, Icons.checkroom_outlined);
+    }
+    if (value.contains('home') || value.contains('decor') || value.contains('décor')) {
+      return (0xFFB8C99D, Icons.chair_outlined);
+    }
+    if (value.contains('paper') || value.contains('book')) {
+      return (0xFFEAD9C6, Icons.menu_book_outlined);
+    }
+    return (0xFFD8BE8B, Icons.handyman_outlined);
+  }
 }

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:madebyhands/core/constants/product_categories.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
+import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
+import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 class HomeTab extends StatefulWidget {
   final String userName;
@@ -41,79 +45,44 @@ class _HomeTabState extends State<HomeTab> {
       'image':
           'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?q=80&w=800&auto=format&fit=crop',
       'asset': 'assets/main_page_elements/painting_main.png',
+      'category': kProductCategories[0],
     },
     {
       'title': 'The Heritage of Phulkari',
       'image':
           'https://images.unsplash.com/photo-1606744888344-493238951221?q=80&w=800&auto=format&fit=crop',
       'asset': 'assets/main_page_elements/textile_main.png',
+      'category': kProductCategories[3],
     },
     {
       'title': 'Royal Terracotta & Pottery',
       'image':
           'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?q=80&w=800&auto=format&fit=crop',
       'asset': 'assets/main_page_elements/pottery_main.png',
+      'category': kProductCategories[2],
     },
     {
       'title': 'Handcrafted Cultural Heritage',
       'image':
           'https://images.unsplash.com/photo-1544816155-12df9643f363?q=80&w=800&auto=format&fit=crop',
       'asset': 'assets/main_page_elements/handicraft_main.png',
+      'category': kProductCategories[8],
     },
   ];
 
-  final List<Map<String, String>> _categories = [
-    {
-      'name': 'Paintings, Drawing, Fine Art & Traditional Art',
-      'asset': 'painting_main.png',
-      'query': 'painting',
-    },
-    {
-      'name': 'Digital Art, Illustration, Design & Photography',
-      'asset': 'digital_main.png',
-      'query': 'digital',
-    },
-    {
-      'name': 'Pottery, Ceramics, Clay & Sculpture',
-      'asset': 'pottery_main.png',
-      'query': 'pottery',
-    },
-    {
-      'name': 'Textile, Fiber, Embroidery, Toys & Dolls',
-      'asset': 'textile_main.png',
-      'query': 'textile',
-    },
-    {
-      'name': 'Fashion, Jewellery & Wearables',
-      'asset': 'fashion_main.png',
-      'query': 'fashion',
-    },
-    {
-      'name': 'Home Décor & Lifestyle',
-      'asset': 'homedec_main.png',
-      'query': 'decor',
-    },
-    {'name': 'Woodwork & Carpentry', 'asset': 'wood_main.png', 'query': 'wood'},
-    {
-      'name': 'Paper Crafts & Origami',
-      'asset': 'paper_main.png',
-      'query': 'paper',
-    },
-    {
-      'name': 'Handicrafts & Cultural Crafts',
-      'asset': 'handicraft_main.png',
-      'query': 'handicraft',
-    },
-    {
-      'name': 'Resin Art & Candle Making',
-      'asset': 'resin_main.png',
-      'query': 'resin',
-    },
-    {
-      'name': 'Other Creative Crafts',
-      'asset': 'other_main.png',
-      'query': 'other',
-    },
+  /// Artwork for each entry of [kProductCategories], in the same order.
+  static const _categoryArt = <String>[
+    'painting_main.png',
+    'digital_main.png',
+    'pottery_main.png',
+    'textile_main.png',
+    'fashion_main.png',
+    'homedec_main.png',
+    'wood_main.png',
+    'paper_main.png',
+    'handicraft_main.png',
+    'resin_main.png',
+    'other_main.png',
   ];
 
   @override
@@ -132,10 +101,15 @@ class _HomeTabState extends State<HomeTab> {
     widget.onBrowseAll();
   }
 
+  void _openCategory(String category) {
+    final onCategoryTap = widget.onCategoryTap;
+    onCategoryTap == null ? _openSearch() : onCategoryTap(category);
+  }
+
   @override
   Widget build(BuildContext context) {
     final firstName = widget.userName.trim().isEmpty
-        ? 'Suhani'
+        ? 'there'
         : widget.userName.trim().split(' ').first;
 
     return Scaffold(
@@ -169,6 +143,12 @@ class _HomeTabState extends State<HomeTab> {
                   _buildSearchBar(),
                   const SizedBox(height: 18),
                   _buildHistoricalArtSection(),
+                  const SizedBox(height: 22),
+                  _PopularPicks(
+                    userId: widget.userId,
+                    onProductTap: widget.onProductTap,
+                    onSeeAll: widget.onBrowseAll,
+                  ),
                   const SizedBox(height: 18),
                   _buildCategoryDivider(),
                   const SizedBox(height: 14),
@@ -411,7 +391,10 @@ class _HomeTabState extends State<HomeTab> {
             itemCount: _stories.length,
             itemBuilder: (context, index) {
               final story = _stories[index];
-              return _buildStoryCard(story);
+              return GestureDetector(
+                onTap: () => _openCategory(story['category']!),
+                child: _buildStoryCard(story),
+              );
             },
           ),
         ),
@@ -584,23 +567,23 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildCategoriesGrid() {
-    final rowsCount = (_categories.length / 2).ceil();
+    final count = kProductCategories.length;
+    final rowsCount = (count / 2).ceil();
 
     return Column(
       children: List.generate(rowsCount, (rowIndex) {
         final firstIndex = rowIndex * 2;
         final secondIndex = firstIndex + 1;
-        final hasSecond = secondIndex < _categories.length;
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 12.0),
           child: Row(
             children: [
-              Expanded(child: _buildCategoryCard(_categories[firstIndex])),
+              Expanded(child: _buildCategoryCard(firstIndex)),
               const SizedBox(width: 10),
               Expanded(
-                child: hasSecond
-                    ? _buildCategoryCard(_categories[secondIndex])
+                child: secondIndex < count
+                    ? _buildCategoryCard(secondIndex)
                     : const SizedBox.shrink(),
               ),
             ],
@@ -610,15 +593,10 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Widget _buildCategoryCard(Map<String, String> category) {
+  Widget _buildCategoryCard(int index) {
+    final name = kProductCategories[index];
     return GestureDetector(
-      onTap: () {
-        if (widget.onCategoryTap != null) {
-          widget.onCategoryTap!(category['query']!);
-        } else {
-          _openSearch();
-        }
-      },
+      onTap: () => _openCategory(name),
       child: AspectRatio(
         aspectRatio: 3 / 4,
         child: Container(
@@ -635,14 +613,15 @@ class _HomeTabState extends State<HomeTab> {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Image.asset(
-              'assets/main_page_elements/${category['asset']}',
+              'assets/main_page_elements/${_categoryArt[index]}',
+              semanticLabel: name,
               fit: BoxFit.contain,
               errorBuilder: (_, _, _) => Container(
                 color: const Color(0xFFF5EFE3),
                 padding: const EdgeInsets.all(8),
                 alignment: Alignment.center,
                 child: Text(
-                  category['name']!,
+                  name,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.playfairDisplay(
                     fontSize: 11.5,
@@ -655,6 +634,102 @@ class _HomeTabState extends State<HomeTab> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// FR-08 home feed: the most wished-for and most ordered products, with
+/// items from categories the buyer has saved ranked first.
+class _PopularPicks extends StatelessWidget {
+  final String userId;
+  final ValueChanged<Product> onProductTap;
+  final VoidCallback onSeeAll;
+
+  const _PopularPicks({
+    required this.userId,
+    required this.onProductTap,
+    required this.onSeeAll,
+  });
+
+  static List<Product> rank(List<Product> products, Set<String> favoriteIds) {
+    final favoriteCategories = <String>{
+      for (final product in products)
+        if (favoriteIds.contains(product.id))
+          ...product.allCategories.map(normalizeCategory),
+    };
+    bool matchesTaste(Product product) =>
+        product.allCategories.any((c) => favoriteCategories.contains(normalizeCategory(c)));
+
+    final candidates = products
+        .where((product) => product.isAvailable && product.stock > 0)
+        .toList()
+      ..sort((a, b) {
+        final taste = (matchesTaste(b) ? 1 : 0) - (matchesTaste(a) ? 1 : 0);
+        if (taste != 0) return taste;
+        return b.popularityScore.compareTo(a.popularityScore);
+      });
+    return candidates.take(10).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<BuyerBloc, BuyerState>(
+      buildWhen: (previous, current) =>
+          previous.products != current.products ||
+          previous.favoriteIds != current.favoriteIds,
+      builder: (context, state) {
+        final picks = rank(state.products, state.favoriteIds);
+        if (picks.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Popular picks',
+                    style: GoogleFonts.playfairDisplay(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF6B1D1D),
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: onSeeAll,
+                  child: const Text(
+                    'Shop all',
+                    style: TextStyle(color: Color(0xFF8B261D), fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 270,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: picks.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final product = picks[index];
+                  return SizedBox(
+                    width: 170,
+                    child: ProductCard(
+                      product: product,
+                      isSaved: state.favoriteIds.contains(product.id),
+                      onTap: () => onProductTap(product),
+                      onSave: () => context.read<BuyerBloc>().add(
+                        BuyerToggleFavorite(userId: userId, product: product),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

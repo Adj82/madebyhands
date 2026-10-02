@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:madebyhands/core/services/payment_api.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 // dart.library.js_interop is true for both dart2js and Wasm builds, while
 // dart.library.html is false under Wasm — which would silently select the
@@ -7,239 +8,230 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'razorpay_checkout_stub.dart'
     if (dart.library.js_interop) 'razorpay_checkout_web.dart';
 
+/// Payment ids returned by Razorpay Checkout after a successful payment.
+class RazorpayPaymentResult {
+  final String? paymentId;
+  final String? orderId;
+  final String? signature;
+
+  const RazorpayPaymentResult({this.paymentId, this.orderId, this.signature});
+}
+
+/// Thrown when the payment API could not turn a captured payment into orders.
+class PaymentConfirmationException implements Exception {
+  final String message;
+
+  /// True when the server already refunded the payment, so retrying the
+  /// confirmation is pointless and the buyer can simply try again.
+  final bool refunded;
+
+  const PaymentConfirmationException(this.message, {this.refunded = false});
+
+  @override
+  String toString() => message;
+}
+
+/// Server order created by `/api/create-order`.
+class RazorpayCheckoutOrder {
+  final String orderId;
+  final int amountInPaise;
+  final String keyId;
+
+  const RazorpayCheckoutOrder({
+    required this.orderId,
+    required this.amountInPaise,
+    required this.keyId,
+  });
+
+  int get amountInRupees => (amountInPaise / 100).round();
+}
+
 class RazorpayService {
-  Razorpay? _razorpay;
-  late Function(String?, String?, String?) _onWebPaymentSuccess;
-  late Function(String) _onWebPaymentFailure;
-  RazorpayService({Dio? dio}) : _dio = dio ?? Dio(_defaultOptions);
-
   final Dio _dio;
-  static const String _apiBaseUrl = String.fromEnvironment(
-    'PAYMENT_API_BASE_URL',
-    defaultValue: 'https://madebyhands.vercel.app',
-  );
-  static final BaseOptions _defaultOptions = BaseOptions(
-    baseUrl: _apiBaseUrl.isNotEmpty
-        ? _apiBaseUrl
-        : (kIsWeb ? Uri.base.origin : 'https://madebyhands.vercel.app'),
-    connectTimeout: const Duration(seconds: 15),
-    receiveTimeout: const Duration(seconds: 20),
-  );
+  Razorpay? _razorpay;
+  ValueChanged<RazorpayPaymentResult>? _onSuccess;
+  ValueChanged<String>? _onFailure;
 
+  RazorpayService({Dio? dio}) : _dio = dio ?? PaymentApi.createClient();
+
+  /// Registers the callbacks for the native SDK and the web bridge.
   void init({
-    required Function(PaymentSuccessResponse) onSuccess,
-    required Function(PaymentFailureResponse) onError,
-    required Function(ExternalWalletResponse) onExternalWallet,
-    required Function(String?, String?, String?) onWebPaymentSuccess,
-    required Function(String) onWebPaymentFailure,
+    required ValueChanged<RazorpayPaymentResult> onSuccess,
+    required ValueChanged<String> onFailure,
   }) {
-    _onWebPaymentSuccess = onWebPaymentSuccess;
-    _onWebPaymentFailure = onWebPaymentFailure;
-    if (kIsWeb) return;
-    try {
-      _razorpay = Razorpay();
-      _razorpay!.on(Razorpay.EVENT_PAYMENT_SUCCESS, onSuccess);
-      _razorpay!.on(Razorpay.EVENT_PAYMENT_ERROR, onError);
-      _razorpay!.on(Razorpay.EVENT_EXTERNAL_WALLET, onExternalWallet);
-    } catch (e) {
-      debugPrint("Razorpay Initialization Warning: $e");
-    }
+    _onSuccess = onSuccess;
+    _onFailure = onFailure;
   }
 
-  /// Create the Razorpay order through the trusted server endpoint.
-  Future<Map<String, dynamic>> createOrder({
+  /// The native SDK is created on first use so screens that never pay (and
+  /// widget tests) do not touch the platform channel.
+  Razorpay _nativeCheckout() {
+    final existing = _razorpay;
+    if (existing != null) return existing;
+    final razorpay = Razorpay();
+    razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, (PaymentSuccessResponse r) {
+      _onSuccess?.call(
+        RazorpayPaymentResult(
+          paymentId: r.paymentId,
+          orderId: r.orderId,
+          signature: r.signature,
+        ),
+      );
+    });
+    razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, (PaymentFailureResponse r) {
+      final message = r.message?.trim();
+      _onFailure?.call(
+        message == null || message.isEmpty
+            ? 'Payment was not completed.'
+            : message,
+      );
+    });
+    return _razorpay = razorpay;
+  }
+
+  /// Creates the Razorpay order through the trusted server endpoint.
+  /// Only product ids, quantities and customization choices are sent.
+  Future<RazorpayCheckoutOrder> createOrder({
     required List<Map<String, dynamic>> items,
-    required String idToken,
-    String currency = 'INR',
   }) async {
     if (items.isEmpty) throw StateError('The cart is empty.');
-
-    late final Response<dynamic> response;
+    final idToken = await PaymentApi.idToken();
     try {
-      response = await _dio.post(
+      final response = await _dio.post<Map<String, dynamic>>(
         '/api/create-order',
-        data: {'items': items, 'currency': currency},
+        data: {'items': items, 'currency': 'INR'},
         options: Options(headers: {'Authorization': 'Bearer $idToken'}),
       );
+      final data = response.data;
+      final orderId = data?['order_id'] as String?;
+      final amount = (data?['amount'] as num?)?.round();
+      final keyId = (data?['key_id'] as String?)?.trim();
+      if (orderId == null || orderId.isEmpty || amount == null || keyId == null || keyId.isEmpty) {
+        throw StateError('The payment server returned an incomplete order.');
+      }
+      return RazorpayCheckoutOrder(
+        orderId: orderId,
+        amountInPaise: amount,
+        keyId: keyId,
+      );
     } on DioException catch (error) {
-      final body = error.response?.data;
-      final serverMessage = body is Map ? body['error']?.toString() : null;
-      if (serverMessage != null && serverMessage.trim().isNotEmpty) {
-        throw StateError(serverMessage.trim());
-      }
-      if (error.response == null) {
-        throw StateError(
-          'Could not reach the payment server. Check your connection and try again.',
-        );
-      }
       throw StateError(
-        'Payment server returned HTTP ${error.response?.statusCode}. Try again or contact support.',
+        PaymentApi.errorMessage(
+          error,
+          fallback: 'Could not start checkout. Please try again.',
+        ),
       );
     }
-    if (response.statusCode != 200 || response.data == null) {
-      throw StateError('Payment server did not create an order.');
-    }
-    return Map<String, dynamic>.from(response.data);
   }
 
-  /// Step 2: Open Standard Razorpay Checkout Modal with generated order_id
+  /// Opens Razorpay Standard Checkout for a server-created order.
   void openCheckout({
-    required String orderId,
-    required double amountInRupees,
-    required String orderDescription,
+    required RazorpayCheckoutOrder order,
+    required String description,
     required String name,
     required String phone,
     required String email,
-    String? keyId,
   }) {
-    final activeKey = keyId?.trim() ?? '';
-    if (activeKey.isEmpty) {
-      throw StateError('Payment server did not return a public key.');
-    }
-    final amountInPaise = (amountInRupees * 100).round();
     final digitsOnly = phone.replaceAll(RegExp(r'\D'), '');
-    final cleanPhone = digitsOnly.length >= 10
-        ? digitsOnly.substring(digitsOnly.length - 10)
-        : (digitsOnly.isNotEmpty ? digitsOnly : '9876543210');
-
-    final options = {
-      'key': activeKey,
-      'order_id': orderId,
-      'amount': amountInPaise,
+    final prefill = <String, String>{
+      if (digitsOnly.length >= 10) 'contact': digitsOnly.substring(digitsOnly.length - 10),
+      if (email.trim().isNotEmpty) 'email': email.trim(),
+      if (name.trim().isNotEmpty) 'name': name.trim(),
+    };
+    final options = <String, dynamic>{
+      'key': order.keyId,
+      'order_id': order.orderId,
+      'amount': order.amountInPaise,
       'currency': 'INR',
-      'name': name.isNotEmpty ? name : 'MADEBYHANDS',
-      'description': orderDescription,
-      'prefill': {
-        'contact': cleanPhone,
-        'email': email.isNotEmpty ? email : 'buyer@madebyhands.com',
-      },
-      'theme': {'color': '#506638'},
-      'external': {
-        'wallets': ['paytm', 'gpay', 'phonepe'],
-      },
+      'name': 'MadeByHands',
+      'description': description,
+      if (prefill.isNotEmpty) 'prefill': prefill,
+      'theme': {'color': '#6B7E43'},
     };
 
-    try {
-      if (kIsWeb) {
-        openWebRazorpayCheckout(options)
-            .then((response) {
-              _onWebPaymentSuccess(
-                response['razorpay_payment_id'] as String?,
-                response['razorpay_order_id'] as String?,
-                response['razorpay_signature'] as String?,
-              );
-            })
-            .catchError((Object error) {
-              _onWebPaymentFailure(error.toString());
-            });
-        return;
-      }
-      _razorpay ??= Razorpay();
-      _razorpay!.open(options);
-    } catch (e) {
-      debugPrint('Error opening Razorpay checkout: $e');
-      rethrow;
-    }
-  }
-
-  /// Step 3: Verify HMAC-SHA256 Payment Signature
-  Future<bool> verifyPaymentSignature({
-    required String razorpayOrderId,
-    required String razorpayPaymentId,
-    required String razorpaySignature,
-    required String idToken,
-  }) async {
-    if (razorpayOrderId.isEmpty ||
-        razorpayPaymentId.isEmpty ||
-        razorpaySignature.isEmpty) {
-      return false;
-    }
-
-    try {
-      final response = await _dio.post(
-        '/api/verify-payment',
-        data: {
-          'razorpay_order_id': razorpayOrderId,
-          'razorpay_payment_id': razorpayPaymentId,
-          'razorpay_signature': razorpaySignature,
-        },
-        options: Options(headers: {'Authorization': 'Bearer $idToken'}),
+    if (kIsWeb) {
+      openWebRazorpayCheckout(options).then(
+        (response) => _onSuccess?.call(
+          RazorpayPaymentResult(
+            paymentId: response['razorpay_payment_id'] as String?,
+            orderId: response['razorpay_order_id'] as String?,
+            signature: response['razorpay_signature'] as String?,
+          ),
+        ),
+        onError: (Object error) => _onFailure?.call(
+          error.toString().replaceFirst(RegExp(r'^(Error|Exception):\s*'), ''),
+        ),
       );
-      if (response.statusCode == 200 && response.data != null) {
-        return response.data['success'] == true;
-      }
-    } catch (error) {
-      debugPrint('Payment verification failed: $error');
-      return false;
+      return;
     }
-    return false;
+    _nativeCheckout().open(options);
   }
 
+  /// Turns a captured payment into orders. Idempotent on the server, so a
+  /// network timeout is retried once with the same payment details.
   Future<List<String>> finalizePaidOrder({
-    required String razorpayOrderId,
-    required String razorpayPaymentId,
-    required String razorpaySignature,
-    required String idToken,
+    required RazorpayPaymentResult payment,
     required String buyerPhone,
     required Map<String, String> address,
-    required List<Map<String, dynamic>> items,
   }) async {
+    final paymentId = payment.paymentId;
+    final orderId = payment.orderId;
+    final signature = payment.signature;
+    if (paymentId == null || orderId == null || signature == null) {
+      throw const PaymentConfirmationException(
+        'Payment confirmation details are missing. If money was debited, contact support.',
+      );
+    }
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
-        final response = await _dio.post(
+        final idToken = await PaymentApi.idToken(forceRefresh: attempt > 0);
+        final response = await _dio.post<Map<String, dynamic>>(
           '/api/finalize-payment',
           data: {
-            'razorpay_order_id': razorpayOrderId,
-            'razorpay_payment_id': razorpayPaymentId,
-            'razorpay_signature': razorpaySignature,
+            'razorpay_order_id': orderId,
+            'razorpay_payment_id': paymentId,
+            'razorpay_signature': signature,
             'buyerPhone': buyerPhone,
             'address': address,
-            'items': items,
           },
           options: Options(headers: {'Authorization': 'Bearer $idToken'}),
         );
-        if (response.statusCode != 200 || response.data?['success'] != true) {
-          throw StateError(
-            'Payment was received, but order confirmation failed. Check your order history or contact support before retrying.',
+        final ids = response.data?['order_ids'];
+        if (response.data?['success'] != true || ids is! List) {
+          throw const PaymentConfirmationException(
+            'Payment was received, but the order could not be confirmed yet.',
           );
         }
-        return List<String>.from(response.data['order_ids'] as List);
+        return ids.map((id) => id.toString()).toList();
       } on DioException catch (error) {
-        final responseData = error.response?.data;
-        final message = responseData is Map
-            ? responseData['error']?.toString()
-            : null;
-        if (responseData is Map && responseData['refunded'] == true) {
-          throw StateError(
-            message ??
-                'Inventory changed during checkout; Razorpay has refunded the payment.',
+        final body = error.response?.data;
+        if (body is Map && body['refunded'] == true) {
+          throw PaymentConfirmationException(
+            PaymentApi.errorMessage(
+              error,
+              fallback: 'Your payment has been refunded.',
+            ),
+            refunded: true,
           );
         }
-        final canRetry =
-            attempt == 0 &&
-            (error.type == DioExceptionType.connectionTimeout ||
-                error.type == DioExceptionType.sendTimeout ||
-                error.type == DioExceptionType.receiveTimeout ||
-                error.type == DioExceptionType.connectionError);
-        if (!canRetry) {
-          throw StateError(
-            message ??
-                'Order confirmation failed. Check your order history or contact support before retrying.',
-          );
-        }
+        if (attempt == 0 && PaymentApi.isNetworkFailure(error)) continue;
+        throw PaymentConfirmationException(
+          PaymentApi.errorMessage(
+            error,
+            fallback: 'Order confirmation failed. Retry confirmation or contact support.',
+          ),
+        );
       }
     }
-    throw StateError(
-      'Order confirmation could not be reached. Check your order history before retrying.',
+    throw const PaymentConfirmationException(
+      'Order confirmation could not be reached. Retry confirmation in a moment.',
     );
   }
 
   void dispose() {
-    if (kIsWeb) return;
-    try {
-      _razorpay?.clear();
-    } catch (e) {
-      debugPrint("Razorpay Dispose Warning: $e");
-    }
+    _onSuccess = null;
+    _onFailure = null;
+    _razorpay?.clear();
+    _razorpay = null;
   }
 }

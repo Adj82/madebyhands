@@ -255,7 +255,8 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
       ),
       body: BlocConsumer<CreatorBloc, CreatorState>(
         listener: (context, state) {
-          if (state is CreatorOnboardingSuccess) {
+          if (state.action == CreatorAction.saveProfile &&
+              state.actionStatus == CreatorActionStatus.success) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
@@ -269,12 +270,18 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
             if (isEditMode) {
               Navigator.pop(context);
             }
-          } else if (state is CreatorFailure) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.message)));
+          } else if (state.action == CreatorAction.saveProfile &&
+              state.actionStatus == CreatorActionStatus.failure) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.actionMessage ?? 'Failed to save profile')),
+            );
           }
         },
         builder: (context, state) {
-          if (state is CreatorLoading) return const Center(child: CircularProgressIndicator());
+          if (state.status == CreatorSessionStatus.loading ||
+              state.isRunning(CreatorAction.saveProfile)) {
+            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+          }
 
           return RefreshIndicator(
             onRefresh: _handleRefresh,

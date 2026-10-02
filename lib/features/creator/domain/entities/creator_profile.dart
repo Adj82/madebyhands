@@ -8,8 +8,15 @@ class CreatorProfile {
   final List<String> socialLinks;
   final List<String> portfolio;
   final String story;
-  final String verificationStatus; // 'Unverified', 'In-Process', 'Verified'
+  /// 'Unverified', 'In-Process', 'Verified' or 'Rejected'.
+  final String verificationStatus;
+
+  /// Admin's reason when verification was rejected.
+  final String verificationNote;
   final String businessName;
+
+  // Legacy: older profiles stored verification documents publicly. New
+  // submissions keep them in the private `creator_verifications` collection.
   final String address;
   final String latestPhoto;
   final String idCard;
@@ -27,6 +34,7 @@ class CreatorProfile {
     required this.portfolio,
     required this.story,
     this.verificationStatus = 'Unverified',
+    this.verificationNote = '',
     this.businessName = '',
     this.address = '',
     this.latestPhoto = '',
@@ -34,4 +42,8 @@ class CreatorProfile {
     this.panCard = '',
     this.aadhaarCard = '',
   });
+
+  bool get isVerified => verificationStatus == 'Verified';
+  bool get isUnderReview => verificationStatus == 'In-Process';
+  bool get isVerificationRejected => verificationStatus == 'Rejected';
 }

@@ -7,64 +7,81 @@ sealed class AdminEvent extends Equatable {
   List<Object> get props => [];
 }
 
+/// Loads everything the admin panel needs. Admin-only.
 final class AdminLoadDataRequested extends AdminEvent {}
 
-final class AdminFetchBuyersRequested extends AdminEvent {}
-
-final class AdminFetchCreatorsRequested extends AdminEvent {}
-
-final class AdminFetchAdminsRequested extends AdminEvent {}
+/// Loads categories without seeding. Safe for creators.
+final class AdminCategoriesRequested extends AdminEvent {}
 
 final class AdminSuspendUserRequested extends AdminEvent {
   final String uid;
   final bool isSuspended;
   const AdminSuspendUserRequested(this.uid, this.isSuspended);
-}
 
-final class AdminChangeUserRoleRequested extends AdminEvent {
-  final String uid;
-  final String newRole;
-  const AdminChangeUserRoleRequested(this.uid, this.newRole);
+  @override
+  List<Object> get props => [uid, isSuspended];
 }
 
 final class AdminApproveCreatorRequested extends AdminEvent {
-  final String applicationId;
-  const AdminApproveCreatorRequested(this.applicationId);
+  final String uid;
+  const AdminApproveCreatorRequested(this.uid);
+
+  @override
+  List<Object> get props => [uid];
 }
 
 final class AdminRejectCreatorRequested extends AdminEvent {
-  final String applicationId;
-  const AdminRejectCreatorRequested(this.applicationId);
-}
+  final String uid;
+  final String reason;
+  const AdminRejectCreatorRequested(this.uid, this.reason);
 
-final class AdminApproveProductRequested extends AdminEvent {
-  final String productId;
-  const AdminApproveProductRequested(this.productId);
-}
-
-final class AdminRejectProductRequested extends AdminEvent {
-  final String productId;
-  const AdminRejectProductRequested(this.productId);
+  @override
+  List<Object> get props => [uid, reason];
 }
 
 final class AdminAddCategoryRequested extends AdminEvent {
   final String name;
   const AdminAddCategoryRequested(this.name);
+
+  @override
+  List<Object> get props => [name];
 }
 
 final class AdminDeleteCategoryRequested extends AdminEvent {
   final String name;
   const AdminDeleteCategoryRequested(this.name);
-}
 
-final class AdminSendMessageRequested extends AdminEvent {
-  final String ticketId;
-  final String message;
-  const AdminSendMessageRequested({required this.ticketId, required this.message});
+  @override
+  List<Object> get props => [name];
 }
 
 final class AdminUpdateSettingsRequested extends AdminEvent {
   final double flatFee;
   final double percentFee;
-  const AdminUpdateSettingsRequested({required this.flatFee, required this.percentFee});
+  const AdminUpdateSettingsRequested({
+    required this.flatFee,
+    required this.percentFee,
+  });
+
+  @override
+  List<Object> get props => [flatFee, percentFee];
+}
+
+final class AdminProductReviewRequested extends AdminEvent {
+  final String productId;
+  final bool approve;
+  final String reviewerName;
+  final String reviewerEmail;
+  final String? rejectionReason;
+
+  const AdminProductReviewRequested({
+    required this.productId,
+    required this.approve,
+    required this.reviewerName,
+    required this.reviewerEmail,
+    this.rejectionReason,
+  });
+
+  @override
+  List<Object> get props => [productId, approve, reviewerName, reviewerEmail];
 }

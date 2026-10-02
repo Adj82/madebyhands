@@ -4,25 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:madebyhands/core/constants/product_categories.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
-
-const List<String> kAvailableCategories = [
-  'Paintings, Drawing, Fine Art & Traditional Art',
-  'Digital Art, Illustration, Design & Photography',
-  'Pottery, Ceramics, Clay & Sculpture',
-  'Textile, Fiber, Embroidery, Toys & Dolls',
-  'Fashion, Jewellery & Wearables',
-  'Home Décor & Lifestyle',
-  'Wood, Metal, Leather & Natural Crafts',
-  'Paper, Books & Stationery',
-  'Handicrafts & Artisan Goods',
-  'Resin & Mixed-Material Art',
-  'Other Creative Works',
-];
 
 class AddProductPage extends StatefulWidget {
   final CreatorProfile profile;
@@ -67,7 +55,7 @@ class _AddProductPageState extends State<AddProductPage> {
     final p = widget.initialProduct;
     _nameController = TextEditingController(text: p?.name);
     _descriptionController = TextEditingController(text: p?.description);
-    _priceController = TextEditingController(text: p?.price.toString());
+    _priceController = TextEditingController(text: p?.price.round().toString());
     _stockController = TextEditingController(text: p?.stock.toString());
     _materialsController = TextEditingController(text: p?.materials);
     _dimensionsController = TextEditingController(text: p?.dimensions);
@@ -91,7 +79,7 @@ class _AddProductPageState extends State<AddProductPage> {
         final controllers = _CustomizationControllers();
         controllers.nameController.text = c.name;
         controllers.descController.text = c.description;
-        controllers.priceController.text = c.additionalPrice.toString();
+        controllers.priceController.text = c.additionalPrice.round().toString();
         controllers.isMultipleSelection = c.isMultipleSelection;
         controllers.hasSubOptions = c.options.isNotEmpty;
         controllers.existingImageUrls.addAll(c.images);
@@ -103,9 +91,22 @@ class _AddProductPageState extends State<AddProductPage> {
         }
         _customizationList.add(controllers);
       }
-    } else {
-      _addCustomizationBlock();
     }
+    final adminBloc = context.read<AdminBloc>();
+    if (adminBloc.state.categories.isEmpty) {
+      adminBloc.add(AdminCategoriesRequested());
+    }
+  }
+
+  bool get _isEditing => widget.initialProduct != null;
+
+  List<String> get _categoryOptions {
+    final fromAdmin = context.read<AdminBloc>().state.categories;
+    final options = [...(fromAdmin.isEmpty ? kProductCategories : fromAdmin)];
+    for (final selected in _selectedCategories) {
+      if (!options.contains(selected)) options.add(selected);
+    }
+    return options;
   }
 
   @override
@@ -155,152 +156,160 @@ class _AddProductPageState extends State<AddProductPage> {
     }
   }
 
+  /// A comparable fingerprint of the customization blocks, used to detect
+  /// edits.
+  static String _customizationSignature(
+    bool isCustomizable,
+    Iterable<(String, String, num, bool, List<String>, int)> blocks,
+  ) => isCustomizable ? blocks.map((b) => b.toString()).join('|') : '';
+
   void _submit() {
-    if (_selectedCategories.isEmpty) {
+    FocusScope.of(context).unfocus();
+    if (_existingImageUrls.isEmpty && _imageFiles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least 1 category for your product.'),
-        ),
+        const SnackBar(content: Text('Add at least one product photo.')),
       );
       return;
     }
+    if (_selectedCategories.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select at least one category.')),
+      );
+      return;
+    }
+    if (!_formKey.currentState!.validate()) return;
 
-    if (_formKey.currentState!.validate()) {
-      final List<String> categoriesList = _selectedCategories.toList();
-      final String categoryStr = categoriesList.join(', ');
-
-      final List<CustomizationInput> customizations = [];
-      if (_isCustomizable) {
-        for (var c in _customizationList) {
-          customizations.add(CustomizationInput(
-            name: c.nameController.text,
-            description: c.descController.text,
-            additionalPrice: double.tryParse(c.priceController.text) ?? 0.0,
-            imageFiles: c.imageFiles,
-            isMultipleSelection: c.isMultipleSelection,
+    final categories = _selectedCategories.toList();
+    final customizations = <CustomizationInput>[
+      if (_isCustomizable)
+        for (final c in _customizationList)
+          CustomizationInput(
+            name: c.nameController.text.trim(),
+            description: c.descController.text.trim(),
+            additionalPrice: double.tryParse(c.priceController.text) ?? 0,
+            imageFiles: List.of(c.imageFiles),
+            existingImageUrls: List.of(c.existingImageUrls),
+            isMultipleSelection: c.hasSubOptions && c.isMultipleSelection,
             options: c.hasSubOptions
                 ? c.options
-                    .map((opt) => opt.text)
-                    .where((s) => s.isNotEmpty)
-                    .toList()
-                : [],
-          ));
-        }
-      }
+                      .map((option) => option.text.trim())
+                      .where((option) => option.isNotEmpty)
+                      .toList()
+                : const [],
+          ),
+    ];
+    final isFramed = _selectedCategories.contains(kPaintingCategory) ? _isFramed : null;
+    final price = double.parse(_priceController.text);
+    final stock = int.parse(_stockController.text);
 
-      final showFramed = _selectedCategories.contains(
-        'Paintings, Drawing, Fine Art & Traditional Art',
+    final initial = widget.initialProduct;
+    if (initial != null) {
+      final before = _customizationSignature(
+        initial.isCustomizable,
+        initial.customizations.map(
+          (c) => (c.name, c.description, c.additionalPrice.round(), c.isMultipleSelection, c.options, c.images.length),
+        ),
       );
-      final bool? finalIsFramed = showFramed ? _isFramed : null;
-
-      if (widget.initialProduct != null) {
-        // Edit mode: Check for changes
-        final p = widget.initialProduct!;
-        bool hasChanges = p.name != _nameController.text ||
-            p.description != _descriptionController.text ||
-            !listEquals(p.categories, categoriesList) ||
-            p.price != (double.tryParse(_priceController.text) ?? 0.0) ||
-            p.stock != (int.tryParse(_stockController.text) ?? 0) ||
-            p.materials != _materialsController.text ||
-            p.dimensions != _dimensionsController.text ||
-            p.weight != _weightController.text ||
-            p.shippingInfo != _shippingController.text ||
-            p.isCustomizable != _isCustomizable ||
-            p.isFramed != finalIsFramed ||
-            _imageFiles.isNotEmpty ||
-            _existingImageUrls.length != p.images.length;
-
-        if (!hasChanges) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No changes detected.')),
-          );
-          return;
-        }
-
-        context.read<CreatorBloc>().add(
-              CreatorUpdateProduct(
-                productId: widget.initialProduct!.id,
-                name: _nameController.text,
-                description: _descriptionController.text,
-                newImageFiles: _imageFiles,
-                existingImageUrls: _existingImageUrls,
-                category: categoryStr,
-                categories: categoriesList,
-                price: double.tryParse(_priceController.text) ?? 0.0,
-                stock: int.tryParse(_stockController.text) ?? 0,
-                materials: _materialsController.text,
-                dimensions: _dimensionsController.text,
-                weight: _weightController.text,
-                shippingInfo: _shippingController.text,
-                creatorUid: widget.profile.uid,
-                creatorName: widget.profile.name,
-                isCustomizable: _isCustomizable,
-                isFramed: finalIsFramed,
-                predefinedCustomizations: const [],
-                customizations: customizations,
-                hasChanges: hasChanges,
-              ),
-            );
-      } else {
-        // Add mode
-        context.read<CreatorBloc>().add(
-              CreatorAddProduct(
-                name: _nameController.text,
-                description: _descriptionController.text,
-                imageFiles: _imageFiles,
-                category: categoryStr,
-                categories: categoriesList,
-                price: double.tryParse(_priceController.text) ?? 0.0,
-                stock: int.tryParse(_stockController.text) ?? 0,
-                materials: _materialsController.text,
-                dimensions: _dimensionsController.text,
-                weight: _weightController.text,
-                shippingInfo: _shippingController.text,
-                creatorUid: widget.profile.uid,
-                creatorName: widget.profile.name,
-                isCustomizable: _isCustomizable,
-                isFramed: finalIsFramed,
-                predefinedCustomizations: const [],
-                customizations: customizations,
-              ),
-            );
+      final after = _customizationSignature(
+        _isCustomizable,
+        customizations.map(
+          (c) => (
+            c.name,
+            c.description,
+            c.additionalPrice.round(),
+            c.isMultipleSelection,
+            c.options,
+            c.existingImageUrls.length + c.imageFiles.length,
+          ),
+        ),
+      );
+      final hasChanges =
+          initial.name != _nameController.text.trim() ||
+          initial.description != _descriptionController.text.trim() ||
+          !listEquals(initial.categories, categories) ||
+          initial.price.round() != price.round() ||
+          initial.stock != stock ||
+          initial.materials != _materialsController.text.trim() ||
+          initial.dimensions != _dimensionsController.text.trim() ||
+          initial.weight != _weightController.text.trim() ||
+          initial.shippingInfo != _shippingController.text.trim() ||
+          initial.isCustomizable != _isCustomizable ||
+          initial.isFramed != isFramed ||
+          before != after ||
+          _imageFiles.isNotEmpty ||
+          !listEquals(initial.images, _existingImageUrls);
+      if (!hasChanges) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No changes to save.')),
+        );
+        return;
       }
     }
+
+    context.read<CreatorBloc>().add(
+      CreatorSaveProduct(
+        productId: initial?.id,
+        input: ProductInput(
+          name: _nameController.text.trim(),
+          description: _descriptionController.text.trim(),
+          newImageFiles: List.of(_imageFiles),
+          existingImageUrls: List.of(_existingImageUrls),
+          categories: categories,
+          price: price.roundToDouble(),
+          stock: stock,
+          materials: _materialsController.text.trim(),
+          dimensions: _dimensionsController.text.trim(),
+          weight: _weightController.text.trim(),
+          shippingInfo: _shippingController.text.trim(),
+          creatorUid: widget.profile.uid,
+          creatorName: widget.profile.businessName.trim().isNotEmpty
+              ? widget.profile.businessName.trim()
+              : widget.profile.name,
+          isCustomizable: _isCustomizable,
+          isFramed: isFramed,
+          customizations: customizations,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Add New Product',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          _isEditing ? 'Edit product' : 'Add new product',
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
       body: BlocConsumer<CreatorBloc, CreatorState>(
+        listenWhen: (previous, current) =>
+            previous.actionId != current.actionId &&
+            current.action == CreatorAction.saveProduct &&
+            current.actionStatus != CreatorActionStatus.inProgress,
         listener: (context, state) {
-          if (state is CreatorAddProductSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Product submitted for review successfully!'),
+          final success = state.actionStatus == CreatorActionStatus.success;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                state.actionMessage ??
+                    (success ? 'Product saved.' : 'Could not save the product.'),
               ),
-            );
-            context
-                .read<CreatorBloc>()
-                .add(CreatorFetchCreatorProducts(widget.profile.uid));
-            Navigator.pop(context);
-          } else if (state is CreatorFailure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message)),
-            );
-          }
+              backgroundColor: success ? null : Colors.red.shade700,
+            ),
+          );
+          if (success) Navigator.pop(context);
         },
+        buildWhen: (previous, current) =>
+            previous.isRunning(CreatorAction.saveProduct) !=
+            current.isRunning(CreatorAction.saveProduct),
         builder: (context, state) {
-          if (state is CreatorLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          return SingleChildScrollView(
+          final saving = state.isRunning(CreatorAction.saveProduct);
+          return Stack(
+            children: [
+              AbsorbPointer(
+                absorbing: saving,
+                child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
               24.0,
               24.0,
@@ -310,9 +319,9 @@ class _AddProductPageState extends State<AddProductPage> {
             child: Form(
               key: _formKey,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildSectionTitle('Product Images (Optional)'),
+                  _buildSectionTitle('Product photos *'),
                   const SizedBox(height: 10),
                   _buildProductImagePicker(),
                   const SizedBox(height: 30),
@@ -335,13 +344,23 @@ class _AddProductPageState extends State<AddProductPage> {
 
                   const SizedBox(height: 50),
                   FilledButton(
-                    onPressed: _submit,
-                    child: const Text('Submit & Apply for Review'),
+                    onPressed: saving ? null : _submit,
+                    child: Text(_isEditing ? 'Save & send for review' : 'Submit for review'),
                   ),
                   const SizedBox(height: 30),
                 ],
               ),
             ),
+                ),
+              ),
+              if (saving)
+                const Positioned.fill(
+                  child: ColoredBox(
+                    color: Color(0x66FFFFFF),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                ),
+            ],
           );
         },
       ),
@@ -401,6 +420,12 @@ class _AddProductPageState extends State<AddProductPage> {
               width: 120,
               height: 120,
               fit: BoxFit.cover,
+              cacheWidth: 360,
+              errorBuilder: (_, _, _) => const SizedBox(
+                width: 120,
+                height: 120,
+                child: Icon(Icons.broken_image, color: Colors.grey),
+              ),
             ),
           ),
         ),
@@ -514,15 +539,20 @@ class _AddProductPageState extends State<AddProductPage> {
               child: TextFormField(
                 controller: _priceController,
                 decoration: const InputDecoration(
-                  labelText: 'Base Price (₹) *',
+                  labelText: 'Price (₹) *',
                   prefixIcon: Icon(Icons.currency_rupee),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: TextInputType.number,
                 inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(7),
                 ],
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Required' : null,
+                validator: (v) {
+                  final price = int.tryParse(v ?? '');
+                  if (price == null) return 'Required';
+                  if (price < 1) return 'Must be at least ₹1';
+                  return null;
+                },
               ),
             ),
             const SizedBox(width: 15),
@@ -530,7 +560,7 @@ class _AddProductPageState extends State<AddProductPage> {
               child: TextFormField(
                 controller: _stockController,
                 decoration: const InputDecoration(
-                  labelText: 'Stock/Quantity *',
+                  labelText: 'Stock *',
                   prefixIcon: Icon(Icons.inventory_2_outlined),
                 ),
                 keyboardType: TextInputType.number,
@@ -597,12 +627,16 @@ class _AddProductPageState extends State<AddProductPage> {
               return Chip(
                 backgroundColor: AppColors.primary.withValues(alpha: 0.12),
                 side: const BorderSide(color: AppColors.primary),
-                label: Text(
-                  cat,
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                label: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 240),
+                  child: Text(
+                    cat,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
                 deleteIcon:
@@ -656,9 +690,11 @@ class _AddProductPageState extends State<AddProductPage> {
   }
 
   void _showCategorySelectionMenu() {
+    final categoryOptions = _categoryOptions;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -674,11 +710,12 @@ class _AddProductPageState extends State<AddProductPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
+                      Expanded(
+                        child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Select Categories *',
+                            'Select categories *',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -693,6 +730,7 @@ class _AddProductPageState extends State<AddProductPage> {
                           ),
                         ],
                       ),
+                      ),
                       IconButton(
                         icon: const Icon(Icons.close),
                         onPressed: () => Navigator.pop(modalContext),
@@ -703,10 +741,10 @@ class _AddProductPageState extends State<AddProductPage> {
                   const Divider(),
                   Expanded(
                     child: ListView.separated(
-                      itemCount: kAvailableCategories.length,
+                      itemCount: categoryOptions.length,
                       separatorBuilder: (_, _) => const Divider(height: 1),
                       itemBuilder: (context, index) {
-                        final category = kAvailableCategories[index];
+                        final category = categoryOptions[index];
                         final isSelected =
                             _selectedCategories.contains(category);
 
@@ -805,6 +843,9 @@ class _AddProductPageState extends State<AddProductPage> {
                 isSelected: !_isCustomizable,
                 onSelected: (v) => setState(() {
                   _isCustomizable = false;
+                  for (final block in _customizationList) {
+                    block.dispose();
+                  }
                   _customizationList.clear();
                 }),
               ),
@@ -867,9 +908,7 @@ class _AddProductPageState extends State<AddProductPage> {
   }
 
   Widget _buildProductDetailsFields() {
-    final showIsFramedOption = _selectedCategories.contains(
-      'Paintings, Drawing, Fine Art & Traditional Art',
-    );
+    final showIsFramedOption = _selectedCategories.contains(kPaintingCategory);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1048,7 +1087,7 @@ class _CustomizationBlockState extends State<_CustomizationBlock> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Customization Block',
+                'Customization',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 15,
@@ -1070,10 +1109,10 @@ class _CustomizationBlockState extends State<_CustomizationBlock> {
           TextFormField(
             controller: widget.controllers.nameController,
             decoration: const InputDecoration(
-              labelText: 'Customization Name *',
-              hintText: 'Enter Name',
+              labelText: 'Name *',
+              hintText: 'e.g. Colour, Engraving text',
             ),
-            validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+            validator: (v) => (v?.trim().isEmpty ?? true) ? 'Required' : null,
           ),
           const SizedBox(height: 12),
           TextFormField(
@@ -1087,11 +1126,16 @@ class _CustomizationBlockState extends State<_CustomizationBlock> {
           TextFormField(
             controller: widget.controllers.priceController,
             decoration: const InputDecoration(
-              labelText: 'Base Additional Price (₹) *',
+              labelText: 'Additional price (₹) *',
+              helperText: 'Enter 0 if this option is free.',
               prefixIcon: Icon(Icons.add),
             ),
             keyboardType: TextInputType.number,
-            validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(6),
+            ],
+            validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
           ),
           const SizedBox(height: 20),
           const Text(
@@ -1126,41 +1170,33 @@ class _CustomizationBlockState extends State<_CustomizationBlock> {
               'Selection Type',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
             ),
-            Wrap(
-              spacing: 20,
-              crossAxisAlignment: WrapCrossAlignment.center,
+            const SizedBox(height: 10),
+            Row(
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Radio<bool>(
-                      value: false,
-                      groupValue: widget.controllers.isMultipleSelection,
-                      onChanged: (v) => setState(
-                        () => widget.controllers.isMultipleSelection = v!,
-                      ),
+                Expanded(
+                  child: _ChoiceChip(
+                    label: 'Pick one',
+                    isSelected: !widget.controllers.isMultipleSelection,
+                    onSelected: (_) => setState(
+                      () => widget.controllers.isMultipleSelection = false,
                     ),
-                    const Text('Single Selection'),
-                  ],
+                  ),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Radio<bool>(
-                      value: true,
-                      groupValue: widget.controllers.isMultipleSelection,
-                      onChanged: (v) => setState(
-                        () => widget.controllers.isMultipleSelection = v!,
-                      ),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: _ChoiceChip(
+                    label: 'Pick several',
+                    isSelected: widget.controllers.isMultipleSelection,
+                    onSelected: (_) => setState(
+                      () => widget.controllers.isMultipleSelection = true,
                     ),
-                    const Text('Multiple Selection'),
-                  ],
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 15),
             const Text(
-              'Options (Subcustomizations) - Max 5',
+              'Options (max 5)',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
@@ -1175,6 +1211,12 @@ class _CustomizationBlockState extends State<_CustomizationBlock> {
                     Expanded(
                       child: TextFormField(
                         controller: widget.controllers.options[index],
+                        validator: (value) {
+                          final anyFilled = widget.controllers.options.any(
+                            (option) => option.text.trim().isNotEmpty,
+                          );
+                          return index == 0 && !anyFilled ? 'Add at least one option' : null;
+                        },
                         decoration: InputDecoration(
                           labelText: 'Option ${index + 1}',
                           isDense: true,
@@ -1186,7 +1228,9 @@ class _CustomizationBlockState extends State<_CustomizationBlock> {
                       ),
                     ),
                     IconButton(
-                      onPressed: () => _removeOption(index),
+                      onPressed: widget.controllers.options.length == 1
+                          ? null
+                          : () => _removeOption(index),
                       icon: const Icon(
                         Icons.remove_circle_outline,
                         color: Colors.red,
@@ -1263,6 +1307,12 @@ class _CustomizationBlockState extends State<_CustomizationBlock> {
               width: 80,
               height: 80,
               fit: BoxFit.cover,
+              cacheWidth: 240,
+              errorBuilder: (_, _, _) => const SizedBox(
+                width: 80,
+                height: 80,
+                child: Icon(Icons.broken_image, color: Colors.grey),
+              ),
             ),
           ),
         ),

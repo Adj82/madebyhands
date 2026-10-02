@@ -2,126 +2,93 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:madebyhands/core/error/failures.dart';
+import 'package:madebyhands/core/services/payment_api.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/orders/domain/order_status.dart';
+import 'package:madebyhands/init_dependencies.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-class OrderManagementView extends StatelessWidget {
+class OrderManagementView extends StatefulWidget {
   const OrderManagementView({super.key});
+
+  @override
+  State<OrderManagementView> createState() => _OrderManagementViewState();
+}
+
+class _OrderManagementViewState extends State<OrderManagementView> {
+  final Stream<QuerySnapshot<Map<String, dynamic>>> _orders = FirebaseFirestore
+      .instance
+      .collection('orders')
+      .snapshots();
 
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: const TabBar(
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           tabs: [
-            Tab(text: 'Pending'),
-            Tab(text: 'Active'),
-            Tab(text: 'Completed'),
+            Tab(text: 'New'),
+            Tab(text: 'In progress'),
+            Tab(text: 'Delivered'),
+            Tab(text: 'Rejected'),
           ],
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.mutedText,
           indicatorColor: AppColors.primary,
         ),
         body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance.collection('orders').snapshots(),
+          stream: _orders,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Unable to load orders from database',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.text),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${snapshot.error}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: AppColors.mutedText, fontSize: 12),
-                      ),
-                    ],
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'Could not load orders: ${snapshot.error}',
+                    textAlign: TextAlign.center,
                   ),
                 ),
               );
             }
-
-            if (snapshot.connectionState == ConnectionState.waiting) {
+            if (!snapshot.hasData) {
               return const Center(
                 child: CircularProgressIndicator(color: AppColors.primary),
               );
             }
-
-            final docs = snapshot.data?.docs ?? [];
-            if (docs.isEmpty) {
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.inbox_outlined, size: 48, color: AppColors.mutedText),
-                      SizedBox(height: 12),
-                      Text(
-                        'No orders found in the database.',
-                        style: TextStyle(color: AppColors.mutedText, fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-
-            final allOrders = docs.map((doc) {
-              final data = doc.data();
-              return {
-                'id': doc.id,
-                ...data,
-              };
-            }).toList();
-
-            allOrders.sort((a, b) {
-              final tA = a['createdAt'] as Timestamp?;
-              final tB = b['createdAt'] as Timestamp?;
-              if (tA == null || tB == null) return 0;
-              return tB.compareTo(tA);
-            });
-
-            // 1. Pending Tab: Newly placed orders + Shipped orders awaiting delivery confirmation
-            final pendingOrders = allOrders.where((o) {
-              final status = (o['status'] as String? ?? 'Placed').trim();
-              return status == 'Placed' ||
-                  status == 'Pending' ||
-                  status == 'Shipped' ||
-                  status == 'In-transit' ||
-                  status == 'Out for Delivery';
-            }).toList();
-
-            // 2. Active Tab: Orders accepted by seller & in processing
-            final activeOrders = allOrders.where((o) {
-              final status = (o['status'] as String? ?? '').trim();
-              return status == 'Accepted' || status == 'Processing' || status == 'Confirmed';
-            }).toList();
-
-            // 3. Completed Tab: Delivered or finished orders
-            final completedOrders = allOrders.where((o) {
-              final status = (o['status'] as String? ?? '').trim();
-              return status == 'Delivered' ||
-                  status == 'Completed' ||
-                  status == 'Rejected' ||
-                  status == 'Cancelled';
-            }).toList();
+            final orders = snapshot.data!.docs
+                .map((doc) => _AdminOrder.fromDocument(doc))
+                .toList()
+              ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
             return TabBarView(
               children: [
-                _OrderList(orders: pendingOrders, emptyMessage: 'No pending / newly placed orders.'),
-                _OrderList(orders: activeOrders, emptyMessage: 'No active / processing orders.'),
-                _OrderList(orders: completedOrders, emptyMessage: 'No completed or past orders.'),
+                _OrderList(
+                  orders: orders.where((o) => OrderStatus.isNew(o.status)).toList(),
+                  emptyMessage: 'No new orders.',
+                ),
+                _OrderList(
+                  orders: orders
+                      .where((o) => OrderStatus.isInProgress(o.status))
+                      .toList(),
+                  emptyMessage: 'No orders in progress.',
+                ),
+                _OrderList(
+                  orders: orders
+                      .where((o) => OrderStatus.isDelivered(o.status))
+                      .toList(),
+                  emptyMessage: 'No delivered orders yet.',
+                ),
+                _OrderList(
+                  orders: orders
+                      .where((o) => OrderStatus.isRejectedOrCancelled(o.status))
+                      .toList(),
+                  emptyMessage: 'No rejected orders.',
+                ),
               ],
             );
           },
@@ -131,275 +98,384 @@ class OrderManagementView extends StatelessWidget {
   }
 }
 
+class _AdminOrder {
+  final String id;
+  final Map<String, dynamic> data;
+  final DateTime createdAt;
+
+  _AdminOrder(this.id, this.data, this.createdAt);
+
+  factory _AdminOrder.fromDocument(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
+    return _AdminOrder(
+      doc.id,
+      data,
+      (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime(1970),
+    );
+  }
+
+  String get status => data['status'] as String? ?? 'Placed';
+  String get shortId => id.length > 6 ? id.substring(id.length - 6).toUpperCase() : id.toUpperCase();
+  int get subtotal =>
+      (data['subtotal'] as num?)?.round() ??
+      (data['totalAmount'] as num?)?.round() ??
+      (data['total'] as num?)?.round() ??
+      0;
+  int get flatFee => (data['flatFee'] as num?)?.round() ?? 0;
+  int get buyerTotal => (data['buyerPayableAmount'] as num?)?.round() ?? subtotal + flatFee;
+  int get platformFee => (data['platformFee'] as num?)?.round() ?? flatFee;
+  int get creatorNet => (data['creatorNetAmount'] as num?)?.round() ?? subtotal;
+  String get paymentStatus => data['paymentStatus'] as String? ?? 'unknown';
+  String get payoutStatus => data['payoutStatus'] as String? ?? 'pending';
+  String? get refundStatus => data['refundStatus'] as String?;
+  String get creatorId => data['creatorId'] as String? ?? '';
+  String get creatorName => data['creatorName'] as String? ?? 'Creator';
+  String get buyerName => data['buyerName'] as String? ?? 'Buyer';
+  String get buyerPhone => data['buyerPhone'] as String? ?? '';
+  String get buyerEmail => data['buyerEmail'] as String? ?? '';
+  bool get isPaid => paymentStatus == 'paid';
+
+  String get address {
+    final raw = data['shippingAddress'] ?? data['deliveryAddress'];
+    if (raw is Map) {
+      return [
+        raw['recipientName'],
+        raw['addressLine'],
+        raw['city'],
+        raw['state'],
+        raw['postalCode'],
+      ].whereType<String>().where((s) => s.trim().isNotEmpty).join(', ');
+    }
+    return raw is String && raw.trim().isNotEmpty ? raw : 'Address unavailable';
+  }
+
+  List<Map<String, dynamic>> get items => (data['items'] as List<dynamic>? ?? const [])
+      .whereType<Map>()
+      .map((item) => Map<String, dynamic>.from(item))
+      .toList();
+}
+
 class _OrderList extends StatelessWidget {
-  final List<Map<String, dynamic>> orders;
+  final List<_AdminOrder> orders;
   final String emptyMessage;
 
-  const _OrderList({
-    required this.orders,
-    required this.emptyMessage,
-  });
+  const _OrderList({required this.orders, required this.emptyMessage});
 
   @override
   Widget build(BuildContext context) {
     if (orders.isEmpty) {
       return Center(
-        child: Text(
-          emptyMessage,
-          style: const TextStyle(color: AppColors.mutedText, fontSize: 14),
-        ),
+        child: Text(emptyMessage, style: const TextStyle(color: AppColors.mutedText)),
       );
     }
-
     return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       itemCount: orders.length,
-      itemBuilder: (context, index) {
-        final order = orders[index];
-        return _OrderTileCard(order: order);
-      },
+      itemBuilder: (context, index) => _OrderTile(order: orders[index]),
     );
   }
 }
 
-class _OrderTileCard extends StatelessWidget {
-  final Map<String, dynamic> order;
+class _OrderTile extends StatefulWidget {
+  final _AdminOrder order;
 
-  const _OrderTileCard({required this.order});
+  const _OrderTile({required this.order});
 
   @override
-  Widget build(BuildContext context) {
-    final id = (order['id'] as String? ?? 'UNKNOWN').toUpperCase();
-    final displayId = id.length > 6 ? id.substring(id.length - 6) : id;
-    final status = (order['status'] as String? ?? 'Placed').trim();
-    final total = (order['totalAmount'] as num?)?.toDouble() ??
-        (order['total'] as num?)?.toDouble() ??
-        (order['buyerPayableAmount'] as num?)?.toDouble() ??
-        0.0;
-    final sellerName = order['sellerName'] as String? ??
-        order['creatorName'] as String? ??
-        order['artisan'] as String? ??
-        'MadeByHands artisan';
-    final buyerName = order['buyerName'] as String? ?? 'Customer';
-    final buyerPhone = order['buyerPhone'] as String? ?? order['phone'] as String? ?? 'N/A';
-    final buyerEmail = order['buyerEmail'] as String? ?? '';
-    final sellerPhone = order['sellerPhone'] as String? ?? 'N/A';
-    final sellerEmail = order['sellerEmail'] as String? ?? '';
-    final paymentStatus = order['paymentStatus'] as String? ?? 'skipped';
-    final payoutStatus = order['payoutStatus'] as String? ?? 'pending';
-    final consignmentNumber = order['consignmentNumber'] as String? ?? '';
-    final rejectionReason = order['rejectionReason'] as String? ?? '';
-    final createdAt = (order['createdAt'] as Timestamp?)?.toDate();
+  State<_OrderTile> createState() => _OrderTileState();
+}
 
-    // Safely extract address (whether stored as Map or String)
-    String address = 'Address unavailable';
-    final rawAddress = order['shippingAddress'] ?? order['deliveryAddress'];
-    if (rawAddress is Map) {
-      final map = Map<String, dynamic>.from(rawAddress);
-      final parts = [
-        map['addressLine'],
-        map['city'],
-        map['state'],
-        map['postalCode'],
-      ].whereType<String>().where((s) => s.trim().isNotEmpty).toList();
-      address = parts.isNotEmpty
-          ? parts.join(', ')
-          : (map['recipientName'] as String? ?? 'Address provided');
-    } else if (rawAddress is String && rawAddress.trim().isNotEmpty) {
-      address = rawAddress;
+class _OrderTileState extends State<_OrderTile> {
+  bool _working = false;
+
+  _AdminOrder get order => widget.order;
+
+  Future<void> _rejectOrRetryRefund({required bool isRetry}) async {
+    String reason = order.data['rejectionReason'] as String? ?? 'Rejected by admin';
+    if (!isRetry) {
+      final entered = await _askReason();
+      if (entered == null || !mounted) return;
+      reason = entered;
     }
+    setState(() => _working = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final result = await serviceLocator<OrderActionsApi>().rejectOrder(
+        orderId: order.id,
+        reason: reason,
+      );
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            result.warning ??
+                (result.refunded
+                    ? 'Order rejected and buyer refunded.'
+                    : 'Order rejected.'),
+          ),
+        ),
+      );
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
 
-    // Calculate platform fee and creator payout safely
-    final double platformFee = order['platformFee'] != null
-        ? (order['platformFee'] as num).toDouble()
-        : (total > 999 ? (50.0 + (total * 0.05)) : 50.0);
-    final double creatorPayout = order['payoutAmount'] != null
-        ? (order['payoutAmount'] as num).toDouble()
-        : (total - platformFee);
-
-    // Safely parse items list
-    final rawItems = order['items'] as List<dynamic>? ?? [];
-    final items = rawItems.whereType<Map>().map((i) {
-      final map = Map<String, dynamic>.from(i);
-      return {
-        'name': map['name'] as String? ?? 'Item',
-        'quantity': (map['quantity'] as num?)?.toInt() ?? 1,
-        'unitPrice': (map['unitPrice'] as num?)?.toDouble() ?? (map['price'] as num?)?.toDouble() ?? 0.0,
-      };
-    }).toList();
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+  Future<String?> _askReason() {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Reject order #${order.shortId}?'),
+        content: TextField(
+          controller: controller,
+          maxLines: 2,
+          decoration: const InputDecoration(labelText: 'Reason (shown to the buyer)'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(
+              dialogContext,
+              controller.text.trim().isEmpty ? 'Rejected by admin' : controller.text.trim(),
+            ),
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Reject & refund'),
           ),
         ],
       ),
-      child: Theme(
-        data: Theme.of(context).copyWith(
-          dividerColor: Colors.transparent,
-          splashColor: Colors.transparent,
-          highlightColor: Colors.transparent,
-        ),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          shape: const RoundedRectangleBorder(
-            side: BorderSide(color: Colors.transparent, width: 0),
-            borderRadius: BorderRadius.all(Radius.circular(16)),
-          ),
-          collapsedShape: const RoundedRectangleBorder(
-            side: BorderSide(color: Colors.transparent, width: 0),
-            borderRadius: BorderRadius.all(Radius.circular(16)),
-          ),
-          title: Row(
-            children: [
-              Text(
-                'Order #$displayId',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: AppColors.text,
-                ),
-              ),
-              const Spacer(),
-              _StatusBadge(status: status),
-            ],
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 6.0),
-            child: Text(
-              '₹${total.toStringAsFixed(0)} · $sellerName${createdAt != null ? " · ${DateFormat('dd MMM yyyy, hh:mm a').format(createdAt)}" : ""}',
+    );
+  }
+
+  Future<void> _contactSeller() async {
+    String phone = '';
+    String email = '';
+    if (order.creatorId.isNotEmpty) {
+      try {
+        final user = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(order.creatorId)
+            .get();
+        phone = user.data()?['phone'] as String? ?? '';
+        email = user.data()?['email'] as String? ?? '';
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    _showContactSheet(
+      title: 'Contact creator',
+      name: order.creatorName,
+      phone: phone,
+      email: email,
+    );
+  }
+
+  void _showContactSheet({
+    required String title,
+    required String name,
+    required String phone,
+    required String email,
+  }) {
+    final messenger = ScaffoldMessenger.of(context);
+    Future<void> launch(Uri uri) async {
+      if (!await launchUrl(uri)) {
+        messenger.showSnackBar(const SnackBar(content: Text('Could not open that app.')));
+      }
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.background,
+      useSafeArea: true,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
               style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.mutedText,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
               ),
             ),
-          ),
-          children: [
-            const Divider(height: 1, color: AppColors.outline),
+            const SizedBox(height: 8),
+            Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
-            _infoLine('Buyer Name', buyerName),
-            const SizedBox(height: 4),
-            _infoLine('Buyer Phone', buyerPhone),
-            if (buyerEmail.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              _infoLine('Buyer Email', buyerEmail),
-            ],
-            const SizedBox(height: 4),
-            _infoLine('Delivery Address', address),
-            const SizedBox(height: 12),
-            const Divider(height: 1, color: AppColors.outline),
-            const SizedBox(height: 12),
-            _infoLine('Seller Name', sellerName),
-            if (sellerPhone.isNotEmpty && sellerPhone != 'N/A') ...[
-              const SizedBox(height: 4),
-              _infoLine('Seller Phone', sellerPhone),
-            ],
-            if (sellerEmail.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              _infoLine('Seller Email', sellerEmail),
-            ],
-            const SizedBox(height: 12),
-            const Divider(height: 1, color: AppColors.outline),
-            const SizedBox(height: 12),
-            const Text('Order Items:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary)),
-            const SizedBox(height: 6),
-            ...items.map((item) {
-              final name = item['name'] as String? ?? 'Item';
-              final quantity = (item['quantity'] as num?)?.toInt() ?? 1;
-              final unitPrice = (item['unitPrice'] as num?)?.toDouble() ?? 0.0;
-              final itemTotal = quantity * unitPrice;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '• $name (x$quantity)',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.text),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.phone_outlined, color: AppColors.primary),
+              title: Text(phone.isEmpty ? 'Phone not available' : phone),
+              trailing: phone.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Copy phone number',
+                      icon: const Icon(Icons.copy_rounded, size: 20),
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: phone));
+                        messenger.showSnackBar(const SnackBar(content: Text('Phone number copied.')));
+                      },
+                    ),
+              onTap: phone.isEmpty ? null : () => launch(Uri(scheme: 'tel', path: phone)),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.email_outlined, color: AppColors.primary),
+              title: Text(email.isEmpty ? 'Email not available' : email),
+              trailing: email.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Copy email',
+                      icon: const Icon(Icons.copy_rounded, size: 20),
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: email));
+                        messenger.showSnackBar(const SnackBar(content: Text('Email copied.')));
+                      },
+                    ),
+              onTap: email.isEmpty
+                  ? null
+                  : () => launch(
+                      Uri(
+                        scheme: 'mailto',
+                        path: email,
+                        query: 'subject=MadeByHands order ${order.shortId}',
                       ),
                     ),
-                    Text(
-                      '₹${itemTotal.toStringAsFixed(0)}',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.text),
-                    ),
-                  ],
-                ),
-              );
-            }),
-            const SizedBox(height: 12),
-            const Divider(height: 1, color: AppColors.outline),
-            const SizedBox(height: 12),
-            _infoLine('Order Total', '₹${total.toStringAsFixed(0)}'),
-            const SizedBox(height: 4),
-            _infoLine('Platform Fee', '₹${platformFee.toStringAsFixed(0)}'),
-            const SizedBox(height: 4),
-            _infoLine('Creator Payout', '₹${creatorPayout.toStringAsFixed(0)}'),
-            const SizedBox(height: 4),
-            _infoLine('Payment Status', paymentStatus.toUpperCase()),
-            const SizedBox(height: 4),
-            _infoLine('Payout Status', payoutStatus.toUpperCase()),
-            if (consignmentNumber.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              _infoLine('Tracking #', consignmentNumber),
-            ],
-            if (rejectionReason.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              _infoLine('Rejection Reason', rejectionReason, isError: true),
-            ],
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showContactModal(
-                      context,
-                      title: 'Contact Buyer',
-                      name: buyerName,
-                      phone: buyerPhone,
-                      email: buyerEmail,
-                      role: 'Buyer',
-                    ),
-                    icon: const Icon(Icons.person, size: 18),
-                    label: const Text('Contact Buyer'),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.outline),
-                      foregroundColor: AppColors.text,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showContactModal(
-                      context,
-                      title: 'Contact Seller',
-                      name: sellerName,
-                      phone: sellerPhone,
-                      email: sellerEmail,
-                      role: 'Creator / Seller',
-                    ),
-                    icon: const Icon(Icons.storefront, size: 18),
-                    label: const Text('Contact Seller'),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.outline),
-                      foregroundColor: AppColors.text,
-                    ),
-                  ),
-                ),
-              ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final refund = order.refundStatus;
+    final canReject = order.isPaid && OrderStatus.canReject(order.status);
+    final needsRefundRetry =
+        order.isPaid &&
+        OrderStatus.isRejectedOrCancelled(order.status) &&
+        (refund == 'failed' || refund == 'processing');
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        shape: const Border(),
+        collapsedShape: const Border(),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Order #${order.shortId}',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+            _StatusBadge(status: order.status),
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            '₹${order.buyerTotal} · ${order.creatorName} · ${DateFormat('dd MMM yyyy, hh:mm a').format(order.createdAt)}',
+            style: const TextStyle(fontSize: 13, color: AppColors.mutedText),
+          ),
+        ),
+        children: [
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          _infoLine('Buyer', order.buyerName),
+          if (order.buyerPhone.isNotEmpty) _infoLine('Buyer phone', order.buyerPhone),
+          if (order.buyerEmail.isNotEmpty) _infoLine('Buyer email', order.buyerEmail),
+          _infoLine('Deliver to', order.address),
+          _infoLine('Creator', order.creatorName),
+          const SizedBox(height: 12),
+          const Text(
+            'Items',
+            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+          ),
+          const SizedBox(height: 6),
+          for (final item in order.items)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      '• ${item['name'] ?? 'Item'} × ${(item['quantity'] as num?)?.round() ?? 1}',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                  Text(
+                    '₹${((item['unitPrice'] as num?)?.round() ?? 0) * ((item['quantity'] as num?)?.round() ?? 1)}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+          const Divider(height: 20),
+          _infoLine('Items subtotal', '₹${order.subtotal}'),
+          _infoLine('Buyer paid', '₹${order.buyerTotal}'),
+          _infoLine('Platform fee', '₹${order.platformFee}'),
+          _infoLine('Creator payout', '₹${order.creatorNet}'),
+          _infoLine('Payment', order.paymentStatus.toUpperCase()),
+          _infoLine('Payout', order.payoutStatus.toUpperCase()),
+          if (refund != null) _infoLine('Refund', refund.toUpperCase(), isError: refund == 'failed'),
+          if ((order.data['carrierName'] as String?)?.isNotEmpty == true)
+            _infoLine('Carrier', order.data['carrierName'] as String),
+          if ((order.data['consignmentNumber'] as String?)?.isNotEmpty == true)
+            _infoLine('Consignment #', order.data['consignmentNumber'] as String),
+          if ((order.data['rejectionReason'] as String?)?.isNotEmpty == true)
+            _infoLine('Rejection reason', order.data['rejectionReason'] as String, isError: true),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _showContactSheet(
+                  title: 'Contact buyer',
+                  name: order.buyerName,
+                  phone: order.buyerPhone,
+                  email: order.buyerEmail,
+                ),
+                icon: const Icon(Icons.person, size: 18),
+                label: const Text('Buyer'),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 40)),
+              ),
+              OutlinedButton.icon(
+                onPressed: _contactSeller,
+                icon: const Icon(Icons.storefront, size: 18),
+                label: const Text('Creator'),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 40)),
+              ),
+              if (canReject)
+                FilledButton.icon(
+                  onPressed: _working ? null : () => _rejectOrRetryRefund(isRetry: false),
+                  icon: const Icon(Icons.cancel_outlined, size: 18),
+                  label: const Text('Reject & refund'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    minimumSize: const Size(0, 40),
+                  ),
+                ),
+              if (needsRefundRetry)
+                FilledButton.icon(
+                  onPressed: _working ? null : () => _rejectOrRetryRefund(isRetry: true),
+                  icon: const Icon(Icons.replay, size: 18),
+                  label: const Text('Retry refund'),
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -411,13 +487,10 @@ class _OrderTileCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 120,
+            width: 115,
             child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.mutedText,
-              ),
+              label,
+              style: const TextStyle(fontSize: 13, color: AppColors.mutedText),
             ),
           ),
           Expanded(
@@ -434,142 +507,6 @@ class _OrderTileCard extends StatelessWidget {
       ),
     );
   }
-
-  void _showContactModal(
-    BuildContext context, {
-    required String title,
-    required String name,
-    required String phone,
-    required String email,
-    required String role,
-  }) {
-    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.background,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (modalContext) => Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(modalContext),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.outline),
-              ),
-              child: Column(
-                children: [
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const CircleAvatar(
-                      backgroundColor: AppColors.primary,
-                      child: Icon(Icons.person, color: Colors.white),
-                    ),
-                    title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    subtitle: Text(role, style: const TextStyle(color: AppColors.mutedText, fontSize: 12)),
-                  ),
-                  const Divider(),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.phone_outlined, color: AppColors.primary),
-                    title: Text(phone.isNotEmpty ? phone : 'Phone unavailable'),
-                    subtitle: const Text('Phone Number'),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.copy_rounded, size: 20),
-                      tooltip: 'Copy Phone Number',
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: phone));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Copied $phone to clipboard')),
-                        );
-                      },
-                    ),
-                  ),
-                  if (email.isNotEmpty)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.email_outlined, color: AppColors.primary),
-                      title: Text(email),
-                      subtitle: const Text('Email Address'),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.copy_rounded, size: 20),
-                        tooltip: 'Copy Email',
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: email));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Copied $email to clipboard')),
-                          );
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: phone));
-                      Navigator.pop(modalContext);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Copied $name\'s phone number ($phone) to clipboard.')),
-                      );
-                    },
-                    icon: const Icon(Icons.phone_in_talk),
-                    label: Text(cleanPhone.isNotEmpty ? 'Call $cleanPhone' : 'Call Number'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: '$name: $phone ($email)'));
-                      Navigator.pop(modalContext);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Copied contact info for $name')),
-                      );
-                    },
-                    icon: const Icon(Icons.copy),
-                    label: const Text('Copy Info'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _StatusBadge extends StatelessWidget {
@@ -578,33 +515,15 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color color;
-    switch (status) {
-      case 'Placed':
-      case 'Pending':
-        color = Colors.blue;
-        break;
-      case 'Accepted':
-      case 'Processing':
-        color = Colors.orange;
-        break;
-      case 'Shipped':
-      case 'In-transit':
-      case 'Out for Delivery':
-        color = Colors.purple;
-        break;
-      case 'Delivered':
-      case 'Completed':
-        color = Colors.green;
-        break;
-      case 'Rejected':
-      case 'Cancelled':
-        color = Colors.red;
-        break;
-      default:
-        color = Colors.grey;
-    }
-
+    final normalized = OrderStatus.normalize(status);
+    final color = switch (normalized) {
+      OrderStatus.placed => Colors.blue,
+      OrderStatus.confirmed || OrderStatus.processing => Colors.orange,
+      OrderStatus.inTransit || OrderStatus.shipped || OrderStatus.outForDelivery => Colors.purple,
+      OrderStatus.delivered => Colors.green,
+      OrderStatus.rejected || OrderStatus.cancelled => Colors.red,
+      _ => Colors.grey,
+    };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -613,7 +532,7 @@ class _StatusBadge extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
-        status.toUpperCase(),
+        OrderStatus.shortLabel(status).toUpperCase(),
         style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
       ),
     );

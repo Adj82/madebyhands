@@ -1,0 +1,72 @@
+rules_version = '2';
+
+// Firebase Storage rules for MadeByHands. Deploy with:
+//   firebase deploy --only storage
+//
+// Uploads (see creator_remote_data_source.dart):
+//   creator_profiles/{uid}/...               profile photo and portfolio (public)
+//   creator_profiles/{uid}/verification/...  identity documents (private)
+//   products/{uid}/...                       product and customization photos (public)
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return signedIn() && (
+        (request.auth.token.email_verified == true &&
+          request.auth.token.email in [
+            'adhirajjain364@gmail.com',
+            'mayankjaisw8673@gmail.com',
+            'suhanimahajan2810@gmail.com',
+            'majumdarpayal50@gmail.com',
+            'reshob.rc12345@gmail.com'
+          ]) ||
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('role', '')
+          in ['admin', 'manager', 'super_admin']
+      );
+    }
+
+    // Images only, at most 10 MB.
+    function isImageUpload() {
+      return request.resource != null &&
+        request.resource.size < 10 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+    }
+
+    // Verification documents: only the creator and admins.
+    match /creator_profiles/{uid}/verification/{file=**} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create, update: if isOwner(uid) && isImageUpload();
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // Public creator media. Rules from overlapping matches are OR-ed, so the
+    // verification folder is excluded here explicitly.
+    match /creator_profiles/{uid}/{file=**} {
+      allow get: if !resource.name.matches('creator_profiles/[^/]+/verification/.*') ||
+        isOwner(uid) || isAdmin();
+      allow list: if isOwner(uid) || isAdmin();
+      allow create, update: if isOwner(uid) && isImageUpload();
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    match /products/{uid}/{file=**} {
+      allow get: if true;
+      allow list: if isOwner(uid) || isAdmin();
+      allow create, update: if isOwner(uid) && isImageUpload();
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // Everything else is closed.
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

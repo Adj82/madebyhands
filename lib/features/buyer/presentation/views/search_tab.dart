@@ -1,5 +1,7 @@
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:madebyhands/core/constants/product_categories.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/public_creator.dart';
@@ -14,11 +16,16 @@ class SearchTab extends StatefulWidget {
   final ValueChanged<Product> onProductTap;
   final ValueChanged<PublicCreator>? onCreatorTap;
 
+  /// Set by other tabs (e.g. a category tile on Home) to open the shop
+  /// filtered to one category. The tab clears it once applied.
+  final ValueNotifier<String?>? categoryRequest;
+
   const SearchTab({
     super.key,
     required this.userId,
     required this.onProductTap,
     this.onCreatorTap,
+    this.categoryRequest,
   });
 
   @override
@@ -28,19 +35,68 @@ class SearchTab extends StatefulWidget {
 class _SearchTabState extends State<SearchTab> {
   String _query = '';
   final Set<String> _selectedCategories = {};
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.categoryRequest?.addListener(_applyCategoryRequest);
+    _applyCategoryRequest();
+  }
+
+  @override
+  void didUpdateWidget(SearchTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.categoryRequest != widget.categoryRequest) {
+      oldWidget.categoryRequest?.removeListener(_applyCategoryRequest);
+      widget.categoryRequest?.addListener(_applyCategoryRequest);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.categoryRequest?.removeListener(_applyCategoryRequest);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _applyCategoryRequest() {
+    final request = widget.categoryRequest;
+    final category = request?.value;
+    if (request == null || category == null) return;
+    request.value = null;
+    void apply() {
+      _searchController.clear();
+      _query = '';
+      _selectedCategories
+        ..clear()
+        ..add(category);
+    }
+
+    // The notifier may fire during the first build; defer setState then.
+    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(apply);
+      });
+    } else if (mounted) {
+      setState(apply);
+    } else {
+      apply();
+    }
+  }
 
   bool _matchesCategory(Product product) {
     if (_selectedCategories.isEmpty) return true;
-    final productCategory = _normalizeCategory(product.category);
-    return _selectedCategories.any((category) {
-      final acceptedNames =
-          _legacyCategoryAliases[category] ?? const <String>[];
-      return productCategory == _normalizeCategory(category) ||
-          acceptedNames.contains(productCategory);
-    });
+    return _selectedCategories.any(
+      (category) => productMatchesCategory(product.allCategories, category),
+    );
   }
 
   Future<void> _openCategoryFilter() async {
+    final state = context.read<BuyerBloc>().state;
+    final categories = [
+      ...(state.categories.isEmpty ? kProductCategories : state.categories),
+    ];
     final draftSelection = Set<String>.from(_selectedCategories);
     final selection = await showModalBottomSheet<Set<String>>(
       context: context,
@@ -92,9 +148,9 @@ class _SearchTabState extends State<SearchTab> {
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: buyerProductCategories.length,
+                  itemCount: categories.length,
                   itemBuilder: (context, index) {
-                    final category = buyerProductCategories[index];
+                    final category = categories[index];
                     return CheckboxListTile(
                       value: draftSelection.contains(category),
                       title: Text(
@@ -167,6 +223,10 @@ class _SearchTabState extends State<SearchTab> {
   Widget build(BuildContext context) {
     return BuyerBackground(
       child: BlocBuilder<BuyerBloc, BuyerState>(
+        buildWhen: (previous, current) =>
+            previous.products != current.products ||
+            previous.creators != current.creators ||
+            previous.favoriteIds != current.favoriteIds,
         builder: (context, state) {
           final products = state.products.where((product) {
             final normalizedQuery = _query.trim().toLowerCase();
@@ -175,7 +235,7 @@ class _SearchTabState extends State<SearchTab> {
                 normalizedQuery.isEmpty ||
                 product.name.toLowerCase().contains(normalizedQuery) ||
                 product.artisan.toLowerCase().contains(normalizedQuery) ||
-                product.category.toLowerCase().contains(normalizedQuery);
+                product.categoryLabel.toLowerCase().contains(normalizedQuery);
             return matchesCategory && matchesQuery;
           }).toList();
           final normalizedQuery = _query.trim().toLowerCase();
@@ -198,7 +258,6 @@ class _SearchTabState extends State<SearchTab> {
 
           return CustomScrollView(
             key: const PageStorageKey('buyer-search'),
-            cacheExtent: 2400,
             slivers: [
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
@@ -219,6 +278,7 @@ class _SearchTabState extends State<SearchTab> {
                     ),
                     const SizedBox(height: 18),
                     TextField(
+                      controller: _searchController,
                       onChanged: (value) => setState(() => _query = value),
                       decoration: InputDecoration(
                         prefixIcon: const Icon(
@@ -285,6 +345,7 @@ class _SearchTabState extends State<SearchTab> {
                               backgroundColor: const Color(0xFFF2DEDD),
                               label: Text(
                                 category,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: Color(0xFF8B261D),
                                   fontWeight: FontWeight.bold,
@@ -384,11 +445,17 @@ class _SearchTabState extends State<SearchTab> {
                                   ? const Icon(Icons.storefront)
                                   : null,
                             ),
-                            title: Text(creator.displayName),
+                            title: Text(
+                              creator.displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             subtitle: Text(
                               [creator.category, creator.location]
                                   .where((value) => value.trim().isNotEmpty)
                                   .join(' · '),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: widget.onCreatorTap == null
@@ -424,28 +491,28 @@ class _SearchTabState extends State<SearchTab> {
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
                   sliver: SliverGrid(
                     gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 240,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                           childAspectRatio: 0.67,
                         ),
-                    delegate: SliverChildListDelegate(
-                      products
-                          .map(
-                            (product) => ProductCard(
+                    delegate: SliverChildBuilderDelegate(
+                      childCount: products.length,
+                      (context, index) {
+                        final product = products[index];
+                        return ProductCard(
+                          product: product,
+                          isSaved: state.favoriteIds.contains(product.id),
+                          onTap: () => widget.onProductTap(product),
+                          onSave: () => context.read<BuyerBloc>().add(
+                            BuyerToggleFavorite(
+                              userId: widget.userId,
                               product: product,
-                              isSaved: state.favoriteIds.contains(product.id),
-                              onTap: () => widget.onProductTap(product),
-                              onSave: () => context.read<BuyerBloc>().add(
-                                BuyerToggleFavorite(
-                                  userId: widget.userId,
-                                  product: product,
-                                ),
-                              ),
                             ),
-                          )
-                          .toList(growable: false),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -456,82 +523,3 @@ class _SearchTabState extends State<SearchTab> {
     );
   }
 }
-
-const buyerProductCategories = <String>[
-  'Paintings & Fine Art',
-  'Drawings & Illustrations',
-  'Digital Art & Design',
-  'Pottery, Ceramics & Clay',
-  'Sculptures & Figurines',
-  'Textile & Fiber Art',
-  'Fashion & Wearables',
-  'Jewellery & Accessories',
-  'Home Décor & Living',
-  'Wood, Bamboo & Natural Crafts',
-  'Paper, Books & Stationery',
-  'Traditional & Folk Art',
-  'Handicrafts & Artisan Goods',
-  'Toys, Dolls & Collectibles',
-  'Resin & Mixed-Material Art',
-  'Photography & Prints',
-  'Gifts & Personalized Creations',
-  'Other Creative Works',
-];
-
-String _normalizeCategory(String value) => value
-    .trim()
-    .toLowerCase()
-    .replaceAll('é', 'e')
-    .replaceAll('&', 'and')
-    .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
-    .trim();
-
-final Map<String, List<String>> _legacyCategoryAliases =
-    {
-      'Paintings & Fine Art': ['painting', 'paintings', 'fine art'],
-      'Drawings & Illustrations': [
-        'drawing',
-        'drawings',
-        'illustration',
-        'illustrations',
-      ],
-      'Digital Art & Design': ['digital art', 'digital design'],
-      'Pottery, Ceramics & Clay': ['pottery', 'ceramics', 'ceramic', 'clay'],
-      'Sculptures & Figurines': [
-        'sculpture',
-        'sculptures',
-        'figurine',
-        'figurines',
-      ],
-      'Textile & Fiber Art': ['textile', 'textiles', 'fiber art', 'fibre art'],
-      'Fashion & Wearables': ['fashion', 'wearables', 'clothing'],
-      'Jewellery & Accessories': ['jewellery', 'jewelry', 'accessories'],
-      'Home Décor & Living': ['home decor', 'decor', 'home and living'],
-      'Wood, Bamboo & Natural Crafts': [
-        'wood',
-        'wooden',
-        'bamboo',
-        'natural crafts',
-      ],
-      'Paper, Books & Stationery': ['paper', 'books', 'stationery'],
-      'Traditional & Folk Art': ['traditional art', 'folk art'],
-      'Handicrafts & Artisan Goods': [
-        'handicrafts',
-        'artisan goods',
-        'handmade',
-      ],
-      'Toys, Dolls & Collectibles': ['toys', 'toy', 'dolls', 'collectibles'],
-      'Resin & Mixed-Material Art': [
-        'resin',
-        'mixed material art',
-        'mixed media',
-      ],
-      'Photography & Prints': ['photography', 'prints'],
-      'Gifts & Personalized Creations': ['gifts', 'gift', 'personalized'],
-      'Other Creative Works': ['other', 'wellness'],
-    }.map(
-      (category, aliases) => MapEntry(
-        category,
-        aliases.map(_normalizeCategory).toList(growable: false),
-      ),
-    );

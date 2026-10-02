@@ -12,9 +12,15 @@ class ApiConfigPage extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         children: [
           const _ConfigHeader(title: 'Razorpay Payment Gateway'),
-          const _ConfigDetail(label: 'Key ID (Public Client Key)', value: 'rzp_test_TiG6pSEctm7B3a'),
+          const _ConfigDetail(
+            label: 'Key ID (Public Client Key)',
+            value: 'Returned per-order by /api/create-order (not stored in the app)',
+          ),
           const _ConfigDetail(label: 'Key Secret', value: '•••••••• (Secured on Server / Vercel Environment Variables)'),
-          const _ConfigDetail(label: 'Environment', value: 'Active Test / Live Sandbox'),
+          const _ConfigDetail(
+            label: 'Environment',
+            value: 'Set by the RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET values on the server',
+          ),
           const SizedBox(height: 30),
           const _ConfigHeader(title: 'Firebase Project Settings'),
           const _ConfigDetail(label: 'Project ID', value: 'madebyhands-77f87'),

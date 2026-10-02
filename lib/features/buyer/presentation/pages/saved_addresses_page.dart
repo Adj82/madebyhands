@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:madebyhands/core/error/failures.dart';
 import 'package:flutter/services.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
@@ -16,7 +17,7 @@ Future<SavedAddress?> showSavedAddressForm(
   builder: (_) => _AddressForm(address: existing),
 );
 
-class SavedAddressesPage extends StatelessWidget {
+class SavedAddressesPage extends StatefulWidget {
   final String userId;
   final BuyerRepository repository;
 
@@ -25,6 +26,17 @@ class SavedAddressesPage extends StatelessWidget {
     required this.userId,
     required this.repository,
   });
+
+  @override
+  State<SavedAddressesPage> createState() => _SavedAddressesPageState();
+}
+
+class _SavedAddressesPageState extends State<SavedAddressesPage> {
+  late final Stream<List<SavedAddress>> _addresses = widget.repository
+      .watchAddresses(widget.userId);
+
+  String get userId => widget.userId;
+  BuyerRepository get repository => widget.repository;
 
   @override
   Widget build(BuildContext context) {
@@ -44,11 +56,13 @@ class SavedAddressesPage extends StatelessWidget {
           iconTheme: const IconThemeData(color: Color(0xFF8B261D)),
         ),
         body: StreamBuilder<List<SavedAddress>>(
-          stream: repository.watchAddresses(userId),
+          stream: _addresses,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return Center(
-                child: Text('Could not load addresses: ${snapshot.error}'),
+                child: Text(
+                  'Could not load addresses: ${friendlyErrorMessage(snapshot.error!)}',
+                ),
               );
             }
             if (!snapshot.hasData) {
@@ -114,13 +128,17 @@ class SavedAddressesPage extends StatelessWidget {
                             Expanded(
                               child: Row(
                                 children: [
-                                  Text(
+                                  Flexible(
+                                    child: Text(
                                     address.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       fontSize: 17,
                                       fontWeight: FontWeight.w800,
                                       color: Color(0xFF8B261D),
                                     ),
+                                  ),
                                   ),
                                   if (address.isDefault) ...[
                                     const SizedBox(width: 8),
@@ -156,8 +174,8 @@ class SavedAddressesPage extends StatelessWidget {
                                 } else if (value == 'delete') {
                                   await _confirmDelete(context, address);
                                 } else if (value == 'default') {
-                                  await repository.saveAddress(
-                                    userId,
+                                  await _saveAddress(
+                                    context,
                                     address.copyWith(isDefault: true),
                                   );
                                 }
@@ -209,6 +227,7 @@ class SavedAddressesPage extends StatelessWidget {
           },
         ),
         floatingActionButton: FloatingActionButton.extended(
+          heroTag: null,
           backgroundColor: const Color(0xFF8B261D),
           foregroundColor: Colors.white,
           onPressed: () async {
@@ -255,7 +274,15 @@ class SavedAddressesPage extends StatelessWidget {
           ),
         ) ??
         false;
-    if (confirmed) await repository.deleteAddress(userId, address.id);
+    if (!confirmed) return;
+    try {
+      await repository.deleteAddress(userId, address.id);
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not delete address: ${friendlyErrorMessage(error)}')),
+      );
+    }
   }
 
   Future<void> _saveAddress(BuildContext context, SavedAddress address) async {
@@ -265,7 +292,9 @@ class SavedAddressesPage extends StatelessWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Could not save address: $error')));
+      ).showSnackBar(
+        SnackBar(content: Text('Could not save address: ${friendlyErrorMessage(error)}')),
+      );
     }
   }
 }

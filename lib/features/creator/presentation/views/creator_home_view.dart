@@ -1,14 +1,21 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/buyer/domain/entities/public_creator.dart';
+import 'package:madebyhands/features/buyer/presentation/pages/public_creator_storefront_page.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_notification.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
+import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 import 'package:madebyhands/features/creator/presentation/pages/creator_notifications_page.dart';
 import 'package:madebyhands/features/creator/presentation/pages/creator_verification_page.dart';
+import 'package:madebyhands/features/orders/domain/order_status.dart';
+import 'package:madebyhands/init_dependencies.dart';
 
 class CreatorHomeView extends StatefulWidget {
   final CreatorProfile profile;
+
   const CreatorHomeView({super.key, required this.profile});
 
   @override
@@ -16,98 +23,72 @@ class CreatorHomeView extends StatefulWidget {
 }
 
 class _CreatorHomeViewState extends State<CreatorHomeView> {
-  bool _isRefreshing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    context
-        .read<CreatorBloc>()
-        .add(CreatorFetchNotifications(widget.profile.uid));
-  }
-
-  Future<void> _handleRefresh() async {
-    if (_isRefreshing) return;
-    setState(() => _isRefreshing = true);
-
-    try {
-      final bloc = context.read<CreatorBloc>();
-      bloc.add(CreatorCheckProfileExists(widget.profile.uid));
-      bloc.add(CreatorFetchOrders(widget.profile.uid));
-      bloc.add(CreatorFetchCreatorProducts(widget.profile.uid));
-      bloc.add(CreatorFetchNotifications(widget.profile.uid));
-      await Future.delayed(const Duration(milliseconds: 600));
-    } finally {
-      if (mounted) {
-        setState(() => _isRefreshing = false);
-      }
-    }
-  }
+  final CreatorRepository _repository = serviceLocator<CreatorRepository>();
+  late final Stream<List<CreatorNotification>> _notifications = _repository
+      .watchNotifications(widget.profile.uid);
+  late final Stream<List<CreatorOrder>> _orders = _repository.watchCreatorOrders(
+    widget.profile.uid,
+  );
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: _handleRefresh,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return BlocBuilder<CreatorBloc, CreatorState>(
+      builder: (context, state) {
+        final profile = state.profile ?? widget.profile;
+        return ListView(
+          padding: const EdgeInsets.all(20),
           children: [
-            _buildNotificationSection(),
+            _NotificationSummary(
+              notifications: _notifications,
+              creatorUid: profile.uid,
+            ),
             const SizedBox(height: 20),
-            _buildStorefrontProminent(context),
-            const SizedBox(height: 30),
-            _buildVerificationStatus(context),
-            const SizedBox(height: 30),
+            _StorefrontCard(profile: profile),
+            const SizedBox(height: 24),
+            _VerificationStatusCard(profile: profile),
+            const SizedBox(height: 28),
             const Text(
-              'Recent Performance',
+              'Your performance',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 15),
-            _buildPerformanceSummary(),
+            _PerformanceSummary(orders: _orders),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
+}
 
-  Widget _buildNotificationSection() {
-    return BlocBuilder<CreatorBloc, CreatorState>(
-      buildWhen: (previous, current) => current is CreatorNotificationsLoaded,
-      builder: (context, state) {
-        String title = "You're all caught up!";
-        String message = 'Check back later for new orders and updates.';
-        int unreadCount = 0;
+class _NotificationSummary extends StatelessWidget {
+  final Stream<List<CreatorNotification>> notifications;
+  final String creatorUid;
 
-        if (state is CreatorNotificationsLoaded) {
-          final unreadNotifications =
-              state.notifications.where((n) => !n.isRead).toList();
-          unreadCount = unreadNotifications.length;
+  const _NotificationSummary({required this.notifications, required this.creatorUid});
 
-          if (unreadCount > 0) {
-            title = unreadCount == 1
-                ? '1 new notification'
-                : '$unreadCount new notifications';
-            final latest = unreadNotifications.first;
-            message = latest.title.isNotEmpty
-                ? '${latest.title}: ${latest.message}'
-                : latest.message;
-          }
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<CreatorNotification>>(
+      stream: notifications,
+      builder: (context, snapshot) {
+        final unread = (snapshot.data ?? const <CreatorNotification>[])
+            .where((n) => !n.isRead)
+            .toList();
+        var title = "You're all caught up!";
+        var message = 'New orders and updates will show up here.';
+        if (unread.isNotEmpty) {
+          title = unread.length == 1 ? '1 new notification' : '${unread.length} new notifications';
+          final latest = unread.first;
+          message = latest.title.isNotEmpty ? '${latest.title}: ${latest.message}' : latest.message;
         }
 
         return InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CreatorNotificationsPage(widget.profile),
-              ),
-            );
-          },
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => CreatorNotificationsPage(creatorUid: creatorUid)),
+          ),
           borderRadius: BorderRadius.circular(15),
-          child: Container(
-            width: double.infinity,
+          child: Ink(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: AppColors.accent.withValues(alpha: 0.1),
@@ -117,13 +98,9 @@ class _CreatorHomeViewState extends State<CreatorHomeView> {
             child: Row(
               children: [
                 Badge(
-                  isLabelVisible: unreadCount > 0,
-                  label: Text('$unreadCount'),
-                  backgroundColor: Colors.red,
-                  child: const Icon(
-                    Icons.notifications_active_outlined,
-                    color: AppColors.accent,
-                  ),
+                  isLabelVisible: unread.isNotEmpty,
+                  label: Text('${unread.length}'),
+                  child: const Icon(Icons.notifications_active_outlined, color: AppColors.accent),
                 ),
                 const SizedBox(width: 15),
                 Expanded(
@@ -132,30 +109,20 @@ class _CreatorHomeViewState extends State<CreatorHomeView> {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                       Text(
                         message,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.mutedText,
-                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
                       ),
                     ],
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right,
-                  color: AppColors.mutedText,
-                  size: 20,
-                ),
+                const Icon(Icons.chevron_right, color: AppColors.mutedText, size: 20),
               ],
             ),
           ),
@@ -163,11 +130,19 @@ class _CreatorHomeViewState extends State<CreatorHomeView> {
       },
     );
   }
+}
 
-  Widget _buildStorefrontProminent(BuildContext context) {
+class _StorefrontCard extends StatelessWidget {
+  final CreatorProfile profile;
+
+  const _StorefrontCard({required this.profile});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      height: 180,
+      padding: const EdgeInsets.all(22),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: AppColors.primary,
         borderRadius: BorderRadius.circular(25),
@@ -179,96 +154,129 @@ class _CreatorHomeViewState extends State<CreatorHomeView> {
           ),
         ],
       ),
-      child: Stack(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Positioned(
-            right: -20,
-            bottom: -20,
-            child: Icon(
-              Icons.storefront,
-              size: 150,
-              color: Colors.white.withValues(alpha: 0.1),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(25.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 30,
+                backgroundColor: AppColors.surface,
+                backgroundImage: profile.profileImage.isNotEmpty
+                    ? NetworkImage(profile.profileImage)
+                    : null,
+                child: profile.profileImage.isEmpty
+                    ? const Icon(Icons.person, size: 30, color: AppColors.primary)
+                    : null,
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundColor: AppColors.surface,
-                      backgroundImage: widget.profile.profileImage.isNotEmpty
-                          ? NetworkImage(widget.profile.profileImage)
-                          : null,
-                      child: widget.profile.profileImage.isEmpty
-                          ? const Icon(Icons.person,
-                              size: 30, color: AppColors.primary)
-                          : null,
+                    Text(
+                      profile.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    const SizedBox(width: 15),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.profile.name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            widget.profile.category,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.8),
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
+                    Text(
+                      profile.category,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        fontSize: 14,
                       ),
                     ),
                   ],
                 ),
-                const Spacer(),
-                OutlinedButton(
-                  onPressed: () {},
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PublicCreatorStorefrontPage.preview(
+                  creator: PublicCreator(
+                    uid: profile.uid,
+                    name: profile.name,
+                    businessName: profile.businessName,
+                    profileImage: profile.profileImage,
+                    bio: profile.bio,
+                    category: profile.category,
+                    location: profile.location,
+                    socialLinks: profile.socialLinks,
+                    portfolio: profile.portfolio,
+                    story: profile.story,
+                    isVerified: profile.isVerified,
                   ),
-                  child: const Text('View Storefront'),
                 ),
-              ],
+              ),
+            ),
+            icon: const Icon(Icons.storefront_outlined, size: 18),
+            label: const Text('View storefront'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildVerificationStatus(BuildContext context) {
-    final status = widget.profile.verificationStatus;
-    final isVerified = status == 'Verified';
-    final isInProcess = status == 'In-Process';
+class _VerificationStatusCard extends StatelessWidget {
+  final CreatorProfile profile;
+
+  const _VerificationStatusCard({required this.profile});
+
+  @override
+  Widget build(BuildContext context) {
+    final (IconData icon, Color color, String title, String subtitle) = switch (profile) {
+      final p when p.isVerified => (
+        Icons.verified,
+        Colors.green,
+        'Verified creator',
+        'You can list products. Tap to view submitted documents.',
+      ),
+      final p when p.isUnderReview => (
+        Icons.hourglass_top,
+        Colors.orange,
+        'Verification under review',
+        'An admin is reviewing your documents. Tap to update.',
+      ),
+      final p when p.isVerificationRejected => (
+        Icons.error_outline,
+        Colors.red,
+        'Verification not approved',
+        p.verificationNote.isEmpty
+            ? 'Tap to update your documents and resubmit.'
+            : '${p.verificationNote}\nTap to resubmit.',
+      ),
+      _ => (
+        Icons.error_outline,
+        Colors.red,
+        'Get verified to start selling',
+        'Tap to submit your documents.',
+      ),
+    };
 
     return InkWell(
-      onTap: () {
-        if (!isVerified) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => CreatorVerificationPage(profile: widget.profile)),
-          );
-        }
-      },
-      child: Container(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => CreatorVerificationPage(profile: profile)),
+      ),
+      borderRadius: BorderRadius.circular(15),
+      child: Ink(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.surface,
@@ -277,88 +285,76 @@ class _CreatorHomeViewState extends State<CreatorHomeView> {
         ),
         child: Row(
           children: [
-            Icon(
-              isVerified
-                  ? Icons.verified
-                  : (isInProcess ? Icons.hourglass_top : Icons.error_outline),
-              color: isVerified
-                  ? Colors.green
-                  : (isInProcess ? Colors.orange : Colors.red),
-            ),
+            Icon(icon, color: color),
             const SizedBox(width: 15),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
                   Text(
-                    isVerified ? 'Officially Verified' : 'Verification Status',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    isVerified
-                        ? 'Your products are live for buyers.'
-                        : (isInProcess
-                            ? 'Under review by admin.'
-                            : 'Required to start selling.'),
+                    subtitle,
                     style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
                   ),
                 ],
               ),
             ),
-            if (!isVerified && !isInProcess)
-              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildPerformanceSummary() {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection('orders')
-          .where('creatorId', isEqualTo: widget.profile.uid)
-          .snapshots(),
+class _PerformanceSummary extends StatelessWidget {
+  final Stream<List<CreatorOrder>> orders;
+
+  const _PerformanceSummary({required this.orders});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<CreatorOrder>>(
+      stream: orders,
       builder: (context, snapshot) {
-        double totalSales = 0.0;
-        int activeOrdersCount = 0;
+        final list = snapshot.data ?? const <CreatorOrder>[];
+        final pending = list.where((o) => OrderStatus.isNew(o.status)).length;
+        final inProgress = list.where((o) => OrderStatus.isInProgress(o.status)).length;
+        final totalEarned = list
+            .where((o) => OrderStatus.isDelivered(o.status))
+            .fold(0, (sum, o) => sum + o.creatorNetAmount);
 
-        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-          for (final doc in snapshot.data!.docs) {
-            final data = doc.data();
-            final status = (data['status'] as String? ?? '').trim();
-            final netAmount = (data['creatorNetAmount'] as num?)?.toDouble() ??
-                (data['subtotal'] as num?)?.toDouble() ??
-                0.0;
-
-            if (status != 'Rejected' && status != 'Cancelled') {
-              totalSales += netAmount;
-            }
-
-            if (['Placed', 'Pending', 'Accepted', 'Confirmed', 'Processing', 'Shipped', 'In-transit', 'Out for Delivery'].contains(status)) {
-              activeOrdersCount++;
-            }
-          }
-        }
-
-        return Row(
+        return GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 15,
+          mainAxisSpacing: 15,
+          childAspectRatio: 1.5,
           children: [
-            Expanded(
-              child: _SummaryCard(
-                label: 'Total Sales',
-                value: '₹${totalSales.toStringAsFixed(0)}',
-                icon: Icons.payments_outlined,
-                color: Colors.blue,
-              ),
+            _StatCard(
+              title: 'New orders',
+              value: '$pending',
+              icon: Icons.new_releases_outlined,
+              color: AppColors.accent,
             ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: _SummaryCard(
-                label: 'Active Orders',
-                value: '$activeOrdersCount',
-                icon: Icons.shopping_bag_outlined,
-                color: Colors.orange,
-              ),
+            _StatCard(
+              title: 'In progress',
+              value: '$inProgress',
+              icon: Icons.precision_manufacturing_outlined,
+              color: Colors.blue,
+            ),
+            _StatCard(
+              title: 'Total orders',
+              value: '${list.length}',
+              icon: Icons.shopping_bag_outlined,
+              color: AppColors.primary,
+            ),
+            _StatCard(
+              title: 'Earned (settled)',
+              value: '₹$totalEarned',
+              icon: Icons.payments_outlined,
+              color: Colors.green,
             ),
           ],
         );
@@ -367,14 +363,14 @@ class _CreatorHomeViewState extends State<CreatorHomeView> {
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  final String label;
+class _StatCard extends StatelessWidget {
+  final String title;
   final String value;
   final IconData icon;
   final Color color;
 
-  const _SummaryCard({
-    required this.label,
+  const _StatCard({
+    required this.title,
     required this.value,
     required this.icon,
     required this.color,
@@ -383,7 +379,7 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(15),
@@ -391,16 +387,21 @@ class _SummaryCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+              ),
+              Icon(icon, color: color, size: 20),
+            ],
+          ),
           Text(
             value,
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
           ),
         ],
       ),

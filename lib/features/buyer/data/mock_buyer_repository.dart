@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:madebyhands/core/constants/product_categories.dart';
 import 'package:madebyhands/features/buyer/data/mock_products.dart';
 import 'package:madebyhands/features/buyer/domain/entities/buyer_order.dart';
 import 'package:madebyhands/features/buyer/domain/entities/buyer_product_notification.dart';
@@ -82,6 +83,10 @@ class MockBuyerRepository implements BuyerRepository {
   @override
   Future<PlatformFeeSettings> getPlatformFeeSettings() async =>
       const PlatformFeeSettings();
+
+  @override
+  Stream<List<String>> watchCategories() =>
+      Stream.value(List<String>.of(kProductCategories));
 
   @override
   Stream<List<PublicCreator>> watchPublicCreators() => Stream.value(const [

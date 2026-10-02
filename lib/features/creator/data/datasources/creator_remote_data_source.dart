@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
@@ -8,67 +9,67 @@ import 'package:madebyhands/features/creator/data/models/creator_notification_mo
 import 'package:madebyhands/features/creator/data/models/creator_order_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_product_model.dart';
 import 'package:madebyhands/features/creator/data/models/creator_profile_model.dart';
+import 'package:madebyhands/features/orders/domain/order_status.dart';
+
+/// Private verification documents, stored in `creator_verifications/{uid}`.
+class VerificationDocumentsModel {
+  final String businessName;
+  final String address;
+  final String latestPhoto;
+  final String idCard;
+
+  const VerificationDocumentsModel({
+    required this.businessName,
+    required this.address,
+    required this.latestPhoto,
+    required this.idCard,
+  });
+}
 
 abstract interface class CreatorRemoteDataSource {
-  /// Fetches the creator profile document from Firestore.
   Future<CreatorProfileModel?> getCreatorProfile(String uid);
 
-  /// Saves or updates the creator profile document in Firestore.
+  /// Creates or updates the public, creator-editable profile fields.
   Future<void> saveCreatorProfile(CreatorProfileModel profile);
 
-  /// Uploads a single profile image to Firebase Storage.
   Future<String> uploadProfileImage({required File image, required String uid});
 
-  /// Uploads multiple portfolio images to Firebase Storage.
   Future<List<String>> uploadPortfolioImages({
     required List<File> images,
     required String uid,
   });
 
-  /// Uploads a verification document (photo or ID) to Firebase Storage.
   Future<String> uploadVerificationFile({
     required File file,
     required String uid,
     required String fileName,
   });
 
-  /// Fetches all creator profiles from Firestore (Admin only).
+  Future<VerificationDocumentsModel?> getVerificationDocuments(String uid);
+
+  /// Stores the documents privately, marks the profile 'In-Process' and
+  /// alerts the admins.
+  Future<void> submitVerification({
+    required String uid,
+    required String creatorName,
+    required VerificationDocumentsModel documents,
+  });
+
   Future<List<CreatorProfileModel>> getAllCreatorProfiles();
 
-  /// Updates the verification status of a creator and toggles their products' visibility.
   Future<void> updateVerificationStatus(String uid, String status);
 
-  /// Adds a new product document to the Firestore 'products' collection.
   Future<void> addProduct(CreatorProductModel product);
-
-  /// Updates an existing product document.
   Future<void> updateProduct(CreatorProductModel product);
+  Future<void> deleteProduct(String productId);
+  Future<void> setProductPublished(String productId, bool published);
+  Future<void> updateStock(String productId, int stock);
+  Future<CreatorProductModel?> getProduct(String productId);
 
-  /// Uploads multiple product images to Firebase Storage.
-  Future<List<String>> uploadProductImages({
-    required List<File> images,
-    required String uid,
-    required String productName,
-  });
-
-  /// Uploads images for a specific product customization.
-  Future<List<String>> uploadCustomizationImages({
-    required List<File> images,
-    required String uid,
-    required String productName,
-    required String customizationName,
-  });
-
-  /// Fetches products that are awaiting admin approval.
   Future<List<CreatorProductModel>> getPendingProducts();
-
-  /// Fetches all products for admin review (Pending, Approved, Rejected).
   Future<List<CreatorProductModel>> getAdminAllProducts();
-
-  /// Fetches all products belonging to a specific creator.
   Future<List<CreatorProductModel>> getCreatorProducts(String uid);
 
-  /// Updates the approval status and active state of a product.
   Future<void> updateProductStatus(
     String productId,
     String status, {
@@ -77,10 +78,25 @@ abstract interface class CreatorRemoteDataSource {
     String? rejectionReason,
   });
 
-  /// Fetches all orders belonging to a specific creator.
+  Future<List<String>> uploadProductImages({
+    required List<File> images,
+    required String uid,
+    required String folder,
+  });
+
+  Future<List<String>> uploadCustomizationImages({
+    required List<File> images,
+    required String uid,
+    required String productName,
+    required String customizationName,
+  });
+
+  Stream<List<CreatorProductModel>> watchCreatorProducts(String uid);
+  Stream<List<CreatorOrderModel>> watchCreatorOrders(String uid);
+
   Future<List<CreatorOrderModel>> getCreatorOrders(String creatorUid);
 
-  /// Updates the status of an order.
+  /// Moves an order forward in fulfilment. Rejections go through the API.
   Future<void> updateOrderStatus(
     String orderId,
     String status, {
@@ -89,22 +105,15 @@ abstract interface class CreatorRemoteDataSource {
     String? carrierName,
   });
 
-  /// Fetches all notifications belonging to a specific creator.
-  Future<List<CreatorNotificationModel>> getCreatorNotifications(String creatorUid);
-
-  /// Marks a specific notification as read.
+  Stream<List<CreatorNotificationModel>> watchNotifications(String uid);
+  Future<List<CreatorNotificationModel>> getCreatorNotifications(
+    String creatorUid,
+  );
   Future<void> markNotificationAsRead(String notificationId);
-
-  /// Marks all notifications for a creator as read.
-  Future<void> markAllNotificationsAsRead(String creatorUid);
-
-  /// Deletes a list of notifications.
+  Future<void> markAllNotificationsAsRead(String uid);
   Future<void> deleteNotifications(List<String> notificationIds);
 
-  /// Fetches bank account details for a specific creator.
   Future<CreatorBankAccountModel?> getCreatorBankAccount(String uid);
-
-  /// Saves or updates bank account details for a creator.
   Future<void> saveCreatorBankAccount(CreatorBankAccountModel bankDetail);
 }
 
@@ -119,75 +128,63 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
     required this.firebaseStorage,
   });
 
-  /// Universal cross-platform image uploader using putData & XFile (works on Web & Native)
-  Future<String> _uploadFileSafely(File file, String path) async {
-    try {
-      final ref = firebaseStorage.ref().child(path);
-      Uint8List bytes;
-      if (kIsWeb) {
-        // Use XFile to fetch blob URL on Web without calling dart:io File methods
-        bytes = await XFile(file.path).readAsBytes();
-      } else {
-        bytes = await file.readAsBytes();
-      }
-      final uploadTask = ref.putData(bytes, _imageMetadata);
-      final snapshot = await uploadTask;
-      if (snapshot.state == TaskState.success) {
-        try {
-          return await snapshot.ref.getDownloadURL();
-        } on FirebaseException catch (e) {
-          if (e.code == 'object-not-found') {
-            final appspotStorage = FirebaseStorage.instanceFor(
-              bucket: 'gs://madebyhands-77f87.appspot.com',
-            );
-            final fallbackRef = appspotStorage.ref().child(path);
-            await fallbackRef.putData(bytes, _imageMetadata);
-            return await fallbackRef.getDownloadURL();
-          }
-          rethrow;
-        }
-      } else {
-        throw Exception("Upload failed with state: ${snapshot.state}");
-      }
-    } catch (e) {
-      debugPrint('Storage Upload Warning: $e');
-      // If Firebase Storage bucket isn't enabled in console or throws object-not-found,
-      // fallback to an operational HTTPS image URL so product creation never fails!
-      return 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?q=80&w=1000&auto=format&fit=crop';
-    }
+  CollectionReference<Map<String, dynamic>> get _profiles =>
+      firestore.collection('creator_profiles');
+  CollectionReference<Map<String, dynamic>> get _products =>
+      firestore.collection('products');
+  CollectionReference<Map<String, dynamic>> get _notifications =>
+      firestore.collection('notifications');
+
+  /// Uploads [file] to [path] and returns its download URL. Works on web
+  /// (where `File` wraps a blob URL) and on mobile.
+  Future<String> _upload(File file, String path) async {
+    final bytes = kIsWeb
+        ? await XFile(file.path).readAsBytes()
+        : await file.readAsBytes();
+    final snapshot = await firebaseStorage
+        .ref()
+        .child(path)
+        .putData(bytes, _imageMetadata);
+    return snapshot.ref.getDownloadURL();
+  }
+
+  /// Storage path segment derived from user input.
+  static String _segment(String value) {
+    final cleaned = value
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
+    if (cleaned.isEmpty) return 'item';
+    return cleaned.length > 40 ? cleaned.substring(0, 40) : cleaned;
   }
 
   @override
   Future<CreatorProfileModel?> getCreatorProfile(String uid) async {
-    try {
-      final doc = await firestore.collection('creator_profiles').doc(uid).get();
-      if (doc.exists && doc.data() != null) {
-        return CreatorProfileModel.fromJson(doc.data()!);
-      }
-      return null;
-    } catch (e) {
-      throw Exception(e.toString());
-    }
+    final doc = await _profiles.doc(uid).get();
+    final data = doc.data();
+    return data == null ? null : CreatorProfileModel.fromJson(data, doc.id);
   }
 
   @override
   Future<void> saveCreatorProfile(CreatorProfileModel profile) async {
-    try {
-      await firestore
-          .collection('creator_profiles')
-          .doc(profile.uid)
-          .set(profile.toJson());
-    } catch (e) {
-      throw Exception(e.toString());
-    }
+    final ref = _profiles.doc(profile.uid);
+    final exists = (await ref.get()).exists;
+    await ref.set({
+      ...profile.toJson(),
+      if (!exists) 'verificationStatus': 'Unverified',
+      if (!exists) 'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   @override
   Future<String> uploadProfileImage({
     required File image,
     required String uid,
-  }) async {
-    return _uploadFileSafely(image, 'creator_profiles/$uid/profile_image.jpg');
+  }) {
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    return _upload(image, 'creator_profiles/$uid/profile_$stamp.jpg');
   }
 
   @override
@@ -195,16 +192,14 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
     required List<File> images,
     required String uid,
   }) async {
-    List<String> urls = [];
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    for (var i = 0; i < images.length; i++) {
-      final url = await _uploadFileSafely(
-        images[i],
-        'creator_profiles/$uid/portfolio/image_${timestamp}_$i.jpg',
-      );
-      urls.add(url);
-    }
-    return urls;
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    return [
+      for (var i = 0; i < images.length; i++)
+        await _upload(
+          images[i],
+          'creator_profiles/$uid/portfolio/image_${stamp}_$i.jpg',
+        ),
+    ];
   }
 
   @override
@@ -212,172 +207,153 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
     required File file,
     required String uid,
     required String fileName,
+  }) {
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    return _upload(
+      file,
+      'creator_profiles/$uid/verification/${stamp}_$fileName',
+    );
+  }
+
+  @override
+  Future<VerificationDocumentsModel?> getVerificationDocuments(
+    String uid,
+  ) async {
+    final doc =
+        await firestore.collection('creator_verifications').doc(uid).get();
+    final data = doc.data();
+    if (data == null) return null;
+    return VerificationDocumentsModel(
+      businessName: data['businessName'] as String? ?? '',
+      address: data['address'] as String? ?? '',
+      latestPhoto: data['latestPhoto'] as String? ?? '',
+      idCard: data['idCard'] as String? ?? '',
+    );
+  }
+
+  @override
+  Future<void> submitVerification({
+    required String uid,
+    required String creatorName,
+    required VerificationDocumentsModel documents,
   }) async {
-    return _uploadFileSafely(file, 'creator_profiles/$uid/verification/$fileName');
+    final batch = firestore.batch();
+    batch.set(firestore.collection('creator_verifications').doc(uid), {
+      'uid': uid,
+      'businessName': documents.businessName,
+      'address': documents.address,
+      'latestPhoto': documents.latestPhoto,
+      'idCard': documents.idCard,
+      'submittedAt': FieldValue.serverTimestamp(),
+    });
+    batch.set(_profiles.doc(uid), {
+      'verificationStatus': 'In-Process',
+      'businessName': documents.businessName,
+      'verificationNote': FieldValue.delete(),
+      'address': FieldValue.delete(),
+      'latestPhoto': FieldValue.delete(),
+      'idCard': FieldValue.delete(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    batch.set(_notifications.doc(), {
+      'type': 'admin',
+      'category': 'creator_verification',
+      'title': 'New creator verification request',
+      'message':
+          '${creatorName.isEmpty ? 'A creator' : creatorName} submitted verification documents.',
+      'targetId': uid,
+      'createdAt': FieldValue.serverTimestamp(),
+      'isRead': false,
+    });
+    await batch.commit();
   }
 
   @override
   Future<List<CreatorProfileModel>> getAllCreatorProfiles() async {
-    try {
-      final snapshot = await firestore.collection('creator_profiles').get();
-      return snapshot.docs
-          .map((doc) => CreatorProfileModel.fromJson(doc.data()))
-          .toList();
-    } catch (e) {
-      throw Exception(e.toString());
-    }
+    final snapshot = await _profiles.get();
+    return snapshot.docs
+        .map((doc) => CreatorProfileModel.fromJson(doc.data(), doc.id))
+        .toList();
   }
 
   @override
   Future<void> updateVerificationStatus(String uid, String status) async {
-    try {
-      final isVerified = status == 'Verified';
-
-      // 1. Update creator_profiles collection
-      await firestore.collection('creator_profiles').doc(uid).update({
-        'verificationStatus': status,
-      });
-
-      // 2. Update users collection (Single source of truth for Role & Verification)
-      await firestore.collection('users').doc(uid).update({
-        'isVerified': isVerified,
-      });
-
-      // 3. Update products visibility (Business/Data Layer enforcement)
-      final productsQuery = await firestore
-          .collection('products')
-          .where('creatorUid', isEqualTo: uid)
-          .get();
-
-      final batch = firestore.batch();
-      for (final doc in productsQuery.docs) {
-        final data = doc.data();
-        final isApproved = data['status'] == 'Approved';
-        // Only mark active if Creator is Verified AND Product is Approved
-        batch.update(doc.reference, {'isActive': isVerified && isApproved});
-      }
-      await batch.commit();
-
-      if (status == 'In-Process') {
-        try {
-          final profileDoc =
-              await firestore.collection('creator_profiles').doc(uid).get();
-          final name = profileDoc.data()?['name'] as String? ?? 'Creator';
-          await firestore.collection('notifications').add({
-            'type': 'admin',
-            'category': 'creator_verification',
-            'title': 'New Creator Verification Request 🆔',
-            'message':
-                'Creator "$name" submitted verification documents for review.',
-            'targetId': uid,
-            'createdAt': FieldValue.serverTimestamp(),
-            'isRead': false,
-          });
-        } catch (_) {}
-      }
-    } catch (e) {
-      throw Exception(e.toString());
-    }
+    final isVerified = status == 'Verified';
+    await _profiles.doc(uid).update({'verificationStatus': status});
+    await firestore.collection('users').doc(uid).update({
+      'isVerified': isVerified,
+    });
   }
 
   @override
   Future<void> addProduct(CreatorProductModel product) async {
-    try {
-      await firestore.collection('products').add(product.toJson());
-    } catch (e) {
-      throw Exception(e.toString());
-    }
+    await _products.add({
+      ...product.toJson(),
+      'orderCount': 0,
+      'wishlistCount': 0,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   @override
   Future<void> updateProduct(CreatorProductModel product) async {
-    try {
-      await firestore
-          .collection('products')
-          .doc(product.id)
-          .update(product.toJson());
-    } catch (e) {
-      throw Exception(e.toString());
-    }
+    final data = product.toJson()
+      ..remove('createdAt')
+      ..['updatedAt'] = FieldValue.serverTimestamp();
+    await _products.doc(product.id).update(data);
   }
 
   @override
-  Future<List<String>> uploadProductImages({
-    required List<File> images,
-    required String uid,
-    required String productName,
-  }) async {
-    List<String> urls = [];
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    for (var i = 0; i < images.length; i++) {
-      final url = await _uploadFileSafely(
-        images[i],
-        'products/$uid/$productName/image_${timestamp}_$i.jpg',
-      );
-      urls.add(url);
-    }
-    return urls;
-  }
+  Future<void> deleteProduct(String productId) =>
+      _products.doc(productId).delete();
 
   @override
-  Future<List<String>> uploadCustomizationImages({
-    required List<File> images,
-    required String uid,
-    required String productName,
-    required String customizationName,
-  }) async {
-    List<String> urls = [];
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    for (var i = 0; i < images.length; i++) {
-      final url = await _uploadFileSafely(
-        images[i],
-        'products/$uid/$productName/customizations/$customizationName/image_${timestamp}_$i.jpg',
-      );
-      urls.add(url);
-    }
-    return urls;
+  Future<void> setProductPublished(String productId, bool published) =>
+      _products.doc(productId).update({
+        'isActive': published,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+  @override
+  Future<void> updateStock(String productId, int stock) =>
+      _products.doc(productId).update({
+        'stock': stock,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+  @override
+  Future<CreatorProductModel?> getProduct(String productId) async {
+    final doc = await _products.doc(productId).get();
+    final data = doc.data();
+    return data == null ? null : CreatorProductModel.fromJson(data, doc.id);
   }
 
   @override
   Future<List<CreatorProductModel>> getPendingProducts() async {
-    try {
-      final snapshot = await firestore
-          .collection('products')
-          .where('status', isEqualTo: 'Pending Approval')
-          .get();
-      return snapshot.docs
-          .map((doc) => CreatorProductModel.fromJson(doc.data(), doc.id))
-          .toList();
-    } catch (e) {
-      throw Exception(e.toString());
-    }
+    final snapshot = await _products
+        .where('status', isEqualTo: 'Pending Approval')
+        .get();
+    return snapshot.docs
+        .map((doc) => CreatorProductModel.fromJson(doc.data(), doc.id))
+        .toList();
   }
 
   @override
   Future<List<CreatorProductModel>> getAdminAllProducts() async {
-    try {
-      final snapshot = await firestore.collection('products').get();
-      return snapshot.docs
-          .map((doc) => CreatorProductModel.fromJson(doc.data(), doc.id))
-          .toList();
-    } catch (e) {
-      throw Exception(e.toString());
-    }
+    final snapshot = await _products.get();
+    return snapshot.docs
+        .map((doc) => CreatorProductModel.fromJson(doc.data(), doc.id))
+        .toList();
   }
 
   @override
   Future<List<CreatorProductModel>> getCreatorProducts(String uid) async {
-    try {
-      final snapshot = await firestore
-          .collection('products')
-          .where('creatorUid', isEqualTo: uid)
-          .get();
-      return snapshot.docs
-          .map((doc) => CreatorProductModel.fromJson(doc.data(), doc.id))
-          .toList();
-    } catch (e) {
-      throw Exception(e.toString());
-    }
+    final snapshot =
+        await _products.where('creatorUid', isEqualTo: uid).get();
+    return snapshot.docs
+        .map((doc) => CreatorProductModel.fromJson(doc.data(), doc.id))
+        .toList();
   }
 
   @override
@@ -388,43 +364,88 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
     String? approvedByEmail,
     String? rejectionReason,
   }) async {
-    try {
-      final updateData = <String, dynamic>{
-        'status': status,
-        'isActive': status == 'Approved',
-      };
-      if (approvedBy != null && approvedBy.isNotEmpty) {
-        updateData['approvedBy'] = approvedBy;
-      }
-      if (approvedByEmail != null && approvedByEmail.isNotEmpty) {
-        updateData['approvedByEmail'] = approvedByEmail;
-      }
-      if (rejectionReason != null && rejectionReason.isNotEmpty) {
-        updateData['rejectionReason'] = rejectionReason;
-      }
-      if (status == 'Approved') {
-        updateData['approvedAt'] = FieldValue.serverTimestamp();
-      }
-
-      await firestore.collection('products').doc(productId).update(updateData);
-    } catch (e) {
-      throw Exception(e.toString());
+    final updateData = <String, dynamic>{
+      'status': status,
+      'isActive': status == 'Approved',
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    if (approvedBy != null && approvedBy.isNotEmpty) {
+      updateData['approvedBy'] = approvedBy;
     }
+    if (approvedByEmail != null && approvedByEmail.isNotEmpty) {
+      updateData['approvedByEmail'] = approvedByEmail;
+    }
+    if (rejectionReason != null && rejectionReason.isNotEmpty) {
+      updateData['rejectionReason'] = rejectionReason;
+    }
+    if (status == 'Approved') {
+      updateData['approvedAt'] = FieldValue.serverTimestamp();
+    }
+    await _products.doc(productId).update(updateData);
   }
 
   @override
+  Future<List<String>> uploadProductImages({
+    required List<File> images,
+    required String uid,
+    required String folder,
+  }) async {
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    final path = 'products/$uid/${_segment(folder)}';
+    return [
+      for (var i = 0; i < images.length; i++)
+        await _upload(images[i], '$path/image_${stamp}_$i.jpg'),
+    ];
+  }
+
+  @override
+  Future<List<String>> uploadCustomizationImages({
+    required List<File> images,
+    required String uid,
+    required String productName,
+    required String customizationName,
+  }) async {
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    final path =
+        'products/$uid/${_segment(productName)}/customizations/${_segment(customizationName)}';
+    return [
+      for (var i = 0; i < images.length; i++)
+        await _upload(images[i], '$path/image_${stamp}_$i.jpg'),
+    ];
+  }
+
+  @override
+  Stream<List<CreatorProductModel>> watchCreatorProducts(String uid) =>
+      _products.where('creatorUid', isEqualTo: uid).snapshots().map((snapshot) {
+        final products = snapshot.docs
+            .map((doc) => CreatorProductModel.fromJson(doc.data(), doc.id))
+            .toList();
+        products.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return products;
+      });
+
+  @override
+  Stream<List<CreatorOrderModel>> watchCreatorOrders(String uid) => firestore
+      .collection('orders')
+      .where('creatorId', isEqualTo: uid)
+      .snapshots()
+      .map((snapshot) {
+        final orders = snapshot.docs
+            .map((doc) => CreatorOrderModel.fromJson(doc.data(), doc.id))
+            .toList();
+        orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return orders;
+      });
+
+  @override
   Future<List<CreatorOrderModel>> getCreatorOrders(String creatorUid) async {
-    try {
-      final snapshot = await firestore
-          .collection('orders')
-          .where('creatorId', isEqualTo: creatorUid)
-          .get();
-      return snapshot.docs
-          .map((doc) => CreatorOrderModel.fromJson(doc.data(), doc.id))
-          .toList();
-    } catch (e) {
-      throw Exception(e.toString());
-    }
+    final snapshot = await firestore
+        .collection('orders')
+        .where('creatorId', isEqualTo: creatorUid)
+        .get();
+    return snapshot.docs
+        .map((doc) => CreatorOrderModel.fromJson(doc.data(), doc.id))
+        .toList();
   }
 
   @override
@@ -434,126 +455,93 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
     String? rejectionReason,
     String? consignmentNumber,
     String? carrierName,
-  }) async {
-    try {
-      final updateData = <String, dynamic>{
-        'status': status,
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-      if (rejectionReason != null) {
-        updateData['rejectionReason'] = rejectionReason;
-      }
-      if (consignmentNumber != null) {
-        updateData['consignmentNumber'] = consignmentNumber;
-      }
-      if (carrierName != null && carrierName.trim().isNotEmpty) {
-        updateData['carrierName'] = carrierName.trim();
-      }
-      if (status == 'Rejected' || status == 'Cancelled') {
-        updateData['payoutStatus'] = 'cancelled';
-      }
-      await firestore.collection('orders').doc(orderId).update(updateData);
-    } catch (e) {
-      throw Exception(e.toString());
-    }
+  }) {
+    final stored = OrderStatus.storedValue(status);
+    return firestore.collection('orders').doc(orderId).update({
+      'status': stored,
+      'updatedAt': FieldValue.serverTimestamp(),
+      if (rejectionReason != null && rejectionReason.trim().isNotEmpty)
+        'rejectionReason': rejectionReason.trim(),
+      if (consignmentNumber != null && consignmentNumber.trim().isNotEmpty)
+        'consignmentNumber': consignmentNumber.trim(),
+      if (carrierName != null && carrierName.trim().isNotEmpty)
+        'carrierName': carrierName.trim(),
+      if (OrderStatus.isDelivered(stored))
+        'deliveredAt': FieldValue.serverTimestamp(),
+    });
   }
+
+  @override
+  Stream<List<CreatorNotificationModel>> watchNotifications(String uid) =>
+      _notifications.where('creatorUid', isEqualTo: uid).snapshots().map((
+        snapshot,
+      ) {
+        final notifications = snapshot.docs
+            .map((doc) => CreatorNotificationModel.fromJson(doc.data(), doc.id))
+            .toList();
+        notifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return notifications;
+      });
 
   @override
   Future<List<CreatorNotificationModel>> getCreatorNotifications(
     String creatorUid,
   ) async {
-    try {
-      final snapshot = await firestore
-          .collection('notifications')
-          .where('creatorUid', isEqualTo: creatorUid)
-          .get();
-
-      final notifications = snapshot.docs
-          .map((doc) => CreatorNotificationModel.fromJson(doc.data(), doc.id))
-          .toList();
-      notifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return notifications;
-    } catch (_) {
-      // If notifications collection query fails or permission is denied,
-      // return an empty list gracefully so UI loads without error banner.
-      return <CreatorNotificationModel>[];
-    }
+    final snapshot = await _notifications
+        .where('creatorUid', isEqualTo: creatorUid)
+        .get();
+    final notifications = snapshot.docs
+        .map((doc) => CreatorNotificationModel.fromJson(doc.data(), doc.id))
+        .toList();
+    notifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return notifications;
   }
 
   @override
-  Future<void> markNotificationAsRead(String notificationId) async {
-    try {
-      await firestore
-          .collection('notifications')
-          .doc(notificationId)
-          .update({'isRead': true});
-    } catch (_) {
-      // Non-blocking catch
-    }
-  }
+  Future<void> markNotificationAsRead(String notificationId) =>
+      _notifications.doc(notificationId).update({'isRead': true});
 
   @override
-  Future<void> markAllNotificationsAsRead(String creatorUid) async {
-    try {
-      final snapshot = await firestore
-          .collection('notifications')
-          .where('creatorUid', isEqualTo: creatorUid)
-          .where('isRead', isEqualTo: false)
-          .get();
-      if (snapshot.docs.isNotEmpty) {
-        final batch = firestore.batch();
-        for (final doc in snapshot.docs) {
-          batch.update(doc.reference, {'isRead': true});
-        }
-        await batch.commit();
-      }
-    } catch (_) {
-      // Non-blocking catch
+  Future<void> markAllNotificationsAsRead(String uid) async {
+    final snapshot = await _notifications
+        .where('creatorUid', isEqualTo: uid)
+        .where('isRead', isEqualTo: false)
+        .get();
+    if (snapshot.docs.isEmpty) return;
+    final batch = firestore.batch();
+    for (final doc in snapshot.docs) {
+      batch.update(doc.reference, {'isRead': true});
     }
+    await batch.commit();
   }
 
   @override
   Future<void> deleteNotifications(List<String> notificationIds) async {
-    try {
-      final batch = firestore.batch();
-      for (final id in notificationIds) {
-        batch.delete(firestore.collection('notifications').doc(id));
-      }
-      await batch.commit();
-    } catch (_) {
-      // Non-blocking catch
+    final batch = firestore.batch();
+    for (final id in notificationIds) {
+      batch.delete(_notifications.doc(id));
     }
+    await batch.commit();
   }
 
   @override
   Future<CreatorBankAccountModel?> getCreatorBankAccount(String uid) async {
-    try {
-      final doc =
-          await firestore.collection('creator_bank_accounts').doc(uid).get();
-      if (doc.exists && doc.data() != null) {
-        return CreatorBankAccountModel.fromJson(doc.data()!, uid);
-      }
-      return null;
-    } catch (e) {
-      throw Exception(e.toString());
-    }
+    final doc =
+        await firestore.collection('creator_bank_accounts').doc(uid).get();
+    final data = doc.data();
+    return data == null ? null : CreatorBankAccountModel.fromJson(data, uid);
   }
 
   @override
   Future<void> saveCreatorBankAccount(
     CreatorBankAccountModel bankDetail,
   ) async {
-    try {
-      final docRef =
-          firestore.collection('creator_bank_accounts').doc(bankDetail.uid);
-      final docSnap = await docRef.get();
-      final data = bankDetail.toJson();
-      if (!docSnap.exists) {
-        data['createdAt'] = FieldValue.serverTimestamp();
-      }
-      await docRef.set(data, SetOptions(merge: true));
-    } catch (e) {
-      throw Exception(e.toString());
-    }
+    final ref =
+        firestore.collection('creator_bank_accounts').doc(bankDetail.uid);
+    final exists = (await ref.get()).exists;
+    await ref.set({
+      ...bankDetail.toJson(),
+      if (!exists) 'createdAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 }

@@ -3,637 +3,612 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/admin/presentation/widgets/small_stat.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:madebyhands/features/orders/domain/order_status.dart';
 
+/// Super-admin finance: platform revenue and creator payout releases.
+///
+/// Payouts are released manually (bank/UPI transfer outside the app) and
+/// then recorded here. Only delivered, paid orders are releasable.
 class FinanceView extends StatelessWidget {
   const FinanceView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final authState = context.watch<AuthBloc>().state;
-    final currentUser = authState is AuthSuccess ? authState.user : null;
-    final isSuperAdmin = currentUser?.isSuperAdmin ?? true;
+    final isSuperAdmin = context.select<AuthBloc, bool>((bloc) {
+      final state = bloc.state;
+      return state is AuthSuccess && state.user.isSuperAdmin;
+    });
+    if (!isSuperAdmin) return const _RestrictedNotice();
+    return const _FinanceBody();
+  }
+}
 
-    if (!isSuperAdmin) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.orange.shade200, width: 2),
-                ),
-                child: Icon(Icons.lock_rounded, size: 56, color: Colors.orange.shade800),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Financial Access Restricted',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.text),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'As per platform administration controls (SRS FR-20), platform balances, fee configurations, and creator payout releases are restricted to Super Admins.\n\nOperational Managers are not permitted to manage financial payouts.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: AppColors.mutedText, height: 1.5),
-              ),
-            ],
-          ),
+class _RestrictedNotice extends StatelessWidget {
+  const _RestrictedNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lock_rounded, size: 56, color: Colors.orange.shade800),
+            const SizedBox(height: 20),
+            const Text(
+              'Finance is restricted to super admins',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Platform balances, fees and creator payouts can only be managed by a super admin.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.mutedText, height: 1.5),
+            ),
+          ],
         ),
-      );
-    }
+      ),
+    );
+  }
+}
 
+class _PayoutOrder {
+  final String id;
+  final String creatorId;
+  final String creatorName;
+  final int amount;
+  final String status;
+  final DateTime createdAt;
+  final DateTime? releasedAt;
+
+  const _PayoutOrder({
+    required this.id,
+    required this.creatorId,
+    required this.creatorName,
+    required this.amount,
+    required this.status,
+    required this.createdAt,
+    this.releasedAt,
+  });
+
+  String get shortId =>
+      id.length > 6 ? id.substring(id.length - 6).toUpperCase() : id.toUpperCase();
+}
+
+class _FinanceSummary {
+  int revenue = 0;
+  int settled = 0;
+  final List<_PayoutOrder> awaiting = [];
+  final List<_PayoutOrder> releasable = [];
+  final List<_PayoutOrder> released = [];
+
+  _FinanceSummary(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+    for (final doc in docs) {
+      final data = doc.data();
+      if (data['isSample'] == true) continue;
+      final paymentStatus = (data['paymentStatus'] as String? ?? 'paid').toLowerCase();
+      if (paymentStatus != 'paid') continue;
+      final status = data['status'] as String? ?? '';
+      final payoutStatus = (data['payoutStatus'] as String? ?? 'pending').toLowerCase();
+      if (OrderStatus.isRejectedOrCancelled(status) || payoutStatus == 'cancelled') continue;
+
+      final subtotal = (data['subtotal'] as num?)?.round() ?? 0;
+      final flatFee = (data['flatFee'] as num?)?.round() ?? 0;
+      revenue += (data['platformFee'] as num?)?.round() ?? flatFee;
+
+      final order = _PayoutOrder(
+        id: doc.id,
+        creatorId: data['creatorId'] as String? ?? '',
+        creatorName: data['creatorName'] as String? ?? 'Creator',
+        amount: (data['creatorNetAmount'] as num?)?.round() ?? subtotal,
+        status: status,
+        createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime(1970),
+        releasedAt: (data['payoutReleasedAt'] as Timestamp?)?.toDate(),
+      );
+      if (payoutStatus == 'paid' || payoutStatus == 'released') {
+        settled += order.amount;
+        released.add(order);
+      } else if (OrderStatus.isDelivered(status)) {
+        releasable.add(order);
+      } else {
+        awaiting.add(order);
+      }
+    }
+    releasable.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    awaiting.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    released.sort(
+      (a, b) => (b.releasedAt ?? b.createdAt).compareTo(a.releasedAt ?? a.createdAt),
+    );
+  }
+}
+
+class _FinanceBody extends StatefulWidget {
+  const _FinanceBody();
+
+  @override
+  State<_FinanceBody> createState() => _FinanceBodyState();
+}
+
+class _FinanceBodyState extends State<_FinanceBody> {
+  final Stream<QuerySnapshot<Map<String, dynamic>>> _orders =
+      FirebaseFirestore.instance.collection('orders').snapshots();
+
+  @override
+  Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: const TabBar(
           tabs: [
-            Tab(text: 'Pending Payouts'),
-            Tab(text: 'Payout History'),
+            Tab(text: 'Pending payouts'),
+            Tab(text: 'Payout history'),
           ],
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.mutedText,
           indicatorColor: AppColors.primary,
         ),
         body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance.collection('orders').snapshots(),
+          stream: _orders,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
-                      const SizedBox(height: 12),
-                      Text('Error loading financial data: ${snapshot.error}', style: const TextStyle(color: Colors.redAccent)),
-                    ],
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'Could not load financial data: ${snapshot.error}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.redAccent),
                   ),
                 ),
               );
             }
-
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+            if (!snapshot.hasData) {
+              return const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              );
             }
-
-            double totalPlatformRevenue = 0.0;
-            double totalSettledPayouts = 0.0;
-            List<Map<String, dynamic>> pendingPayoutOrders = [];
-            List<Map<String, dynamic>> releasedPayoutOrders = [];
-
-            final docs = snapshot.data?.docs ?? [];
-            for (var doc in docs) {
-              final data = doc.data();
-              final total = (data['totalAmount'] as num?)?.toDouble() ??
-                  (data['total'] as num?)?.toDouble() ??
-                  (data['buyerPayableAmount'] as num?)?.toDouble() ??
-                  0.0;
-              final platformFee = data['platformFee'] != null
-                  ? (data['platformFee'] as num).toDouble()
-                  : (total > 999 ? (50.0 + (total * 0.05)) : 50.0);
-              final payoutAmount = data['payoutAmount'] != null
-                  ? (data['payoutAmount'] as num).toDouble()
-                  : (data['creatorNetAmount'] as num?)?.toDouble() ?? (total - platformFee);
-
-              totalPlatformRevenue += platformFee;
-
-              final payoutStatus = (data['payoutStatus'] as String? ?? 'pending').toLowerCase();
-              final status = (data['status'] as String? ?? 'Placed').toLowerCase();
-
-              final orderItem = {
-                'docId': doc.id,
-                'orderId': doc.id.length > 6 ? doc.id.substring(doc.id.length - 6).toUpperCase() : doc.id.toUpperCase(),
-                'creatorId': data['creatorId'] as String? ?? data['sellerId'] as String? ?? '',
-                'sellerName': data['sellerName'] as String? ?? data['creatorName'] as String? ?? 'Artisan',
-                'payoutAmount': payoutAmount,
-                'status': data['status'] ?? 'Placed',
-                'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-                'releasedAt': (data['payoutReleasedAt'] as Timestamp?)?.toDate() ??
-                    (data['paidAt'] as Timestamp?)?.toDate() ??
-                    (data['updatedAt'] as Timestamp?)?.toDate() ??
-                    DateTime.now(),
-              };
-
-              if ((payoutStatus == 'paid' || payoutStatus == 'released') && status != 'rejected' && status != 'cancelled') {
-                totalSettledPayouts += payoutAmount;
-                releasedPayoutOrders.add(orderItem);
-              } else if (payoutStatus == 'pending' && status != 'rejected' && status != 'cancelled') {
-                pendingPayoutOrders.add(orderItem);
-              }
-            }
-
-            // Sort history by released date descending
-            releasedPayoutOrders.sort((a, b) {
-              final tA = a['releasedAt'] as DateTime;
-              final tB = b['releasedAt'] as DateTime;
-              return tB.compareTo(tA);
-            });
-
-            return BlocBuilder<AdminBloc, AdminState>(
-              builder: (context, adminState) {
-                return TabBarView(
-                  children: [
-                    _buildPendingPayoutsList(
-                      context,
-                      adminState: adminState,
-                      totalPlatformRevenue: totalPlatformRevenue,
-                      pendingPayoutOrders: pendingPayoutOrders,
-                    ),
-                    _buildPayoutHistoryList(
-                      context,
-                      totalSettledPayouts: totalSettledPayouts,
-                      releasedPayoutOrders: releasedPayoutOrders,
-                    ),
-                  ],
-                );
-              },
+            final summary = _FinanceSummary(snapshot.data!.docs);
+            return TabBarView(
+              children: [
+                _PendingTab(summary: summary),
+                _HistoryTab(summary: summary),
+              ],
             );
           },
         ),
       ),
     );
   }
+}
 
-  Widget _buildPendingPayoutsList(
-    BuildContext context, {
-    required AdminState adminState,
-    required double totalPlatformRevenue,
-    required List<Map<String, dynamic>> pendingPayoutOrders,
-  }) {
-    return RefreshIndicator(
-      onRefresh: () async {
-        context.read<AdminBloc>().add(AdminLoadDataRequested());
-      },
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Financial Overview', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(24),
-              width: double.infinity,
-              decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(24)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Realized Platform Revenue', style: TextStyle(color: Colors.white70)),
-                  Text(
-                    '₹${totalPlatformRevenue.toStringAsFixed(2)}',
-                    style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      SmallStat(label: 'Flat Fee', value: '₹${adminState.flatFee.toStringAsFixed(0)}'),
-                      const SizedBox(width: 32),
-                      SmallStat(label: 'Commission', value: '${adminState.percentFee.toStringAsFixed(0)}%'),
-                    ],
-                  )
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Pending Creator Payouts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${pendingPayoutOrders.length} pending',
-                    style: const TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold),
+class _PendingTab extends StatelessWidget {
+  final _FinanceSummary summary;
+
+  const _PendingTab({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Platform revenue', style: TextStyle(color: Colors.white70)),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '₹${summary.revenue}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            pendingPayoutOrders.isEmpty
-                ? Container(
-                    padding: const EdgeInsets.all(24),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.outline),
+              ),
+              const SizedBox(height: 16),
+              BlocBuilder<AdminBloc, AdminState>(
+                buildWhen: (previous, current) =>
+                    previous.flatFee != current.flatFee ||
+                    previous.percentFee != current.percentFee,
+                builder: (context, state) => Wrap(
+                  spacing: 32,
+                  runSpacing: 12,
+                  children: [
+                    SmallStat(label: 'Flat fee', value: '₹${state.flatFee.round()}'),
+                    SmallStat(
+                      label: 'Commission (> ₹999)',
+                      value: '${state.percentFee.toStringAsFixed(state.percentFee % 1 == 0 ? 0 : 1)}%',
                     ),
-                    child: const Text('All creator payouts are fully settled!', style: TextStyle(color: AppColors.mutedText)),
-                  )
-                : ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: pendingPayoutOrders.length,
-                    itemBuilder: (context, index) {
-                      final payout = pendingPayoutOrders[index];
-                      final docId = payout['docId'] as String;
-                      final orderId = payout['orderId'] as String;
-                      final creatorId = payout['creatorId'] as String;
-                      final sellerName = payout['sellerName'] as String;
-                      final amount = payout['payoutAmount'] as double;
-                      final createdAt = payout['createdAt'] as DateTime;
-
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      sellerName,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Order #$orderId · ${DateFormat('dd MMM yyyy, hh:mm a').format(createdAt)}',
-                                      style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    '₹${amount.toStringAsFixed(0)}',
-                                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.primary),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  FilledButton.icon(
-                                    onPressed: () => _showPayoutReleaseModal(
-                                      context,
-                                      docId: docId,
-                                      orderId: orderId,
-                                      creatorId: creatorId,
-                                      sellerName: sellerName,
-                                      amount: amount,
-                                    ),
-                                    icon: const Icon(Icons.account_balance_wallet, size: 14),
-                                    label: const Text('Release Payout', style: TextStyle(fontSize: 11)),
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: AppColors.primary,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                    SmallStat(
+                      label: 'Awaiting delivery',
+                      value: '${summary.awaiting.length} orders',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Ready to release',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            Text(
+              '${summary.releasable.length} delivered',
+              style: const TextStyle(color: AppColors.mutedText, fontSize: 12),
+            ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildPayoutHistoryList(
-    BuildContext context, {
-    required double totalSettledPayouts,
-    required List<Map<String, dynamic>> releasedPayoutOrders,
-  }) {
-    return RefreshIndicator(
-      onRefresh: () async {
-        context.read<AdminBloc>().add(AdminLoadDataRequested());
-      },
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Settlement History', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(20),
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.green.shade800,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Total Settled Creator Payouts', style: TextStyle(color: Colors.white70)),
-                  Text(
-                    '₹${totalSettledPayouts.toStringAsFixed(2)}',
-                    style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${releasedPayoutOrders.length} creator payout(s) completed',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Settled Transactions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Text('${releasedPayoutOrders.length} records', style: const TextStyle(color: AppColors.mutedText, fontSize: 12)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            releasedPayoutOrders.isEmpty
-                ? Container(
-                    padding: const EdgeInsets.all(24),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.outline),
-                    ),
-                    child: const Text('No historical payout releases yet.', style: TextStyle(color: AppColors.mutedText)),
-                  )
-                : ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: releasedPayoutOrders.length,
-                    itemBuilder: (context, index) {
-                      final payout = releasedPayoutOrders[index];
-                      final orderId = payout['orderId'] as String;
-                      final sellerName = payout['sellerName'] as String;
-                      final amount = payout['payoutAmount'] as double;
-                      final releasedAt = payout['releasedAt'] as DateTime;
-
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                backgroundColor: Colors.green.withValues(alpha: 0.15),
-                                child: const Icon(Icons.check_circle, color: Colors.green, size: 22),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      sellerName,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'Order #$orderId · Released: ${DateFormat('dd MMM yyyy, hh:mm a').format(releasedAt)}',
-                                      style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    '₹${amount.toStringAsFixed(0)}',
-                                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.green),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: const Text(
-                                      'SETTLED',
-                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+        const SizedBox(height: 4),
+        const Text(
+          'Creator payouts become releasable once the order is delivered.',
+          style: TextStyle(color: AppColors.mutedText, fontSize: 12),
+        ),
+        const SizedBox(height: 12),
+        if (summary.releasable.isEmpty)
+          const _EmptyBox(message: 'No payouts waiting to be released.')
+        else
+          for (final order in summary.releasable)
+            Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            order.creatorName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showPayoutReleaseModal(
-    BuildContext context, {
-    required String docId,
-    required String orderId,
-    required String creatorId,
-    required String sellerName,
-    required double amount,
-  }) async {
-    String upiId = '';
-    String phone = 'N/A';
-
-    try {
-      if (creatorId.isNotEmpty) {
-        final profileDoc = await FirebaseFirestore.instance
-            .collection('creator_profiles')
-            .doc(creatorId)
-            .get();
-        if (profileDoc.exists && profileDoc.data() != null) {
-          final pData = profileDoc.data()!;
-          upiId = pData['upiId'] as String? ?? pData['payoutUpi'] as String? ?? '';
-          phone = pData['phone'] as String? ?? '';
-        }
-
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(creatorId)
-            .get();
-        if (userDoc.exists && userDoc.data() != null) {
-          final uData = userDoc.data()!;
-          if (phone.isEmpty || phone == 'N/A') {
-            phone = uData['phone'] as String? ?? '';
-          }
-        }
-      }
-    } catch (_) {}
-
-    if (upiId.isEmpty) {
-      final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
-      upiId = cleanPhone.length == 10 ? '$cleanPhone@upi' : '${sellerName.toLowerCase().replaceAll(' ', '')}@upi';
-    }
-
-    if (!context.mounted) return;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.background,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (modalContext) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          24,
-          24,
-          24,
-          MediaQuery.of(modalContext).viewInsets.bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Release Seller Payout',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(modalContext),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.outline),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const CircleAvatar(
-                      backgroundColor: AppColors.primary,
-                      child: Icon(Icons.storefront, color: Colors.white),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Order #${order.shortId} · ${DateFormat('dd MMM yyyy').format(order.createdAt)}',
+                            style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+                          ),
+                        ],
+                      ),
                     ),
-                    title: Text(sellerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    subtitle: Text('Order #$orderId · Creator Payout', style: const TextStyle(color: AppColors.mutedText, fontSize: 12)),
-                    trailing: Text(
-                      '₹${amount.toStringAsFixed(0)}',
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: AppColors.primary),
-                    ),
-                  ),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  const Text('Seller UPI ID / Payment Address:', style: TextStyle(fontSize: 12, color: AppColors.mutedText)),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Icon(Icons.account_balance_wallet, color: Colors.green, size: 20),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            upiId,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.green),
+                        Text(
+                          '₹${order.amount}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                            color: AppColors.primary,
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.copy_rounded, size: 20, color: Colors.green),
-                          tooltip: 'Copy UPI ID',
-                          onPressed: () {
-                            Clipboard.setData(ClipboardData(text: upiId));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Copied UPI ID ($upiId) to clipboard')),
-                            );
-                          },
+                        const SizedBox(height: 6),
+                        FilledButton(
+                          onPressed: () => _showReleaseSheet(context, order),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            minimumSize: const Size(0, 34),
+                          ),
+                          child: const Text('Release', style: TextStyle(fontSize: 12)),
                         ),
                       ],
                     ),
-                  ),
-                  if (phone.isNotEmpty && phone != 'N/A') ...[
-                    const SizedBox(height: 8),
-                    Text('Seller Phone: $phone', style: const TextStyle(fontSize: 12, color: AppColors.mutedText)),
                   ],
-                ],
+                ),
               ),
             ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: upiId));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Copied UPI ID ($upiId)')),
-                      );
-                    },
-                    icon: const Icon(Icons.copy),
-                    label: const Text('Copy UPI'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () async {
-                      final messenger = ScaffoldMessenger.of(context);
-                      Navigator.pop(modalContext);
-                      try {
-                        await FirebaseFirestore.instance
-                            .collection('orders')
-                            .doc(docId)
-                            .update({
-                              'payoutStatus': 'paid',
-                              'payoutReleasedAt': FieldValue.serverTimestamp(),
-                            });
-                        messenger.showSnackBar(
-                          SnackBar(content: Text('Payout of ₹${amount.toStringAsFixed(0)} marked as released to $sellerName.')),
-                        );
-                      } catch (e) {
-                        messenger.showSnackBar(
-                          SnackBar(content: Text('Could not update payout status: $e')),
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.check_circle),
-                    label: const Text('Confirm Released'),
-                    style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-                  ),
-                ),
-              ],
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Awaiting delivery',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            Text(
+              '₹${summary.awaiting.fold<int>(0, (total, order) => total + order.amount)} owed',
+              style: const TextStyle(color: AppColors.mutedText, fontSize: 12),
             ),
           ],
         ),
+        const SizedBox(height: 4),
+        const Text(
+          'Paid orders still being fulfilled. They move to "Ready to release" once delivered.',
+          style: TextStyle(color: AppColors.mutedText, fontSize: 12),
+        ),
+        const SizedBox(height: 12),
+        if (summary.awaiting.isEmpty)
+          const _EmptyBox(message: 'No paid orders in fulfilment.')
+        else
+          for (final order in summary.awaiting)
+            Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                title: Text(
+                  order.creatorName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  'Order #${order.shortId} · ${OrderStatus.label(order.status)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                trailing: Text(
+                  '₹${order.amount}',
+                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                ),
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+class _HistoryTab extends StatelessWidget {
+  final _FinanceSummary summary;
+
+  const _HistoryTab({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.green.shade800,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Total paid to creators', style: TextStyle(color: Colors.white70)),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '₹${summary.settled}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${summary.released.length} payout(s) released',
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        if (summary.released.isEmpty)
+          const _EmptyBox(message: 'No payouts released yet.')
+        else
+          for (final order in summary.released)
+            Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.green.withValues(alpha: 0.15),
+                  child: const Icon(Icons.check_circle, color: Colors.green, size: 22),
+                ),
+                title: Text(
+                  order.creatorName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  'Order #${order.shortId}'
+                  '${order.releasedAt == null ? '' : ' · Released ${DateFormat('dd MMM yyyy').format(order.releasedAt!)}'}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                trailing: Text(
+                  '₹${order.amount}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                    color: Colors.green,
+                  ),
+                ),
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+class _EmptyBox extends StatelessWidget {
+  final String message;
+
+  const _EmptyBox({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Text(message, style: const TextStyle(color: AppColors.mutedText)),
+    );
+  }
+}
+
+Future<void> _showReleaseSheet(BuildContext context, _PayoutOrder order) async {
+  Map<String, dynamic>? bank;
+  String? loadError;
+  if (order.creatorId.isNotEmpty) {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('creator_bank_accounts')
+          .doc(order.creatorId)
+          .get();
+      bank = doc.data();
+    } catch (error) {
+      loadError = friendlyErrorMessage(error);
+    }
+  }
+  if (!context.mounted) return;
+  final messenger = ScaffoldMessenger.of(context);
+
+  Widget detail(String label, String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.mutedText)),
+          ),
+          Expanded(
+            child: Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          IconButton(
+            tooltip: 'Copy $label',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.copy_rounded, size: 18),
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: text));
+              messenger.showSnackBar(SnackBar(content: Text('$label copied.')));
+            },
+          ),
+        ],
       ),
     );
   }
+
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: AppColors.background,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (sheetContext) => SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Release creator payout',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.primary),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${order.creatorName} · Order #${order.shortId}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              Text(
+                '₹${order.amount}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 22,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 28),
+          if (loadError != null)
+            Text('Could not load payout details: $loadError',
+                style: const TextStyle(color: Colors.redAccent))
+          else if (bank == null)
+            const Text(
+              'This creator has not added payout details yet. Ask them to add bank details in their profile before releasing.',
+              style: TextStyle(color: Colors.redAccent),
+            )
+          else ...[
+            detail('Account holder', bank['accountHolderName'] as String?),
+            detail('Account no.', bank['accountNumber'] as String?),
+            detail('IFSC', bank['ifscCode'] as String?),
+            detail('Bank', bank['bankName'] as String?),
+            detail('UPI ID', bank['upiId'] as String?),
+          ],
+          const SizedBox(height: 12),
+          const Text(
+            'Transfer the amount using these details, then confirm below to record the payout.',
+            style: TextStyle(fontSize: 12, color: AppColors.mutedText),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: bank == null
+                  ? null
+                  : () async {
+                      Navigator.pop(sheetContext);
+                      try {
+                        await FirebaseFirestore.instance
+                            .collection('orders')
+                            .doc(order.id)
+                            .update({
+                              'payoutStatus': 'paid',
+                              'payoutReleasedAt': FieldValue.serverTimestamp(),
+                              'updatedAt': FieldValue.serverTimestamp(),
+                            });
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Payout of ₹${order.amount} recorded for ${order.creatorName}.',
+                            ),
+                          ),
+                        );
+                      } catch (error) {
+                        messenger.showSnackBar(
+                          SnackBar(content: Text(friendlyErrorMessage(error))),
+                        );
+                      }
+                    },
+              icon: const Icon(Icons.check_circle),
+              label: const Text('Mark as paid'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }

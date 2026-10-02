@@ -3,10 +3,15 @@ part of 'creator_bloc.dart';
 @immutable
 sealed class CreatorEvent {}
 
+/// Loads the creator profile for [uid] (or refreshes it silently).
 final class CreatorCheckProfileExists extends CreatorEvent {
   final String uid;
-  CreatorCheckProfileExists(this.uid);
+  final bool silent;
+  CreatorCheckProfileExists(this.uid, {this.silent = false});
 }
+
+/// Clears the session on sign-out.
+final class CreatorSessionEnded extends CreatorEvent {}
 
 final class CreatorSubmitOnboarding extends CreatorEvent {
   final String uid;
@@ -66,178 +71,48 @@ final class CreatorSubmitVerification extends CreatorEvent {
   });
 }
 
-final class CreatorFetchAllProfiles extends CreatorEvent {}
-
-final class CreatorUpdateVerificationStatus extends CreatorEvent {
-  final String uid;
-  final String status;
-  CreatorUpdateVerificationStatus({required this.uid, required this.status});
+/// Creates a product, or updates [productId] when it is set.
+final class CreatorSaveProduct extends CreatorEvent {
+  final String? productId;
+  final ProductInput input;
+  CreatorSaveProduct({this.productId, required this.input});
 }
 
-final class CreatorAddProduct extends CreatorEvent {
-  final String name;
-  final String description;
-  final List<File> imageFiles;
-  final String category;
-  final List<String> categories;
-  final double price;
-  final int stock;
-  final String materials;
-  final String dimensions;
-  final String weight;
-  final String shippingInfo;
-  final String creatorUid;
-  final String creatorName;
-  final bool isCustomizable;
-  final bool? isFramed;
-  final List<String> predefinedCustomizations;
-  final List<CustomizationInput> customizations;
-
-  CreatorAddProduct({
-    required this.name,
-    required this.description,
-    required this.imageFiles,
-    required this.category,
-    this.categories = const [],
-    required this.price,
-    required this.stock,
-    required this.materials,
-    required this.dimensions,
-    required this.weight,
-    required this.shippingInfo,
-    required this.creatorUid,
-    required this.creatorName,
-    this.isCustomizable = false,
-    this.isFramed,
-    this.predefinedCustomizations = const [],
-    this.customizations = const [],
-  });
-}
-
-final class CreatorUpdateProduct extends CreatorEvent {
+final class CreatorDeleteProduct extends CreatorEvent {
   final String productId;
-  final String name;
-  final String description;
-  final List<File> newImageFiles;
-  final List<String> existingImageUrls;
-  final String category;
-  final List<String> categories;
-  final double price;
-  final int stock;
-  final String materials;
-  final String dimensions;
-  final String weight;
-  final String shippingInfo;
-  final String creatorUid;
-  final String creatorName;
-  final bool isCustomizable;
-  final bool? isFramed;
-  final List<String> predefinedCustomizations;
-  final List<CustomizationInput> customizations;
-  final bool hasChanges;
-
-  CreatorUpdateProduct({
-    required this.productId,
-    required this.name,
-    required this.description,
-    required this.newImageFiles,
-    required this.existingImageUrls,
-    required this.category,
-    this.categories = const [],
-    required this.price,
-    required this.stock,
-    required this.materials,
-    required this.dimensions,
-    required this.weight,
-    required this.shippingInfo,
-    required this.creatorUid,
-    required this.creatorName,
-    required this.isCustomizable,
-    this.isFramed,
-    this.predefinedCustomizations = const [],
-    required this.customizations,
-    required this.hasChanges,
-  });
+  CreatorDeleteProduct(this.productId);
 }
 
-final class CreatorFetchPendingProducts extends CreatorEvent {}
-
-final class CreatorFetchAdminAllProducts extends CreatorEvent {}
-
-final class CreatorFetchCreatorProducts extends CreatorEvent {
-  final String uid;
-  CreatorFetchCreatorProducts(this.uid);
-}
-
-final class CreatorUpdateProductStatus extends CreatorEvent {
+final class CreatorSetProductPublished extends CreatorEvent {
   final String productId;
-  final String status;
-  final String? approvedBy;
-  final String? approvedByEmail;
-  final String? rejectionReason;
-
-  CreatorUpdateProductStatus({
-    required this.productId,
-    required this.status,
-    this.approvedBy,
-    this.approvedByEmail,
-    this.rejectionReason,
-  });
+  final bool published;
+  CreatorSetProductPublished({required this.productId, required this.published});
 }
 
-final class CreatorFetchOrders extends CreatorEvent {
-  final String uid;
-  CreatorFetchOrders(this.uid);
+final class CreatorUpdateStock extends CreatorEvent {
+  final String productId;
+  final int stock;
+  CreatorUpdateStock({required this.productId, required this.stock});
 }
 
 final class CreatorUpdateOrderStatus extends CreatorEvent {
   final String orderId;
   final String status;
-  final String? rejectionReason;
   final String? consignmentNumber;
   final String? carrierName;
-  final String uid; // to re-fetch
+
   CreatorUpdateOrderStatus({
     required this.orderId,
     required this.status,
-    this.rejectionReason,
     this.consignmentNumber,
     this.carrierName,
-    required this.uid,
   });
 }
 
-final class CreatorFetchNotifications extends CreatorEvent {
-  final String uid;
-  CreatorFetchNotifications(this.uid);
-}
-
-final class CreatorMarkNotificationAsRead extends CreatorEvent {
-  final String notificationId;
-  final String uid;
-  CreatorMarkNotificationAsRead({
-    required this.notificationId,
-    required this.uid,
-  });
-}
-
-final class CreatorMarkAllNotificationsAsRead extends CreatorEvent {
-  final String uid;
-  CreatorMarkAllNotificationsAsRead(this.uid);
-}
-
-final class CreatorDeleteNotifications extends CreatorEvent {
-  final List<String> notificationIds;
-  final String uid;
-  CreatorDeleteNotifications({
-    required this.notificationIds,
-    required this.uid,
-  });
-}
-
-final class CreatorFetchBankAccount extends CreatorEvent {
-  final String uid;
-  CreatorFetchBankAccount(this.uid);
+final class CreatorRejectOrder extends CreatorEvent {
+  final String orderId;
+  final String reason;
+  CreatorRejectOrder({required this.orderId, required this.reason});
 }
 
 final class CreatorSaveBankAccount extends CreatorEvent {

@@ -28,6 +28,8 @@ class CreatorProductModel extends CreatorProduct {
     super.approvedBy,
     super.approvedByEmail,
     super.rejectionReason,
+    super.orderCount,
+    super.wishlistCount,
   });
 
   Map<String, dynamic> toJson() {
@@ -109,6 +111,8 @@ class CreatorProductModel extends CreatorProduct {
       approvedBy: json['approvedBy'] ?? '',
       approvedByEmail: json['approvedByEmail'] ?? '',
       rejectionReason: json['rejectionReason'] ?? '',
+      orderCount: (json['orderCount'] as num?)?.toInt() ?? 0,
+      wishlistCount: (json['wishlistCount'] as num?)?.toInt() ?? 0,
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/auth/domain/repositories/auth_repository.dart';
+import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/buyer/data/mock_buyer_repository.dart';
 import 'package:madebyhands/features/buyer/data/mock_products.dart';
 import 'package:madebyhands/features/buyer/domain/entities/buyer_product_notification.dart';
@@ -63,18 +64,30 @@ void main() {
     await tester.tap(find.text('Filter'));
     await tester.pumpAndSettle();
     expect(find.text('Filter by category'), findsOneWidget);
-    expect(find.text('Paintings & Fine Art'), findsOneWidget);
     expect(
-      find.widgetWithText(CheckboxListTile, 'Pottery, Ceramics & Clay'),
+      find.text('Paintings, Drawing, Fine Art & Traditional Art'),
+      findsOneWidget,
+    );
+    expect(
+      find.widgetWithText(
+        CheckboxListTile,
+        'Pottery, Ceramics, Clay & Sculpture',
+      ),
       findsOneWidget,
     );
 
     await tester.tap(
-      find.widgetWithText(CheckboxListTile, 'Paintings & Fine Art'),
+      find.widgetWithText(
+        CheckboxListTile,
+        'Paintings, Drawing, Fine Art & Traditional Art',
+      ),
     );
     await tester.pump();
     await tester.tap(
-      find.widgetWithText(CheckboxListTile, 'Pottery, Ceramics & Clay'),
+      find.widgetWithText(
+        CheckboxListTile,
+        'Pottery, Ceramics, Clay & Sculpture',
+      ),
     );
     await tester.pump();
     await tester.tap(find.text('Apply (2)'));
@@ -428,7 +441,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Creator story'), findsOneWidget);
-    expect(find.text('Storefront · 1 products'), findsOneWidget);
+    expect(find.text('Storefront · 1 product'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('Handwoven Storage Basket'),
       300,
@@ -499,17 +512,20 @@ void main() {
     expect(restoredBloc.state.cartQuantities[product.id], product.stock);
   });
 
-  testWidgets('buyer updates profile and requests account deletion', (
+  testWidgets('buyer updates profile and deletes the account', (
     tester,
   ) async {
     final repository = _FakeAccountAuthRepository();
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.lightThemeMode,
-        home: BuyerAccountPage(
-          user: buyer,
-          repository: repository,
-          onProfileUpdated: (_) {},
+        home: BlocProvider(
+          create: (_) => AuthBloc(authRepository: repository),
+          child: BuyerAccountPage(
+            user: buyer,
+            repository: repository,
+            onProfileUpdated: (_) {},
+          ),
         ),
       ),
     );
@@ -520,18 +536,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(repository.updatedName, 'Suhani Mahajan');
 
-    await tester.ensureVisible(find.text('Request account deletion'));
-    await tester.tap(find.text('Request account deletion'));
+    await tester.ensureVisible(find.text('Delete Account'));
+    await tester.tap(find.text('Delete Account'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Submit request'));
+    await tester.tap(find.text('Permanently Delete'));
     await tester.pumpAndSettle();
-    expect(repository.deletionRequested, isTrue);
+    expect(repository.deletedUid, buyer.uid);
   });
 }
 
 class _FakeAccountAuthRepository implements AuthRepository {
   String? updatedName;
-  bool deletionRequested = false;
+  String? deletedUid;
 
   @override
   Future<Either<Failure, UserEntity>> updateProfile({
@@ -552,14 +568,10 @@ class _FakeAccountAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, void>> requestAccountDeletion(UserEntity user) async {
-    deletionRequested = true;
+  Future<Either<Failure, void>> deleteAccount(String uid) async {
+    deletedUid = uid;
     return right(null);
   }
-
-  @override
-  Future<Either<Failure, void>> sendPasswordReset(String email) async =>
-      right(null);
 
   @override
   Future<Either<Failure, UserEntity>> getCurrentUser() async =>

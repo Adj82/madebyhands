@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:madebyhands/features/auth/data/models/user_model.dart';
+import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 
 abstract interface class AuthRemoteDataSource {
   Future<UserModel?> signInWithGoogle();
@@ -14,14 +17,14 @@ abstract interface class AuthRemoteDataSource {
     required String phone,
     required String role,
   });
+
+  /// The signed-in user's profile, or null when nobody is signed in.
   Future<UserModel?> getCurrentUserData();
   Future<UserModel> updateProfile({
     required String uid,
     required String name,
     required String phone,
   });
-  Future<void> sendPasswordReset(String email);
-  Future<void> requestAccountDeletion(UserModel user);
   Future<void> deleteAccount(String uid);
   Future<void> signOut();
 }
@@ -30,85 +33,74 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final FirebaseAuth firebaseAuth;
   final FirebaseFirestore firestore;
   final GoogleSignIn googleSignIn;
+  final FirebaseStorage storage;
 
   AuthRemoteDataSourceImpl({
     required this.firebaseAuth,
     required this.firestore,
     required this.googleSignIn,
+    required this.storage,
   });
+
+  UserModel _userFromDocument(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data() ?? const <String, dynamic>{};
+    final storedUid = data['uid'] as String?;
+    return UserModel.fromJson({
+      ...data,
+      'uid': storedUid == null || storedUid.isEmpty ? doc.id : storedUid,
+    });
+  }
 
   @override
   Future<UserModel?> signInWithGoogle() async {
     try {
-      debugPrint("Starting Google Sign-In flow...");
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      if (googleUser == null) {
-        debugPrint("Google Sign-In: User cancelled the flow.");
-        return null;
-      }
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) return null;
 
-      debugPrint("Google Sign-In: Fetching authentication details...");
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
+      final googleAuth = await googleUser.authentication;
       if (googleAuth.idToken == null && googleAuth.accessToken == null) {
         throw Exception(
-          'Both idToken and accessToken are null. Check your Google Cloud Console configuration.',
+          'Google did not return sign-in credentials. Please try again.',
         );
       }
 
-      final AuthCredential credential = GoogleAuthProvider.credential(
+      final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
-
-      debugPrint("Firebase: Signing in with Google credentials...");
-      final UserCredential userCredential = await firebaseAuth
-          .signInWithCredential(credential);
-      final User? user = userCredential.user;
-
+      final userCredential = await firebaseAuth.signInWithCredential(
+        credential,
+      );
+      final user = userCredential.user;
       if (user == null) return null;
 
-      // Admin emails list
-      const adminEmails = [
-        'adhirajjain364@gmail.com',
-        'mayankjaisw8673@gmail.com',
-        'suhanimahajan2810@gmail.com',
-        'majumdarpayal50@gmail.com',
-        'reshob.rc12345@gmail.com',
-      ];
-      final String userEmail = user.email ?? '';
-
-      // Check if user exists in Firestore
+      final email = user.email ?? '';
       final userDoc = await firestore.collection('users').doc(user.uid).get();
-      final userData = userDoc.data();
-
-      if (userDoc.exists && userData != null) {
-        return UserModel.fromJson(userData);
-      } else if (adminEmails.contains(userEmail)) {
-        // Automatically create admin profile if it's a preset admin email
+      if (userDoc.exists && userDoc.data() != null) {
+        return _userFromDocument(userDoc);
+      }
+      if (UserEntity.presetSuperAdminEmails.contains(email.toLowerCase())) {
+        // Preset administrators get their profile created on first sign-in.
         return await signUpWithRole(
           uid: user.uid,
-          email: userEmail,
+          email: email,
           name: user.displayName ?? 'Admin',
           phone: '',
           role: 'admin',
         );
-      } else {
-        // Return partial user for role selection
-        return UserModel(
-          uid: user.uid,
-          email: userEmail,
-          name: user.displayName ?? '',
-          role: '', // Triggers Role Selection UI
-        );
       }
+      // An empty role sends the user to role selection.
+      return UserModel(
+        uid: user.uid,
+        email: email,
+        name: user.displayName ?? '',
+        role: '',
+      );
     } on FirebaseAuthException catch (e) {
-      throw Exception(e.message ?? 'A Firebase authentication error occurred.');
-    } catch (e, stackTrace) {
-      debugPrint("Google Sign-In Detailed Error: $e");
-      debugPrint("Stacktrace: $stackTrace");
-      throw Exception('Google sign-in error: $e');
+      throw Exception(e.message ?? 'Google sign-in failed. Please try again.');
+    } catch (e) {
+      debugPrint('Google sign-in error: $e');
+      rethrow;
     }
   }
 
@@ -120,60 +112,51 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String phone,
     required String role,
   }) async {
-    try {
-      final reference = firestore.collection('users').doc(uid);
-      final existing = await reference.get();
-      if (existing.exists && existing.data() != null) {
-        await reference.update({'name': name, 'email': email, 'phone': phone});
-        return UserModel.fromJson({
-          ...existing.data()!,
-          'name': name,
-          'email': email,
-          'phone': phone,
-        });
-      }
-      final userModel = UserModel(
-        uid: uid,
-        email: email,
-        name: name,
-        phone: phone,
-        role: role,
-        isVerified: false,
-      );
-      await reference.set(userModel.toJson());
-      return userModel;
-    } on FirebaseException catch (e) {
-      throw Exception(
-        e.message ?? 'A Firestore error occurred while creating user.',
-      );
-    } catch (e) {
-      throw Exception('An unexpected error occurred during role assignment.');
+    final reference = firestore.collection('users').doc(uid);
+    final existing = await reference.get();
+    if (existing.exists && existing.data() != null) {
+      await reference.update({'name': name, 'email': email, 'phone': phone});
+      return UserModel.fromJson({
+        ..._userFromDocument(existing).toJson(),
+        'name': name,
+        'email': email,
+        'phone': phone,
+      });
     }
+    final userModel = UserModel(
+      uid: uid,
+      email: email,
+      name: name,
+      phone: phone,
+      role: role,
+    );
+    await reference.set(userModel.toJson());
+    return userModel;
   }
 
   @override
   Future<UserModel?> getCurrentUserData() async {
-    try {
-      final user = firebaseAuth.currentUser;
-      if (user == null) return null;
+    // On web the persisted session is restored asynchronously, so
+    // currentUser can be null for a moment after start-up.
+    final user =
+        firebaseAuth.currentUser ??
+        await firebaseAuth
+            .authStateChanges()
+            .first
+            .timeout(const Duration(seconds: 10), onTimeout: () => null);
+    if (user == null) return null;
 
-      final userDoc = await firestore.collection('users').doc(user.uid).get();
-      final userData = userDoc.data();
-      if (userDoc.exists && userData != null) {
-        return UserModel.fromJson(userData);
-      }
-
-      // If user is authenticated in Firebase but no profile in Firestore,
-      // trigger role selection by returning a UserModel with empty role.
-      return UserModel(
-        uid: user.uid,
-        email: user.email ?? '',
-        name: user.displayName ?? '',
-        role: '',
-      );
-    } catch (e) {
-      return null;
+    final userDoc = await firestore.collection('users').doc(user.uid).get();
+    if (userDoc.exists && userDoc.data() != null) {
+      return _userFromDocument(userDoc);
     }
+    // Signed in with Firebase but no profile yet: ask for a role.
+    return UserModel(
+      uid: user.uid,
+      email: user.email ?? '',
+      name: user.displayName ?? '',
+      role: '',
+    );
   }
 
   @override
@@ -191,126 +174,96 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     if (!snapshot.exists || snapshot.data() == null) {
       throw StateError('User profile not found.');
     }
-    return UserModel.fromJson(snapshot.data()!);
-  }
-
-  @override
-  Future<void> sendPasswordReset(String email) =>
-      firebaseAuth.sendPasswordResetEmail(email: email.trim());
-
-  @override
-  Future<void> requestAccountDeletion(UserModel user) async {
-    // Obsolete: Immediate account deletion is now handled via deleteAccount(uid)
+    return _userFromDocument(snapshot);
   }
 
   @override
   Future<void> deleteAccount(String uid) async {
     final currentUser = firebaseAuth.currentUser;
+    if (currentUser == null || currentUser.uid != uid) {
+      throw Exception('Please sign in again before deleting your account.');
+    }
+    // Firebase only deletes accounts that signed in recently. Checking first
+    // avoids wiping the user's data and then failing to delete the login.
+    final lastSignIn = currentUser.metadata.lastSignInTime;
+    if (lastSignIn == null ||
+        DateTime.now().difference(lastSignIn) > const Duration(minutes: 4)) {
+      throw Exception(
+        'For your security, sign out and sign in again, then delete your account.',
+      );
+    }
+
+    final userDoc = await firestore.collection('users').doc(uid).get();
+    final role = (userDoc.data()?['role'] as String? ?? '').toLowerCase();
+
+    if (role == 'creator' || role == 'seller') {
+      await _deleteQuietly(firestore.collection('creator_profiles').doc(uid));
+      await _deleteQuietly(firestore.collection('creator_verifications').doc(uid));
+      await _deleteQuietly(firestore.collection('creator_bank_accounts').doc(uid));
+      await _deleteQuery(
+        firestore.collection('products').where('creatorUid', isEqualTo: uid),
+      );
+      await _deleteQuery(
+        firestore.collection('notifications').where('creatorUid', isEqualTo: uid),
+      );
+      await _deleteStorageFolder(storage.ref('creator_profiles/$uid'));
+      await _deleteStorageFolder(storage.ref('products/$uid'));
+    }
+    await _deleteQuery(
+      firestore.collection('users').doc(uid).collection('favorites'),
+    );
+    await _deleteQuery(
+      firestore.collection('users').doc(uid).collection('addresses'),
+    );
+    await firestore.collection('users').doc(uid).delete();
 
     try {
-      // 1. Fetch user role safely
-      DocumentSnapshot<Map<String, dynamic>>? userDoc;
-      try {
-        userDoc = await firestore.collection('users').doc(uid).get();
-      } catch (_) {}
-
-      final role = userDoc?.data()?['role'] as String? ?? '';
-
-      // 2. Safely clean up Firestore subcollections & documents
-      if (role == 'creator') {
-        try {
-          await firestore.collection('creator_profiles').doc(uid).delete();
-        } catch (_) {}
-        try {
-          await firestore.collection('creator_bank_accounts').doc(uid).delete();
-        } catch (_) {}
-        try {
-          final products = await firestore
-              .collection('products')
-              .where('creatorUid', isEqualTo: uid)
-              .get();
-          for (final doc in products.docs) {
-            try {
-              await doc.reference.delete();
-            } catch (_) {}
-          }
-        } catch (_) {}
-        try {
-          final notifications = await firestore
-              .collection('notifications')
-              .where('creatorUid', isEqualTo: uid)
-              .get();
-          for (final doc in notifications.docs) {
-            try {
-              await doc.reference.delete();
-            } catch (_) {}
-          }
-        } catch (_) {}
-
-        try {
-          final storage = FirebaseStorage.instance;
-          final result = await storage.ref('creator_profiles/$uid').listAll();
-          for (final item in result.items) {
-            try {
-              await item.delete();
-            } catch (_) {}
-          }
-        } catch (_) {}
-      } else if (role == 'buyer') {
-        try {
-          final favs = await firestore
-              .collection('users')
-              .doc(uid)
-              .collection('favorites')
-              .get();
-          for (final doc in favs.docs) {
-            try {
-              await doc.reference.delete();
-            } catch (_) {}
-          }
-        } catch (_) {}
-        try {
-          final addrs = await firestore
-              .collection('users')
-              .doc(uid)
-              .collection('addresses')
-              .get();
-          for (final doc in addrs.docs) {
-            try {
-              await doc.reference.delete();
-            } catch (_) {}
-          }
-        } catch (_) {}
-      }
-
-      // 3. Delete main user document
-      try {
-        await firestore.collection('users').doc(uid).delete();
-      } catch (_) {}
-
-      // 4. Delete Firebase Auth User
-      if (currentUser != null && currentUser.uid == uid) {
-        await currentUser.delete();
-      }
-
-      // 5. Sign out Google
-      try {
-        await googleSignIn.signOut();
-      } catch (_) {}
+      await currentUser.delete();
     } on FirebaseAuthException catch (e) {
       if (e.code == 'requires-recent-login') {
         throw Exception(
-          'For security reasons, please sign out and sign in again before deleting your account.',
+          'For your security, sign out and sign in again, then delete your account.',
         );
       }
-      throw Exception(
-        e.message ?? 'An error occurred while deleting your account.',
-      );
-    } catch (e) {
-      if (firebaseAuth.currentUser == null) {
-        return;
+      throw Exception(e.message ?? 'Your account could not be deleted.');
+    }
+    try {
+      await googleSignIn.signOut();
+    } catch (_) {}
+  }
+
+  Future<void> _deleteQuietly(DocumentReference<Map<String, dynamic>> ref) async {
+    try {
+      await ref.delete();
+    } catch (error) {
+      debugPrint('Account cleanup skipped ${ref.path}: $error');
+    }
+  }
+
+  Future<void> _deleteQuery(Query<Map<String, dynamic>> query) async {
+    try {
+      final snapshot = await query.get();
+      for (final doc in snapshot.docs) {
+        await _deleteQuietly(doc.reference);
       }
-      throw Exception('An error occurred while deleting your account: $e');
+    } catch (error) {
+      debugPrint('Account cleanup query failed: $error');
+    }
+  }
+
+  Future<void> _deleteStorageFolder(Reference folder) async {
+    try {
+      final listing = await folder.listAll();
+      for (final item in listing.items) {
+        try {
+          await item.delete();
+        } catch (_) {}
+      }
+      for (final prefix in listing.prefixes) {
+        await _deleteStorageFolder(prefix);
+      }
+    } catch (error) {
+      debugPrint('Storage cleanup skipped ${folder.fullPath}: $error');
     }
   }
 
@@ -318,9 +271,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<void> signOut() async {
     try {
       await googleSignIn.signOut();
-      await firebaseAuth.signOut();
-    } catch (e) {
-      throw Exception('Error signing out.');
+    } catch (_) {
+      // Google may already be signed out; Firebase sign-out still matters.
     }
+    await firebaseAuth.signOut();
   }
 }

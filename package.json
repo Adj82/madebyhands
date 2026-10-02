@@ -1,8 +1,13 @@
 {
   "name": "madebyhands",
   "version": "1.0.0",
+  "private": true,
   "scripts": {
-    "build": "bash vercel-build.sh"
+    "build": "bash vercel-build.sh",
+    "test": "node --test test/api/payment_server.test.js test/api/handlers.test.js"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "razorpay": "^2.9.5",

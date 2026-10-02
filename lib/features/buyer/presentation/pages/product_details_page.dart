@@ -46,6 +46,8 @@ class ProductDetailsPage extends StatefulWidget {
 class _ProductDetailsPageState extends State<ProductDetailsPage> {
   late bool _isSaved = widget.isSaved;
   late Future<ProductReviewEligibility> _reviewEligibility;
+  late final Stream<List<ProductReview>> _reviews = widget.buyerRepository
+      .watchProductReviews(widget.product.id);
   late Map<String, List<String>> _customizationValues;
 
   @override
@@ -151,23 +153,10 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
         body: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
           children: [
-            AspectRatio(
-              aspectRatio: 1.15,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: product.color,
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                child: Icon(
-                  product.icon,
-                  size: 112,
-                  color: AppColors.text.withValues(alpha: 0.62),
-                ),
-              ),
-            ),
+            _ProductGallery(product: product),
             const SizedBox(height: 24),
             Text(
-              product.category.toUpperCase(),
+              product.categoryLabel.toUpperCase(),
               style: const TextStyle(
                 color: Color(0xFF8B261D),
                 fontWeight: FontWeight.w800,
@@ -190,10 +179,11 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
                   children: [
-                    const Icon(Icons.star_rounded, color: Color(0xFFE0A72F)),
+                    const Icon(Icons.storefront_outlined, size: 20, color: Color(0xFF8B261D)),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        '${product.rating}  ·  Made by ${product.artisan}',
+                        'Made by ${product.artisan}',
                         style: const TextStyle(color: AppColors.mutedText),
                       ),
                     ),
@@ -220,13 +210,15 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 ),
                 if (customizationSelection.additionalPrice > 0) ...[
                   const SizedBox(width: 8),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 3),
-                    child: Text(
-                      'includes ₹${customizationSelection.additionalPrice} customization',
-                      style: const TextStyle(
-                        color: Color(0xFF8B261D),
-                        fontWeight: FontWeight.w700,
+                  Flexible(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 3),
+                      child: Text(
+                        'includes ₹${customizationSelection.additionalPrice} customization',
+                        style: const TextStyle(
+                          color: Color(0xFF8B261D),
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
@@ -295,17 +287,15 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
               icon: Icons.handyman_outlined,
               text: 'Handmade in India',
             ),
-            const _DetailLine(
-              icon: Icons.inventory_2_outlined,
-              text: 'Plastic-conscious packaging',
-            ),
-            const _DetailLine(
-              icon: Icons.local_shipping_outlined,
-              text: 'Estimated delivery in 4–7 days',
-            ),
+            if (product.isAvailable && product.stock > 0 && product.stock <= 5)
+              _DetailLine(
+                icon: Icons.inventory_2_outlined,
+                text: 'Only ${product.stock} left',
+              ),
             const SizedBox(height: 20),
             _ProductReviewsSection(
               product: product,
+              reviewStream: _reviews,
               buyerId: widget.buyerId,
               buyerName: widget.buyerName,
               repository: widget.buyerRepository,
@@ -655,6 +645,7 @@ class _CustomizationChoice extends StatelessWidget {
 
 class _ProductReviewsSection extends StatelessWidget {
   final Product product;
+  final Stream<List<ProductReview>> reviewStream;
   final String buyerId;
   final String buyerName;
   final BuyerRepository repository;
@@ -662,6 +653,7 @@ class _ProductReviewsSection extends StatelessWidget {
 
   const _ProductReviewsSection({
     required this.product,
+    required this.reviewStream,
     required this.buyerId,
     required this.buyerName,
     required this.repository,
@@ -671,7 +663,7 @@ class _ProductReviewsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<ProductReview>>(
-      stream: repository.watchProductReviews(product.id),
+      stream: reviewStream,
       builder: (context, snapshot) {
         final reviews = snapshot.data ?? const <ProductReview>[];
         final ownReview = reviews.where((review) => review.buyerId == buyerId);
@@ -694,12 +686,14 @@ class _ProductReviewsSection extends StatelessWidget {
                     ),
                   ),
                 ),
-                const Icon(Icons.star_rounded, color: Color(0xFFE0A72F)),
-                Text(
-                  average.toStringAsFixed(1),
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(width: 4),
+                if (average > 0) ...[
+                  const Icon(Icons.star_rounded, color: Color(0xFFE0A72F)),
+                  Text(
+                    average.toStringAsFixed(1),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(width: 4),
+                ],
                 Text(
                   '(${reviews.length})',
                   style: const TextStyle(color: AppColors.mutedText),
@@ -1019,4 +1013,83 @@ class _DetailLine extends StatelessWidget {
           ],
         ),
       );
+}
+
+/// Swipeable product photos with a page indicator, or the category
+/// placeholder when the listing has no photos.
+class _ProductGallery extends StatefulWidget {
+  final Product product;
+
+  const _ProductGallery({required this.product});
+
+  @override
+  State<_ProductGallery> createState() => _ProductGalleryState();
+}
+
+class _ProductGalleryState extends State<_ProductGallery> {
+  int _page = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final product = widget.product;
+    final images = product.images.where((url) => url.trim().isNotEmpty).toList();
+    final placeholder = DecoratedBox(
+      decoration: BoxDecoration(color: product.color),
+      child: Center(
+        child: Icon(
+          product.icon,
+          size: 112,
+          color: AppColors.text.withValues(alpha: 0.62),
+        ),
+      ),
+    );
+
+    return AspectRatio(
+      aspectRatio: 1.15,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: images.isEmpty
+            ? placeholder
+            : Stack(
+                children: [
+                  PageView.builder(
+                    itemCount: images.length,
+                    onPageChanged: (page) => setState(() => _page = page),
+                    itemBuilder: (context, index) => Image.network(
+                      images[index],
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      cacheWidth: 1200,
+                      loadingBuilder: (context, child, progress) =>
+                          progress == null ? child : placeholder,
+                      errorBuilder: (_, _, _) => placeholder,
+                    ),
+                  ),
+                  if (images.length > 1)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 12,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          for (var i = 0; i < images.length; i++)
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                              width: i == _page ? 18 : 7,
+                              height: 7,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: i == _page ? 0.95 : 0.6),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+      ),
+    );
+  }
 }

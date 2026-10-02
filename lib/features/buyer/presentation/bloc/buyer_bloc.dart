@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/public_creator.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
@@ -15,6 +16,7 @@ class BuyerBloc extends Bloc<BuyerEvent, BuyerState> {
   StreamSubscription? _productSubscription;
   StreamSubscription? _favoriteSubscription;
   StreamSubscription? _creatorSubscription;
+  StreamSubscription? _categorySubscription;
   String? _cartUserId;
 
   BuyerBloc({required BuyerRepository repository})
@@ -31,13 +33,51 @@ class BuyerBloc extends Bloc<BuyerEvent, BuyerState> {
     on<BuyerUpdateCartQuantity>(_onUpdateCartQuantity);
     on<BuyerUpdateProductCustomization>(_onUpdateProductCustomization);
     on<BuyerErrorOccurred>(_onErrorOccurred);
+    on<BuyerWatchCategories>(_onWatchCategories);
+    on<BuyerCategoriesUpdated>(
+      (event, emit) => emit(state.copyWith(categories: event.categories)),
+    );
+    on<BuyerSessionEnded>(_onSessionEnded);
+  }
+
+  void _onWatchCategories(BuyerWatchCategories event, Emitter<BuyerState> emit) {
+    _categorySubscription?.cancel();
+    _categorySubscription = _repository.watchCategories().listen(
+      (categories) => add(BuyerCategoriesUpdated(categories)),
+      // Filters fall back to the default category list.
+      onError: (_) {},
+    );
+  }
+
+  Future<void> _cancelSubscriptions() async {
+    for (final subscription in [
+      _productSubscription,
+      _favoriteSubscription,
+      _creatorSubscription,
+      _categorySubscription,
+    ]) {
+      await subscription?.cancel();
+    }
+    _productSubscription = null;
+    _favoriteSubscription = null;
+    _creatorSubscription = null;
+    _categorySubscription = null;
+  }
+
+  Future<void> _onSessionEnded(
+    BuyerSessionEnded event,
+    Emitter<BuyerState> emit,
+  ) async {
+    await _cancelSubscriptions();
+    _cartUserId = null;
+    emit(const BuyerState());
   }
 
   void _onWatchCreators(BuyerWatchCreators event, Emitter<BuyerState> emit) {
     _creatorSubscription?.cancel();
     _creatorSubscription = _repository.watchPublicCreators().listen(
       (creators) => add(BuyerCreatorsUpdated(creators)),
-      onError: (error) => add(BuyerErrorOccurred(error.toString())),
+      onError: (error) => add(BuyerErrorOccurred(friendlyErrorMessage(error))),
     );
   }
 
@@ -109,7 +149,7 @@ class BuyerBloc extends Bloc<BuyerEvent, BuyerState> {
     _productSubscription?.cancel();
     _productSubscription = _repository.watchProducts().listen(
       (products) => add(BuyerProductsUpdated(products)),
-      onError: (err) => add(BuyerErrorOccurred(err.toString())),
+      onError: (err) => add(BuyerErrorOccurred(friendlyErrorMessage(err))),
     );
   }
 
@@ -136,7 +176,10 @@ class BuyerBloc extends Bloc<BuyerEvent, BuyerState> {
     _favoriteSubscription?.cancel();
     _favoriteSubscription = _repository
         .watchFavoriteProductIds(event.userId)
-        .listen((ids) => add(BuyerFavoritesUpdated(ids)));
+        .listen(
+          (ids) => add(BuyerFavoritesUpdated(ids)),
+          onError: (_) => add(const BuyerErrorOccurred('Could not load your wishlist.')),
+        );
   }
 
   void _onFavoritesUpdated(
@@ -157,8 +200,8 @@ class BuyerBloc extends Bloc<BuyerEvent, BuyerState> {
         productId: event.product.id,
         isFavorite: !isFavorite,
       );
-    } catch (e) {
-      add(BuyerErrorOccurred('Could not update favorites.'));
+    } catch (_) {
+      add(const BuyerErrorOccurred('Could not update your wishlist.'));
     }
   }
 
@@ -248,10 +291,8 @@ class BuyerBloc extends Bloc<BuyerEvent, BuyerState> {
   }
 
   @override
-  Future<void> close() {
-    _productSubscription?.cancel();
-    _favoriteSubscription?.cancel();
-    _creatorSubscription?.cancel();
+  Future<void> close() async {
+    await _cancelSubscriptions();
     return super.close();
   }
 }

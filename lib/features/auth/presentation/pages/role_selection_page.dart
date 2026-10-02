@@ -85,7 +85,9 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
               children: [
                 const SizedBox(height: 10),
                 Text(
-                  'Welcome, ${widget.tempUser.name.split(' ').first}',
+                  widget.tempUser.name.trim().isEmpty
+                      ? 'Welcome'
+                      : 'Welcome, ${widget.tempUser.name.trim().split(' ').first}',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: AppColors.primary,
@@ -160,7 +162,8 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
 
                 Center(
                   child: Text(
-                    'You can change your role later in settings.',
+                    'Need to switch later? Contact support from your account.',
+                    textAlign: TextAlign.center,
                     style: GoogleFonts.montserrat(
                       fontSize: 12,
                       color: AppColors.mutedText,

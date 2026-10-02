@@ -1,56 +1,35 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_notification.dart';
-import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
-import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
+import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
+import 'package:madebyhands/init_dependencies.dart';
 
 class CreatorNotificationsPage extends StatefulWidget {
-  final CreatorProfile profile;
+  final String creatorUid;
 
-  const CreatorNotificationsPage(this.profile, {super.key});
+  const CreatorNotificationsPage({super.key, required this.creatorUid});
 
   @override
-  State<CreatorNotificationsPage> createState() =>
-      _CreatorNotificationsPageState();
+  State<CreatorNotificationsPage> createState() => _CreatorNotificationsPageState();
 }
 
 class _CreatorNotificationsPageState extends State<CreatorNotificationsPage> {
-  bool _isRefreshing = false;
+  final CreatorRepository _repository = serviceLocator<CreatorRepository>();
+  late final Stream<List<CreatorNotification>> _notifications = _repository
+      .watchNotifications(widget.creatorUid);
   bool _isSelectionMode = false;
   final Set<String> _selectedIds = {};
 
-  @override
-  void initState() {
-    super.initState();
-    _fetchNotifications();
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _fetchNotifications() {
-    context
-        .read<CreatorBloc>()
-        .add(CreatorFetchNotifications(widget.profile.uid));
-  }
-
-  Future<void> _handleRefresh() async {
-    if (_isRefreshing) return;
-    setState(() => _isRefreshing = true);
-
-    try {
-      _fetchNotifications();
-      await Future.delayed(const Duration(milliseconds: 600));
-    } finally {
-      if (mounted) {
-        setState(() => _isRefreshing = false);
-      }
-    }
-  }
-
-  void _markAllAsRead() {
-    context
-        .read<CreatorBloc>()
-        .add(CreatorMarkAllNotificationsAsRead(widget.profile.uid));
+  Future<void> _markAllAsRead() async {
+    final result = await _repository.markAllNotificationsAsRead(widget.creatorUid);
+    result.fold((failure) => _showError(failure.message), (_) {});
   }
 
   void _exitSelectionMode() {
@@ -62,13 +41,10 @@ class _CreatorNotificationsPageState extends State<CreatorNotificationsPage> {
 
   void _toggleSelection(String id) {
     setState(() {
-      if (_selectedIds.contains(id)) {
-        _selectedIds.remove(id);
-        if (_selectedIds.isEmpty) {
-          _isSelectionMode = false;
-        }
-      } else {
+      if (!_selectedIds.remove(id)) {
         _selectedIds.add(id);
+      } else if (_selectedIds.isEmpty) {
+        _isSelectionMode = false;
       }
     });
   }
@@ -80,42 +56,31 @@ class _CreatorNotificationsPageState extends State<CreatorNotificationsPage> {
     });
   }
 
-  void _confirmDeleteSelected(List<CreatorNotification> allNotifications) {
+  Future<void> _confirmDeleteSelected() async {
     if (_selectedIds.isEmpty) return;
-
-    showDialog(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete Notifications'),
-        content: Text(
-          'Are you sure you want to delete ${_selectedIds.length} notification(s)?',
-        ),
+        title: const Text('Delete notifications'),
+        content: Text('Delete ${_selectedIds.length} notification(s)?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              final idsToDelete = _selectedIds.toList();
-              _exitSelectionMode();
-              context.read<CreatorBloc>().add(
-                    CreatorDeleteNotifications(
-                      notificationIds: idsToDelete,
-                      uid: widget.profile.uid,
-                    ),
-                  );
-            },
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Delete'),
           ),
         ],
       ),
     );
+    if (confirmed != true) return;
+    final ids = _selectedIds.toList();
+    _exitSelectionMode();
+    final result = await _repository.deleteNotifications(ids);
+    result.fold((failure) => _showError(failure.message), (_) {});
   }
 
   void _selectAll(List<CreatorNotification> notifications) {
@@ -124,42 +89,31 @@ class _CreatorNotificationsPageState extends State<CreatorNotificationsPage> {
         _selectedIds.clear();
         _isSelectionMode = false;
       } else {
-        _selectedIds.clear();
-        _selectedIds.addAll(notifications.map((n) => n.id));
+        _selectedIds
+          ..clear()
+          ..addAll(notifications.map((n) => n.id));
       }
     });
   }
 
-  void _showNotificationDetailDialog(CreatorNotification notification) {
+  void _showNotificationDetail(CreatorNotification notification) {
     if (!notification.isRead) {
-      context.read<CreatorBloc>().add(
-            CreatorMarkNotificationAsRead(
-              notificationId: notification.id,
-              uid: widget.profile.uid,
-            ),
-          );
+      _repository.markNotificationAsRead(notification.id);
     }
-
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (dialogContext) => _NotificationDetailDialog(
-        notification: notification,
-        profile: widget.profile,
-      ),
+      builder: (_) => _NotificationDetailDialog(notification: notification),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<CreatorBloc, CreatorState>(
-      buildWhen: (previous, current) =>
-          current is CreatorNotificationsLoaded ||
-          current is CreatorLoading ||
-          current is CreatorFailure,
-      builder: (context, state) {
-        final notifications = state is CreatorNotificationsLoaded
-            ? state.notifications
-            : <CreatorNotification>[];
+    return StreamBuilder<List<CreatorNotification>>(
+      stream: _notifications,
+      builder: (context, snapshot) {
+        final notifications = snapshot.data ?? const <CreatorNotification>[];
+        final allSelected =
+            notifications.isNotEmpty && _selectedIds.length == notifications.length;
 
         return Scaffold(
           appBar: AppBar(
@@ -171,154 +125,119 @@ class _CreatorNotificationsPageState extends State<CreatorNotificationsPage> {
                   )
                 : null,
             title: Text(
-              _isSelectionMode
-                  ? '${_selectedIds.length} Selected'
-                  : 'Notifications',
+              _isSelectionMode ? '${_selectedIds.length} selected' : 'Notifications',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             centerTitle: !_isSelectionMode,
             actions: _isSelectionMode
                 ? [
                     IconButton(
-                      icon: Icon(
-                        _selectedIds.length == notifications.length
-                            ? Icons.deselect
-                            : Icons.select_all,
-                      ),
-                      tooltip: _selectedIds.length == notifications.length
-                          ? 'Deselect all'
-                          : 'Select all',
+                      icon: Icon(allSelected ? Icons.deselect : Icons.select_all),
+                      tooltip: allSelected ? 'Deselect all' : 'Select all',
                       onPressed: () => _selectAll(notifications),
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline, color: Colors.red),
                       tooltip: 'Delete selected',
-                      onPressed: _selectedIds.isEmpty
-                          ? null
-                          : () => _confirmDeleteSelected(notifications),
+                      onPressed: _selectedIds.isEmpty ? null : _confirmDeleteSelected,
                     ),
                     const SizedBox(width: 8),
                   ]
                 : [
-                    IconButton(
-                      tooltip: 'Mark all as read',
-                      icon: const Icon(Icons.done_all),
-                      onPressed: _markAllAsRead,
-                    ),
+                    if (notifications.any((n) => !n.isRead))
+                      IconButton(
+                        tooltip: 'Mark all as read',
+                        icon: const Icon(Icons.done_all),
+                        onPressed: _markAllAsRead,
+                      ),
                     const SizedBox(width: 8),
                   ],
           ),
-          body: _buildBody(state, notifications),
+          body: _buildBody(snapshot, notifications),
         );
       },
     );
   }
 
-  Widget _buildBody(CreatorState state, List<CreatorNotification> notifications) {
-    if (state is CreatorLoading) {
+  Widget _buildBody(
+    AsyncSnapshot<List<CreatorNotification>> snapshot,
+    List<CreatorNotification> notifications,
+  ) {
+    if (snapshot.hasError) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'Could not load notifications: ${friendlyErrorMessage(snapshot.error!)}',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+    if (!snapshot.hasData) {
       return const Center(child: CircularProgressIndicator());
     }
-
-    if (state is CreatorNotificationsLoaded) {
-      if (notifications.isEmpty) {
-        return RefreshIndicator(
-          onRefresh: _handleRefresh,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Container(
-              height: MediaQuery.of(context).size.height * 0.7,
-              alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(
-                    Icons.notifications_none,
-                    size: 64,
-                    color: AppColors.mutedText,
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'No notifications yet.',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Updates about your orders, products, and account will appear here.',
-                    style: TextStyle(color: AppColors.mutedText),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+    if (notifications.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.notifications_none, size: 64, color: AppColors.mutedText),
+              SizedBox(height: 16),
+              Text(
+                'No notifications yet.',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
-            ),
+              SizedBox(height: 8),
+              Text(
+                'Updates about your orders, products and account will appear here.',
+                style: TextStyle(color: AppColors.mutedText),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      itemCount: notifications.length,
+      itemBuilder: (context, index) {
+        final notification = notifications[index];
+        return _NotificationTile(
+          notification: notification,
+          isSelectionMode: _isSelectionMode,
+          isSelected: _selectedIds.contains(notification.id),
+          onTap: () => _isSelectionMode
+              ? _toggleSelection(notification.id)
+              : _showNotificationDetail(notification),
+          onLongPress: () => _isSelectionMode
+              ? _toggleSelection(notification.id)
+              : _enterSelectionMode(notification.id),
         );
-      }
-
-      return RefreshIndicator(
-        onRefresh: _handleRefresh,
-        child: ListView.builder(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          itemCount: notifications.length,
-          itemBuilder: (context, index) {
-            final notification = notifications[index];
-            final isSelected = _selectedIds.contains(notification.id);
-
-            return _NotificationTile(
-              notification: notification,
-              isSelectionMode: _isSelectionMode,
-              isSelected: isSelected,
-              onTap: () {
-                if (_isSelectionMode) {
-                  _toggleSelection(notification.id);
-                } else {
-                  _showNotificationDetailDialog(notification);
-                }
-              },
-              onLongPress: () {
-                if (!_isSelectionMode) {
-                  _enterSelectionMode(notification.id);
-                } else {
-                  _toggleSelection(notification.id);
-                }
-              },
-            );
-          },
-        ),
-      );
-    }
-
-    if (state is CreatorFailure) {
-      return RefreshIndicator(
-        onRefresh: _handleRefresh,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Container(
-            height: MediaQuery.of(context).size.height * 0.7,
-            alignment: Alignment.center,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('Error: ${state.message}'),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: _fetchNotifications,
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    return const Center(child: CircularProgressIndicator());
+      },
+    );
   }
 }
+
+IconData _iconFor(String type) => switch (type) {
+  'order' => Icons.shopping_bag_outlined,
+  'verification' => Icons.verified_outlined,
+  'product' => Icons.inventory_2_outlined,
+  'announcement' => Icons.campaign_outlined,
+  _ => Icons.notifications_outlined,
+};
+
+Color _colorFor(String type) => switch (type) {
+  'order' => AppColors.primary,
+  'verification' => Colors.green,
+  'product' => Colors.orange,
+  'announcement' => Colors.purple,
+  _ => AppColors.accent,
+};
 
 class _NotificationTile extends StatelessWidget {
   final CreatorNotification notification;
@@ -334,36 +253,6 @@ class _NotificationTile extends StatelessWidget {
     required this.onTap,
     required this.onLongPress,
   });
-
-  IconData _getIcon() {
-    switch (notification.type) {
-      case 'order':
-        return Icons.shopping_bag_outlined;
-      case 'verification':
-        return Icons.verified_outlined;
-      case 'product':
-        return Icons.inventory_2_outlined;
-      case 'announcement':
-        return Icons.campaign_outlined;
-      default:
-        return Icons.notifications_outlined;
-    }
-  }
-
-  Color _getIconColor() {
-    switch (notification.type) {
-      case 'order':
-        return AppColors.primary;
-      case 'verification':
-        return Colors.green;
-      case 'product':
-        return Colors.orange;
-      case 'announcement':
-        return Colors.purple;
-      default:
-        return AppColors.accent;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -406,10 +295,10 @@ class _NotificationTile extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: _getIconColor().withValues(alpha: 0.1),
+                    color: _colorFor(notification.type).withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(_getIcon(), color: _getIconColor(), size: 20),
+                  child: Icon(_iconFor(notification.type), color: _colorFor(notification.type), size: 20),
                 ),
               const SizedBox(width: 12),
               Expanded(
@@ -472,42 +361,8 @@ class _NotificationTile extends StatelessWidget {
 
 class _NotificationDetailDialog extends StatelessWidget {
   final CreatorNotification notification;
-  final CreatorProfile profile;
 
-  const _NotificationDetailDialog({
-    required this.notification,
-    required this.profile,
-  });
-
-  IconData _getIcon() {
-    switch (notification.type) {
-      case 'order':
-        return Icons.shopping_bag_outlined;
-      case 'verification':
-        return Icons.verified_outlined;
-      case 'product':
-        return Icons.inventory_2_outlined;
-      case 'announcement':
-        return Icons.campaign_outlined;
-      default:
-        return Icons.notifications_outlined;
-    }
-  }
-
-  Color _getIconColor() {
-    switch (notification.type) {
-      case 'order':
-        return AppColors.primary;
-      case 'verification':
-        return Colors.green;
-      case 'product':
-        return Colors.orange;
-      case 'announcement':
-        return Colors.purple;
-      default:
-        return AppColors.accent;
-    }
-  }
+  const _NotificationDetailDialog({required this.notification});
 
   @override
   Widget build(BuildContext context) {
@@ -519,10 +374,10 @@ class _NotificationDetailDialog extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: _getIconColor().withValues(alpha: 0.1),
+              color: _colorFor(notification.type).withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(_getIcon(), color: _getIconColor(), size: 22),
+            child: Icon(_iconFor(notification.type), color: _colorFor(notification.type), size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(

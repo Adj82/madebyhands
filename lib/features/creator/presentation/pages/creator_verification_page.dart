@@ -1,10 +1,13 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
+import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
+import 'package:madebyhands/init_dependencies.dart';
 
 class CreatorVerificationPage extends StatefulWidget {
   final CreatorProfile profile;
@@ -22,21 +25,9 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
 
   File? _latestPhotoFile;
   File? _idCardFile;
-  bool _isRefreshing = false;
-
-  Future<void> _handleRefresh() async {
-    if (_isRefreshing) return;
-    setState(() => _isRefreshing = true);
-
-    try {
-      context.read<CreatorBloc>().add(CreatorCheckProfileExists(widget.profile.uid));
-      await Future.delayed(const Duration(milliseconds: 600));
-    } finally {
-      if (mounted) {
-        setState(() => _isRefreshing = false);
-      }
-    }
-  }
+  late String _existingPhotoUrl = widget.profile.latestPhoto;
+  late String _existingIdCardUrl = widget.profile.idCard;
+  bool _documentsMissing = false;
 
   @override
   void initState() {
@@ -44,6 +35,27 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
     _creatorNameController = TextEditingController(text: widget.profile.name);
     _businessNameController = TextEditingController(text: widget.profile.businessName);
     _addressController = TextEditingController(text: widget.profile.address);
+    _loadPreviousSubmission();
+  }
+
+  Future<void> _loadPreviousSubmission() async {
+    try {
+      final result = await serviceLocator<CreatorRepository>().getVerificationDocuments(
+        widget.profile.uid,
+      );
+      final documents = result.getRight().toNullable();
+      if (!mounted || documents == null) return;
+      setState(() {
+        if (_businessNameController.text.trim().isEmpty) {
+          _businessNameController.text = documents.businessName;
+        }
+        if (_addressController.text.trim().isEmpty) {
+          _addressController.text = documents.address;
+        }
+        if (documents.latestPhotoUrl.isNotEmpty) _existingPhotoUrl = documents.latestPhotoUrl;
+        if (documents.idCardUrl.isNotEmpty) _existingIdCardUrl = documents.idCardUrl;
+      });
+    } catch (_) {}
   }
 
   @override
@@ -54,164 +66,202 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
     super.dispose();
   }
 
-  Future<void> _pickLatestPhoto() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
-    if (pickedFile != null) {
-      setState(() => _latestPhotoFile = File(pickedFile.path));
-    }
-  }
-
-  Future<void> _pickIdCard() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
-    if (pickedFile != null) {
-      setState(() => _idCardFile = File(pickedFile.path));
+  Future<File?> _pickImage() async {
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 70,
+        maxWidth: 2000,
+      );
+      return picked == null ? null : File(picked.path);
+    } catch (_) {
+      return null;
     }
   }
 
   void _submit() {
-    if (_formKey.currentState!.validate()) {
-      context.read<CreatorBloc>().add(
-            CreatorSubmitVerification(
-              uid: widget.profile.uid,
-              creatorName: _creatorNameController.text,
-              businessName: _businessNameController.text,
-              address: _addressController.text,
-              latestPhotoFile: _latestPhotoFile,
-              idCardFile: _idCardFile,
-              existingLatestPhotoUrl: widget.profile.latestPhoto,
-              existingIdCardUrl: widget.profile.idCard,
-            ),
-          );
-    }
+    FocusScope.of(context).unfocus();
+    final hasPhoto = _latestPhotoFile != null || _existingPhotoUrl.isNotEmpty;
+    final hasId = _idCardFile != null || _existingIdCardUrl.isNotEmpty;
+    setState(() => _documentsMissing = !hasPhoto || !hasId);
+    if (!_formKey.currentState!.validate() || _documentsMissing) return;
+    context.read<CreatorBloc>().add(
+      CreatorSubmitVerification(
+        uid: widget.profile.uid,
+        creatorName: _creatorNameController.text.trim(),
+        businessName: _businessNameController.text.trim(),
+        address: _addressController.text.trim(),
+        latestPhotoFile: _latestPhotoFile,
+        idCardFile: _idCardFile,
+        existingLatestPhotoUrl: _existingPhotoUrl,
+        existingIdCardUrl: _existingIdCardUrl,
+      ),
+    );
   }
 
-  void _showSuccessDialog() {
-    showDialog(
+  Future<void> _showSuccessDialog() async {
+    await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.green),
-            SizedBox(width: 10),
-            Text('Request Submitted'),
-          ],
-        ),
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 40),
+        title: const Text('Request submitted'),
         content: const Text(
-          'Your verification details have been successfully submitted for review. Our admin team will verify your documents shortly. You can check your status on the dashboard.',
+          'Our team will review your documents shortly. You can follow the status on your dashboard.',
         ),
         actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              // Trigger profile refresh to show In-Process status
-              this.context.read<CreatorBloc>().add(CreatorCheckProfileExists(widget.profile.uid));
-              Navigator.pop(this.context); // Back to Creator Studio
-            },
-            child: const Text('Back to Studio'),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Back to studio'),
           ),
         ],
       ),
     );
+    if (mounted) Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.surface,
       appBar: AppBar(
-        title: const Text('Get Verified', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Get verified', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: BlocConsumer<CreatorBloc, CreatorState>(
+        listenWhen: (previous, current) =>
+            previous.actionId != current.actionId &&
+            current.action == CreatorAction.submitVerification &&
+            current.actionStatus != CreatorActionStatus.inProgress,
         listener: (context, state) {
-          if (state is CreatorVerificationSuccess) {
+          if (state.actionStatus == CreatorActionStatus.success) {
             _showSuccessDialog();
-          } else if (state is CreatorFailure) {
+          } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message)),
+              SnackBar(content: Text(state.actionMessage ?? 'Could not submit. Please try again.')),
             );
           }
         },
         builder: (context, state) {
-          if (state is CreatorLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          return RefreshIndicator(
-            onRefresh: _handleRefresh,
+          final submitting = state.isRunning(CreatorAction.submitVerification);
+          return AbsorbPointer(
+            absorbing: submitting,
             child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.fromLTRB(
-                24.0,
-                24.0,
-                24.0,
-                MediaQuery.of(context).viewInsets.bottom + 24.0,
+                24,
+                24,
+                24,
+                MediaQuery.of(context).viewInsets.bottom + 24,
               ),
               child: Form(
                 key: _formKey,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Text(
-                      'Creator Verification Request',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primary),
+                      'Creator verification',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Provide your authentic business information to enable storefront access and product listings.',
+                      'Verified creators can list products. Your documents are only visible to the MadeByHands team.',
                       style: TextStyle(fontSize: 14, color: AppColors.mutedText),
                     ),
+                    if (widget.profile.isVerificationRejected &&
+                        widget.profile.verificationNote.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(
+                          'Previous request was not approved: ${widget.profile.verificationNote}',
+                          style: const TextStyle(color: Colors.red, fontSize: 13),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 24),
                     TextFormField(
                       controller: _creatorNameController,
+                      textCapitalization: TextCapitalization.words,
                       decoration: const InputDecoration(
-                        labelText: "Creator's Full Name *",
+                        labelText: 'Full name (as on your ID) *',
                         prefixIcon: Icon(Icons.person),
                       ),
-                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                      validator: (v) => (v?.trim().isEmpty ?? true) ? 'Required' : null,
                     ),
                     const SizedBox(height: 20),
                     TextFormField(
                       controller: _businessNameController,
                       decoration: const InputDecoration(
-                        labelText: 'Business/Storefront Name *',
+                        labelText: 'Business / storefront name *',
+                        helperText: 'Shown to buyers on your storefront.',
                         prefixIcon: Icon(Icons.storefront),
                       ),
-                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                      validator: (v) => (v?.trim().isEmpty ?? true) ? 'Required' : null,
                     ),
                     const SizedBox(height: 20),
                     TextFormField(
                       controller: _addressController,
                       decoration: const InputDecoration(
-                        labelText: 'Current Registered Address *',
+                        labelText: 'Address *',
                         prefixIcon: Icon(Icons.home_outlined),
                       ),
                       maxLines: 3,
-                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                      minLines: 1,
+                      validator: (v) => (v?.trim().isEmpty ?? true) ? 'Required' : null,
                     ),
                     const SizedBox(height: 30),
-                    const Text('Documents (Optional)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 15),
-                    _buildFilePickerTile(
-                      title: 'Latest Photo',
-                      subtitle: 'Clear, well-lit portrait photo',
-                      file: _latestPhotoFile,
-                      existingUrl: widget.profile.latestPhoto,
-                      onTap: _pickLatestPhoto,
+                    const Text(
+                      'Documents *',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 15),
-                    _buildFilePickerTile(
-                      title: 'PAN Card / Identity Card',
-                      subtitle: 'Official government-issued ID card',
-                      file: _idCardFile,
-                      existingUrl: widget.profile.idCard,
-                      onTap: _pickIdCard,
+                    _FilePickerTile(
+                      title: 'Recent photo of you',
+                      subtitle: 'Clear, well-lit portrait',
+                      hasNewFile: _latestPhotoFile != null,
+                      hasExisting: _existingPhotoUrl.isNotEmpty,
+                      onTap: () async {
+                        final file = await _pickImage();
+                        if (file != null) setState(() => _latestPhotoFile = file);
+                      },
                     ),
+                    const SizedBox(height: 15),
+                    _FilePickerTile(
+                      title: 'PAN card / government ID',
+                      subtitle: 'Photo of an official ID',
+                      hasNewFile: _idCardFile != null,
+                      hasExisting: _existingIdCardUrl.isNotEmpty,
+                      onTap: () async {
+                        final file = await _pickImage();
+                        if (file != null) setState(() => _idCardFile = file);
+                      },
+                    ),
+                    if (_documentsMissing)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 10),
+                        child: Text(
+                          'Please add both documents.',
+                          style: TextStyle(color: Colors.red, fontSize: 12),
+                        ),
+                      ),
                     const SizedBox(height: 40),
                     FilledButton(
-                      onPressed: _submit,
-                      child: Text(widget.profile.verificationStatus == 'Verified' ? 'Re-Submit & Await Review' : 'Submit for Verification'),
+                      onPressed: submitting ? null : _submit,
+                      child: submitting
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text('Submit for verification'),
                     ),
                   ],
                 ),
@@ -222,15 +272,26 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
       ),
     );
   }
+}
 
-  Widget _buildFilePickerTile({
-    required String title,
-    required String subtitle,
-    required File? file,
-    required String existingUrl,
-    required VoidCallback onTap,
-  }) {
-    final hasFile = file != null || existingUrl.isNotEmpty;
+class _FilePickerTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool hasNewFile;
+  final bool hasExisting;
+  final VoidCallback onTap;
+
+  const _FilePickerTile({
+    required this.title,
+    required this.subtitle,
+    required this.hasNewFile,
+    required this.hasExisting,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasFile = hasNewFile || hasExisting;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -240,19 +301,36 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
       ),
       child: Row(
         children: [
-          Icon(hasFile ? Icons.check_circle : Icons.upload_file, color: hasFile ? Colors.green : AppColors.mutedText, size: 30),
+          Icon(
+            hasFile ? Icons.check_circle : Icons.upload_file,
+            color: hasFile ? Colors.green : AppColors.mutedText,
+            size: 30,
+          ),
           const SizedBox(width: 15),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                Text(file != null ? 'New file selected' : (existingUrl.isNotEmpty ? 'Previously uploaded' : subtitle), style: const TextStyle(color: AppColors.mutedText, fontSize: 12)),
+                Text(
+                  hasNewFile
+                      ? 'New file selected'
+                      : (hasExisting ? 'Previously uploaded' : subtitle),
+                  style: const TextStyle(color: AppColors.mutedText, fontSize: 12),
+                ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
           OutlinedButton(
             onPressed: onTap,
+            // The app-wide OutlinedButtonTheme sets minimumSize to
+            // Size.fromHeight(56), i.e. an infinite minimum width, meant for
+            // full-width buttons stretched in a Column. Inside this Row that
+            // infinite minimum conflicts with the Row's loose width
+            // constraint and crashes layout, so override it with a compact
+            // bounded size for this button only.
+            style: OutlinedButton.styleFrom(minimumSize: const Size(64, 36)),
             child: Text(hasFile ? 'Change' : 'Select'),
           ),
         ],

@@ -1,3 +1,5 @@
+// Bridge between the Flutter web build and Razorpay Standard Checkout.
+// Called from lib/core/services/razorpay_checkout_web.dart.
 window.openMadeByHandsRazorpay = function (optionsJson) {
   return new Promise(function (resolve, reject) {
     if (typeof window.Razorpay !== 'function') {
@@ -5,7 +7,7 @@ window.openMadeByHandsRazorpay = function (optionsJson) {
       return;
     }
 
-    let options;
+    var options;
     try {
       options = JSON.parse(optionsJson);
     } catch (_) {
@@ -13,18 +15,27 @@ window.openMadeByHandsRazorpay = function (optionsJson) {
       return;
     }
 
+    var settled = false;
+    var lastFailure = null;
+
     options.handler = function (response) {
+      if (settled) return;
+      settled = true;
       resolve(JSON.stringify(response));
     };
     options.modal = {
+      // The buyer can retry inside the modal after a failed attempt, so a
+      // failure only ends checkout once the modal is closed.
       ondismiss: function () {
-        reject(new Error('Payment checkout was closed.'));
+        if (settled) return;
+        settled = true;
+        reject(new Error(lastFailure || 'Payment checkout was closed.'));
       },
     };
 
-    const checkout = new window.Razorpay(options);
+    var checkout = new window.Razorpay(options);
     checkout.on('payment.failed', function (response) {
-      reject(new Error(response?.error?.description || 'Payment failed.'));
+      lastFailure = (response && response.error && response.error.description) || 'Payment failed.';
     });
     checkout.open();
   });

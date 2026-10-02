@@ -1,4 +1,5 @@
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
+import 'package:madebyhands/features/orders/domain/order_status.dart';
 
 enum BuyerProductNotificationReason { wishlisted, purchased, both }
 
@@ -40,7 +41,7 @@ class BuyerProductNotification {
       : 'New in $category';
 
   String get message => type == BuyerNotificationType.order
-      ? 'Order #$orderId is now ${_statusLabel(orderStatus ?? '').toLowerCase()}.'
+      ? 'Order #$orderId: ${OrderStatus.label(orderStatus ?? '').toLowerCase()}.'
       : switch (reason) {
           BuyerProductNotificationReason.wishlisted =>
             '${product!.artisan} added ${product!.name} in a category you have wishlisted.',
@@ -51,9 +52,9 @@ class BuyerProductNotification {
           null => '',
         };
 
-  static String _statusLabel(String status) => status
-      .replaceAll('-', ' ')
-      .split(' ')
+  /// Title-cased status, e.g. 'in_transit' -> 'In Transit'.
+  static String _statusLabel(String status) => OrderStatus.normalize(status)
+      .split('_')
       .where((part) => part.isNotEmpty)
       .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
       .join(' ');

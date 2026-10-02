@@ -59,3 +59,13 @@ final class BuyerErrorOccurred extends BuyerEvent {
   final String message;
   const BuyerErrorOccurred(this.message);
 }
+
+final class BuyerWatchCategories extends BuyerEvent {}
+
+final class BuyerCategoriesUpdated extends BuyerEvent {
+  final List<String> categories;
+  const BuyerCategoriesUpdated(this.categories);
+}
+
+/// Stops all listeners and clears buyer data on sign-out.
+final class BuyerSessionEnded extends BuyerEvent {}
