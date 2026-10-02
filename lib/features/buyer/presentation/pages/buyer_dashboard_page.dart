@@ -354,7 +354,6 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
               final pages = [
                 HomeTab(
                   userName: _currentUser.name,
-                  userId: _currentUser.uid,
                   selectedAddress: _selectedAddress,
                   onAddressTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
@@ -364,7 +363,6 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                       ),
                     ),
                   ),
-                  onProductTap: _openProduct,
                   onBrowseAll: _openShop,
                   onCategoryTap: _openShopCategory,
                   unreadNotificationCount: _notifications

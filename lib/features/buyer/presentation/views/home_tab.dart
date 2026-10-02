@@ -1,17 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:madebyhands/core/constants/product_categories.dart';
-import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
-import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
-import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 class HomeTab extends StatefulWidget {
   final String userName;
-  final String userId;
-  final ValueChanged<Product> onProductTap;
   final VoidCallback onBrowseAll;
   final ValueChanged<String>? onCategoryTap;
   final SavedAddress? selectedAddress;
@@ -22,8 +16,6 @@ class HomeTab extends StatefulWidget {
   const HomeTab({
     super.key,
     required this.userName,
-    required this.userId,
-    required this.onProductTap,
     required this.onBrowseAll,
     this.onCategoryTap,
     this.selectedAddress,
@@ -143,12 +135,6 @@ class _HomeTabState extends State<HomeTab> {
                   _buildSearchBar(),
                   const SizedBox(height: 18),
                   _buildHistoricalArtSection(),
-                  const SizedBox(height: 22),
-                  _PopularPicks(
-                    userId: widget.userId,
-                    onProductTap: widget.onProductTap,
-                    onSeeAll: widget.onBrowseAll,
-                  ),
                   const SizedBox(height: 18),
                   _buildCategoryDivider(),
                   const SizedBox(height: 14),
@@ -638,98 +624,3 @@ class _HomeTabState extends State<HomeTab> {
   }
 }
 
-/// FR-08 home feed: the most wished-for and most ordered products, with
-/// items from categories the buyer has saved ranked first.
-class _PopularPicks extends StatelessWidget {
-  final String userId;
-  final ValueChanged<Product> onProductTap;
-  final VoidCallback onSeeAll;
-
-  const _PopularPicks({
-    required this.userId,
-    required this.onProductTap,
-    required this.onSeeAll,
-  });
-
-  static List<Product> rank(List<Product> products, Set<String> favoriteIds) {
-    final favoriteCategories = <String>{
-      for (final product in products)
-        if (favoriteIds.contains(product.id))
-          ...product.allCategories.map(normalizeCategory),
-    };
-    bool matchesTaste(Product product) =>
-        product.allCategories.any((c) => favoriteCategories.contains(normalizeCategory(c)));
-
-    final candidates = products
-        .where((product) => product.isAvailable && product.stock > 0)
-        .toList()
-      ..sort((a, b) {
-        final taste = (matchesTaste(b) ? 1 : 0) - (matchesTaste(a) ? 1 : 0);
-        if (taste != 0) return taste;
-        return b.popularityScore.compareTo(a.popularityScore);
-      });
-    return candidates.take(10).toList();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<BuyerBloc, BuyerState>(
-      buildWhen: (previous, current) =>
-          previous.products != current.products ||
-          previous.favoriteIds != current.favoriteIds,
-      builder: (context, state) {
-        final picks = rank(state.products, state.favoriteIds);
-        if (picks.isEmpty) return const SizedBox.shrink();
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Popular picks',
-                    style: GoogleFonts.playfairDisplay(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF6B1D1D),
-                    ),
-                  ),
-                ),
-                TextButton(
-                  onPressed: onSeeAll,
-                  child: const Text(
-                    'Shop all',
-                    style: TextStyle(color: Color(0xFF8B261D), fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            SizedBox(
-              height: 270,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: picks.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 12),
-                itemBuilder: (context, index) {
-                  final product = picks[index];
-                  return SizedBox(
-                    width: 170,
-                    child: ProductCard(
-                      product: product,
-                      isSaved: state.favoriteIds.contains(product.id),
-                      onTap: () => onProductTap(product),
-                      onSave: () => context.read<BuyerBloc>().add(
-                        BuyerToggleFavorite(userId: userId, product: product),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
