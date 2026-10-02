@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/public_creator.dart';
-import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
-import 'package:madebyhands/init_dependencies.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class PublicCreatorStorefrontPage extends StatelessWidget {
@@ -15,89 +12,33 @@ class PublicCreatorStorefrontPage extends StatelessWidget {
   final String buyerId;
   final ValueChanged<Product>? onProductTap;
 
-  /// Lets a creator see their shop as buyers do. Products are streamed
-  /// directly (the buyer session is not running) and cannot be saved.
-  final bool previewMode;
-
   const PublicCreatorStorefrontPage({
     super.key,
     required this.creator,
     required this.buyerId,
     required this.onProductTap,
-  }) : previewMode = false;
-
-  const PublicCreatorStorefrontPage.preview({super.key, required this.creator})
-    : buyerId = '',
-      onProductTap = null,
-      previewMode = true;
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(previewMode ? 'Storefront preview' : creator.displayName),
+      appBar: AppBar(title: Text(creator.displayName)),
+      body: BlocBuilder<BuyerBloc, BuyerState>(
+        buildWhen: (previous, current) =>
+            previous.products != current.products ||
+            previous.favoriteIds != current.favoriteIds,
+        builder: (context, state) => _StorefrontBody(
+          creator: creator,
+          products: state.products
+              .where((product) => product.creatorUid == creator.uid)
+              .toList(),
+          favoriteIds: state.favoriteIds,
+          onProductTap: onProductTap,
+          onSave: (product) => context.read<BuyerBloc>().add(
+            BuyerToggleFavorite(userId: buyerId, product: product),
+          ),
+        ),
       ),
-      body: previewMode
-          ? _PreviewProducts(
-              creator: creator,
-              builder: (products) => _StorefrontBody(
-                creator: creator,
-                products: products,
-                favoriteIds: const {},
-              ),
-            )
-          : BlocBuilder<BuyerBloc, BuyerState>(
-              buildWhen: (previous, current) =>
-                  previous.products != current.products ||
-                  previous.favoriteIds != current.favoriteIds,
-              builder: (context, state) => _StorefrontBody(
-                creator: creator,
-                products: state.products
-                    .where((product) => product.creatorUid == creator.uid)
-                    .toList(),
-                favoriteIds: state.favoriteIds,
-                onProductTap: onProductTap,
-                onSave: (product) => context.read<BuyerBloc>().add(
-                  BuyerToggleFavorite(userId: buyerId, product: product),
-                ),
-              ),
-            ),
-    );
-  }
-}
-
-class _PreviewProducts extends StatefulWidget {
-  final PublicCreator creator;
-  final Widget Function(List<Product> products) builder;
-
-  const _PreviewProducts({required this.creator, required this.builder});
-
-  @override
-  State<_PreviewProducts> createState() => _PreviewProductsState();
-}
-
-class _PreviewProductsState extends State<_PreviewProducts> {
-  late final Stream<List<Product>> _products = serviceLocator<BuyerRepository>()
-      .watchProducts()
-      .map(
-        (products) => products
-            .where((product) => product.creatorUid == widget.creator.uid)
-            .toList(),
-      );
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<List<Product>>(
-      stream: _products,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(child: Text(friendlyErrorMessage(snapshot.error!)));
-        }
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        return widget.builder(snapshot.data!);
-      },
     );
   }
 }

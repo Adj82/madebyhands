@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
-import 'package:madebyhands/features/buyer/domain/entities/public_creator.dart';
-import 'package:madebyhands/features/buyer/presentation/pages/public_creator_storefront_page.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_notification.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
@@ -198,35 +196,6 @@ class _StorefrontCard extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 20),
-          OutlinedButton.icon(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => PublicCreatorStorefrontPage.preview(
-                  creator: PublicCreator(
-                    uid: profile.uid,
-                    name: profile.name,
-                    businessName: profile.businessName,
-                    profileImage: profile.profileImage,
-                    bio: profile.bio,
-                    location: profile.location,
-                    socialLinks: profile.socialLinks,
-                    portfolio: profile.portfolio,
-                    story: profile.story,
-                    isVerified: profile.isVerified,
-                  ),
-                ),
-              ),
-            ),
-            icon: const Icon(Icons.storefront_outlined, size: 18),
-            label: const Text('View storefront'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: const BorderSide(color: Colors.white),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
           ),
         ],
       ),
