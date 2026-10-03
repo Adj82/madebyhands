@@ -26,6 +26,8 @@ class AdminRepositoryImpl implements AdminRepository {
         return {
           'flatFee': (settings['flatFee'] as num?)?.toDouble() ?? 50,
           'percentFee': (settings['percentFee'] as num?)?.toDouble() ?? 5,
+          'commissionThreshold':
+              (settings['commissionThreshold'] as num?)?.toDouble() ?? 999,
         };
       });
 
@@ -33,7 +35,14 @@ class AdminRepositoryImpl implements AdminRepository {
   Future<Either<Failure, void>> updatePlatformSettings(
     double flatFee,
     double percentFee,
-  ) => _guard(() => remoteDataSource.updatePlatformSettings(flatFee, percentFee));
+    double commissionThreshold,
+  ) => _guard(
+    () => remoteDataSource.updatePlatformSettings(
+      flatFee,
+      percentFee,
+      commissionThreshold,
+    ),
+  );
 
   @override
   Future<Either<Failure, List<CreatorProfile>>> getCreatorProfiles() =>

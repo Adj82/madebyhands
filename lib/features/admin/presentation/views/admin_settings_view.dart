@@ -20,7 +20,8 @@ class AdminSettingsView extends StatelessWidget {
     return BlocBuilder<AdminBloc, AdminState>(
       buildWhen: (previous, current) =>
           previous.flatFee != current.flatFee ||
-          previous.percentFee != current.percentFee,
+          previous.percentFee != current.percentFee ||
+          previous.commissionThreshold != current.commissionThreshold,
       builder: (context, state) {
         return ListView(
           padding: const EdgeInsets.all(20),
@@ -32,7 +33,8 @@ class AdminSettingsView extends StatelessWidget {
               icon: Icons.payments_outlined,
               trailing: isSuperAdmin
                   ? TextButton(
-                      onPressed: () => _showUpdateFeeDialog(context, isFlat: true),
+                      onPressed: () =>
+                          _showUpdateFeeDialog(context, field: _FeeField.flat),
                       child: const Text('Change'),
                     )
                   : const Icon(Icons.lock_outline, size: 20),
@@ -40,11 +42,27 @@ class AdminSettingsView extends StatelessWidget {
             _ConfigTile(
               title: 'Commission',
               subtitle:
-                  '${_formatPercent(state.percentFee)}% of the creator subtotal on orders above ₹999',
+                  '${_formatPercent(state.percentFee)}% of the creator subtotal on orders above ₹${state.commissionThreshold.round()}',
               icon: Icons.percent,
               trailing: isSuperAdmin
                   ? TextButton(
-                      onPressed: () => _showUpdateFeeDialog(context, isFlat: false),
+                      onPressed: () =>
+                          _showUpdateFeeDialog(context, field: _FeeField.percent),
+                      child: const Text('Change'),
+                    )
+                  : const Icon(Icons.lock_outline, size: 20),
+            ),
+            _ConfigTile(
+              title: 'Commission threshold',
+              subtitle:
+                  'Commission only applies when the creator subtotal is above ₹${state.commissionThreshold.round()}',
+              icon: Icons.trending_up,
+              trailing: isSuperAdmin
+                  ? TextButton(
+                      onPressed: () => _showUpdateFeeDialog(
+                        context,
+                        field: _FeeField.threshold,
+                      ),
                       child: const Text('Change'),
                     )
                   : const Icon(Icons.lock_outline, size: 20),
@@ -97,37 +115,63 @@ class AdminSettingsView extends StatelessWidget {
   static String _formatPercent(double value) =>
       value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
 
-  Future<void> _showUpdateFeeDialog(BuildContext context, {required bool isFlat}) async {
+  Future<void> _showUpdateFeeDialog(
+    BuildContext context, {
+    required _FeeField field,
+  }) async {
     final adminBloc = context.read<AdminBloc>();
-    final current = isFlat ? adminBloc.state.flatFee : adminBloc.state.percentFee;
+    final current = switch (field) {
+      _FeeField.flat => adminBloc.state.flatFee,
+      _FeeField.percent => adminBloc.state.percentFee,
+      _FeeField.threshold => adminBloc.state.commissionThreshold,
+    };
+    final isDecimal = field == _FeeField.percent;
     final controller = TextEditingController(
-      text: isFlat ? current.round().toString() : _formatPercent(current),
+      text: isDecimal ? _formatPercent(current) : current.round().toString(),
     );
     final formKey = GlobalKey<FormState>();
 
     final value = await showDialog<double>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(isFlat ? 'Flat platform fee' : 'Commission'),
+        title: Text(switch (field) {
+          _FeeField.flat => 'Flat platform fee',
+          _FeeField.percent => 'Commission',
+          _FeeField.threshold => 'Commission threshold',
+        }),
         content: Form(
           key: formKey,
           child: TextFormField(
             controller: controller,
             autofocus: true,
-            keyboardType: TextInputType.numberWithOptions(decimal: !isFlat),
+            keyboardType: TextInputType.numberWithOptions(decimal: isDecimal),
             inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(isFlat ? r'[0-9]' : r'[0-9.]')),
+              FilteringTextInputFormatter.allow(
+                RegExp(isDecimal ? r'[0-9.]' : r'[0-9]'),
+              ),
             ],
             decoration: InputDecoration(
-              prefixText: isFlat ? '₹ ' : null,
-              suffixText: isFlat ? null : '%',
-              helperText: isFlat ? 'Whole rupees, 0 – 1000' : '0 – 50',
+              prefixText: field == _FeeField.percent ? null : '₹ ',
+              suffixText: field == _FeeField.percent ? '%' : null,
+              helperText: switch (field) {
+                _FeeField.flat => 'Whole rupees, 0 – 1000',
+                _FeeField.percent => '0 – 50',
+                _FeeField.threshold => 'Whole rupees, 0 – 100000',
+              },
             ),
             validator: (text) {
               final parsed = double.tryParse(text?.trim() ?? '');
               if (parsed == null) return 'Enter a number.';
-              if (isFlat && (parsed < 0 || parsed > 1000)) return 'Enter 0 – 1000.';
-              if (!isFlat && (parsed < 0 || parsed > 50)) return 'Enter 0 – 50.';
+              switch (field) {
+                case _FeeField.flat:
+                  if (parsed < 0 || parsed > 1000) return 'Enter 0 – 1000.';
+                case _FeeField.percent:
+                  if (parsed < 0 || parsed > 50) return 'Enter 0 – 50.';
+                case _FeeField.threshold:
+                  if (parsed < 0 || parsed > 100000) {
+                    return 'Enter 0 – 100000.';
+                  }
+              }
               return null;
             },
           ),
@@ -150,12 +194,21 @@ class AdminSettingsView extends StatelessWidget {
     if (value == null) return;
     adminBloc.add(
       AdminUpdateSettingsRequested(
-        flatFee: isFlat ? value.roundToDouble() : adminBloc.state.flatFee,
-        percentFee: isFlat ? adminBloc.state.percentFee : value,
+        flatFee: field == _FeeField.flat
+            ? value.roundToDouble()
+            : adminBloc.state.flatFee,
+        percentFee: field == _FeeField.percent
+            ? value
+            : adminBloc.state.percentFee,
+        commissionThreshold: field == _FeeField.threshold
+            ? value.roundToDouble()
+            : adminBloc.state.commissionThreshold,
       ),
     );
   }
 }
+
+enum _FeeField { flat, percent, threshold }
 
 class _ConfigTile extends StatelessWidget {
   final String title;

@@ -22,6 +22,22 @@ class _OrderManagementViewState extends State<OrderManagementView> {
       .collection('orders')
       .snapshots();
 
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  bool _matchesSearch(_AdminOrder order) {
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return true;
+    return order.id.toLowerCase().contains(query) ||
+        order.shortId.toLowerCase().contains(query);
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -41,57 +57,99 @@ class _OrderManagementViewState extends State<OrderManagementView> {
           unselectedLabelColor: AppColors.mutedText,
           indicatorColor: AppColors.primary,
         ),
-        body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _orders,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text(
-                    'Could not load orders: ${snapshot.error}',
-                    textAlign: TextAlign.center,
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
+                decoration: InputDecoration(
+                  hintText: 'Search by order ID',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchQuery.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () => setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          }),
+                        ),
+                  isDense: true,
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.outline),
                   ),
                 ),
-              );
-            }
-            if (!snapshot.hasData) {
-              return const Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
-              );
-            }
-            final orders = snapshot.data!.docs
-                .map((doc) => _AdminOrder.fromDocument(doc))
-                .toList()
-              ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+              ),
+            ),
+            Expanded(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: _orders,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          'Could not load orders: ${snapshot.error}',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    );
+                  }
+                  if (!snapshot.hasData) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
+                    );
+                  }
+                  final orders =
+                      snapshot.data!.docs
+                          .map((doc) => _AdminOrder.fromDocument(doc))
+                          .where(_matchesSearch)
+                          .toList()
+                        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-            return TabBarView(
-              children: [
-                _OrderList(
-                  orders: orders.where((o) => OrderStatus.isNew(o.status)).toList(),
-                  emptyMessage: 'No new orders.',
-                ),
-                _OrderList(
-                  orders: orders
-                      .where((o) => OrderStatus.isInProgress(o.status))
-                      .toList(),
-                  emptyMessage: 'No orders in progress.',
-                ),
-                _OrderList(
-                  orders: orders
-                      .where((o) => OrderStatus.isDelivered(o.status))
-                      .toList(),
-                  emptyMessage: 'No delivered orders yet.',
-                ),
-                _OrderList(
-                  orders: orders
-                      .where((o) => OrderStatus.isRejectedOrCancelled(o.status))
-                      .toList(),
-                  emptyMessage: 'No rejected orders.',
-                ),
-              ],
-            );
-          },
+                  return TabBarView(
+                    children: [
+                      _OrderList(
+                        orders: orders
+                            .where((o) => OrderStatus.isNew(o.status))
+                            .toList(),
+                        emptyMessage: 'No new orders.',
+                      ),
+                      _OrderList(
+                        orders: orders
+                            .where((o) => OrderStatus.isInProgress(o.status))
+                            .toList(),
+                        emptyMessage: 'No orders in progress.',
+                      ),
+                      _OrderList(
+                        orders: orders
+                            .where((o) => OrderStatus.isDelivered(o.status))
+                            .toList(),
+                        emptyMessage: 'No delivered orders yet.',
+                      ),
+                      _OrderList(
+                        orders: orders
+                            .where(
+                              (o) =>
+                                  OrderStatus.isRejectedOrCancelled(o.status),
+                            )
+                            .toList(),
+                        emptyMessage: 'No rejected orders.',
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

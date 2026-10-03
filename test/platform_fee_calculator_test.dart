@@ -41,6 +41,24 @@ void main() {
       expect(result.totalFee, 50);
       expect(result.creatorNetAmount, 30);
     });
+
+    test('honors an admin-configured commission threshold', () {
+      final belowCustomThreshold = PlatformFeeCalculator.calculate(
+        subtotal: 1500,
+        flatFee: 50,
+        percentFee: 5,
+        commissionThreshold: 2000,
+      );
+      expect(belowCustomThreshold.commissionAmount, 0);
+
+      final aboveCustomThreshold = PlatformFeeCalculator.calculate(
+        subtotal: 2500,
+        flatFee: 50,
+        percentFee: 5,
+        commissionThreshold: 2000,
+      );
+      expect(aboveCustomThreshold.commissionAmount, 125);
+    });
   });
 
   group('PlatformFeeSettings', () {
@@ -49,6 +67,7 @@ void main() {
 
       expect(settings.flatFee, 50);
       expect(settings.percentFee, 5);
+      expect(settings.commissionThreshold, 999);
       expect(settings.flatFeePerCreator, 50);
     });
 
@@ -56,10 +75,12 @@ void main() {
       final settings = PlatformFeeSettings.fromMap({
         'flatFee': 75.0,
         'percentFee': 8.0,
+        'commissionThreshold': 1500.0,
       });
 
       expect(settings.flatFeePerCreator, 75);
       expect(settings.percentFee, 8);
+      expect(settings.commissionThreshold, 1500);
     });
 
     test('rounds the flat fee the way api/create-order.js does', () {

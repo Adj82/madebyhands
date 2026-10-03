@@ -58,13 +58,15 @@ final class AdminDeleteCategoryRequested extends AdminEvent {
 final class AdminUpdateSettingsRequested extends AdminEvent {
   final double flatFee;
   final double percentFee;
+  final double commissionThreshold;
   const AdminUpdateSettingsRequested({
     required this.flatFee,
     required this.percentFee,
+    required this.commissionThreshold,
   });
 
   @override
-  List<Object> get props => [flatFee, percentFee];
+  List<Object> get props => [flatFee, percentFee, commissionThreshold];
 }
 
 final class AdminProductReviewRequested extends AdminEvent {

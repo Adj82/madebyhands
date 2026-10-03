@@ -64,6 +64,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
       next = next.copyWith(
         flatFee: settings['flatFee'],
         percentFee: settings['percentFee'],
+        commissionThreshold: settings['commissionThreshold'],
       );
     });
     profilesResult.fold<void>(
@@ -174,6 +175,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     final res = await _adminRepository.updatePlatformSettings(
       event.flatFee,
       event.percentFee,
+      event.commissionThreshold,
     );
     res.fold(
       (failure) => emit(state.copyWith(errorMessage: failure.message)),
@@ -181,6 +183,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
         state.copyWith(
           flatFee: event.flatFee,
           percentFee: event.percentFee,
+          commissionThreshold: event.commissionThreshold,
           notice: 'Platform fees updated.',
         ),
       ),

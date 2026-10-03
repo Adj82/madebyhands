@@ -100,6 +100,9 @@ module.exports = async (req, res) => {
     const percentFee = Number.isFinite(Number(intent.platformFeeRate))
       ? Number(intent.platformFeeRate)
       : DEFAULT_PERCENT_FEE;
+    const commissionThreshold = Number.isFinite(Number(intent.commissionThreshold))
+      ? Number(intent.commissionThreshold)
+      : undefined;
     const buyer = buyerSnapshot.exists ? buyerSnapshot.data() : {};
     const buyerName = buyer.name || user.name || 'Buyer';
     const orderRefs = [...grouped.keys()].map(() => firestore.collection('orders').doc());
@@ -142,7 +145,7 @@ module.exports = async (req, res) => {
       let orderIndex = 0;
       for (const [creatorId, items] of grouped) {
         const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-        const fees = computeOrderFees({ subtotal, flatFee: flatFeePerCreator, percentFee });
+        const fees = computeOrderFees({ subtotal, flatFee: flatFeePerCreator, percentFee, commissionThreshold });
         const orderRef = orderRefs[orderIndex++];
         orderIds.push(orderRef.id);
         transaction.set(orderRef, {

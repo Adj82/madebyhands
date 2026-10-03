@@ -5,6 +5,7 @@ class AdminState extends Equatable {
   final List<CreatorProfile> creatorProfiles;
   final double flatFee;
   final double percentFee;
+  final double commissionThreshold;
   final bool isLoading;
 
   /// One-shot messages for a snackbar; cleared by the next state.
@@ -16,6 +17,7 @@ class AdminState extends Equatable {
     this.creatorProfiles = const [],
     this.flatFee = 50.0,
     this.percentFee = 5.0,
+    this.commissionThreshold = 999.0,
     this.isLoading = false,
     this.errorMessage,
     this.notice,
@@ -31,6 +33,7 @@ class AdminState extends Equatable {
     List<CreatorProfile>? creatorProfiles,
     double? flatFee,
     double? percentFee,
+    double? commissionThreshold,
     bool? isLoading,
     String? errorMessage,
     String? notice,
@@ -40,6 +43,7 @@ class AdminState extends Equatable {
       creatorProfiles: creatorProfiles ?? this.creatorProfiles,
       flatFee: flatFee ?? this.flatFee,
       percentFee: percentFee ?? this.percentFee,
+      commissionThreshold: commissionThreshold ?? this.commissionThreshold,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
       notice: notice,
@@ -52,6 +56,7 @@ class AdminState extends Equatable {
     creatorProfiles,
     flatFee,
     percentFee,
+    commissionThreshold,
     isLoading,
     errorMessage,
     notice,

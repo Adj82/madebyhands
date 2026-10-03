@@ -91,8 +91,8 @@ Key invariants:
 ## Money and status conventions
 
 - **All Firestore amounts are integer rupees.** Paise exist only at the Razorpay boundary (`× 100`).
-- The buyer pays `subtotal + flatFee`. The percentage commission applies **only when `subtotal > 999`** and is deducted from the creator's subtotal, so `creatorNetAmount` can never go negative.
-- Rates come from `settings/platform_economics` (`flatFee`, `percentFee`), defaulting to 50 and 5.
+- The buyer pays `subtotal + flatFee`. The percentage commission applies **only when `subtotal > commissionThreshold`** and is deducted from the creator's subtotal, so `creatorNetAmount` can never go negative.
+- Rates come from `settings/platform_economics` (`flatFee`, `percentFee`, `commissionThreshold`), defaulting to 50, 5, and 999. All three are admin-editable from Admin → Settings.
 - This fee math is **duplicated**: `PlatformFeeCalculator` in `lib/features/orders/domain/entities/marketplace_order.dart` (covered by `test/platform_fee_calculator_test.dart`) and `computeOrderFees` in `server/fees.js` (covered by `npm test`). Change both together.
 - Fees are snapshotted onto each order (`flatFee`, `commissionRate`, `commissionAmount`, `platformFee`, `creatorNetAmount`); Admin Finance derives balances from those stored values, so never recompute historical orders.
 - **Order status strings are mixed-case in the database** — the API writes `'Placed'`, and older records use `'Accepted'`, `'pending'`, `'Completed'`. Always compare through `OrderStatus.normalize()` / `.label()` / `.shipmentStep()` in `lib/features/orders/domain/order_status.dart` instead of raw string equality.
@@ -108,7 +108,7 @@ The rules are load-bearing, not advisory — deploy them alongside API changes.
 - Products: only verified creators create them, always `Pending Approval` + inactive; creator edits go back to review; creators may toggle `isActive` (approved listings only) and `stock` directly.
 - `creator_verifications` (documents) and `creator_bank_accounts` (payout details) are private to the owner and admins / super admins.
 - Product ownership is checked against **either** `creatorUid` **or** `creatorId`; both spellings exist in the data, and `server/checkout.js` falls back the same way.
-- `storage.rules` covers uploads: `creator_profiles/{uid}/…` and `products/{uid}/…` are public images written only by the owner; `creator_profiles/{uid}/verification/…` is readable only by the owner and admins. Deploy with `firebase deploy --only storage`.
+- Storage rules are not in this repo. Uploads go to `creator_profiles/{uid}/…` and `products/{uid}/…`.
 
 ## Environment variables
 

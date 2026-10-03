@@ -9,8 +9,13 @@
 class PlatformFeeSettings {
   final double flatFee;
   final double percentFee;
+  final double commissionThreshold;
 
-  const PlatformFeeSettings({this.flatFee = 50, this.percentFee = 5});
+  const PlatformFeeSettings({
+    this.flatFee = 50,
+    this.percentFee = 5,
+    this.commissionThreshold = 999,
+  });
 
   /// Matches `Math.round` in `api/create-order.js` so the client and the
   /// server agree on the per-creator flat fee.
@@ -21,6 +26,8 @@ class PlatformFeeSettings {
     return PlatformFeeSettings(
       flatFee: (settings['flatFee'] as num?)?.toDouble() ?? 50,
       percentFee: (settings['percentFee'] as num?)?.toDouble() ?? 5,
+      commissionThreshold:
+          (settings['commissionThreshold'] as num?)?.toDouble() ?? 999,
     );
   }
 }
@@ -46,9 +53,10 @@ class PlatformFeeCalculator {
     required int subtotal,
     required double flatFee,
     required double percentFee,
+    double commissionThreshold = 999,
   }) {
     final normalizedFlatFee = flatFee.round().clamp(0, 100000000);
-    final appliedRate = subtotal > 999
+    final appliedRate = subtotal > commissionThreshold
         ? percentFee.clamp(0, 100).toDouble()
         : 0.0;
     final commission = (subtotal * appliedRate / 100).round();

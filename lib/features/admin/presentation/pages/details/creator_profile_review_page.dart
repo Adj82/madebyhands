@@ -1,6 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/admin/presentation/pages/details/product_review_page.dart';
 import 'package:madebyhands/features/admin/presentation/views/verification_view.dart';
+import 'package:madebyhands/features/creator/data/models/creator_product_model.dart';
+import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 
 class CreatorProfileReviewPage extends StatelessWidget {
@@ -87,9 +91,12 @@ class CreatorProfileReviewPage extends StatelessWidget {
                     ...profile.socialLinks.map((link) => _SocialItem(icon: Icons.link, label: link))
                   else
                     const Text('No social links provided.'),
+                  const SizedBox(height: 25),
+                  const _SectionHeader(title: 'Listed Products'),
                 ],
               ),
             ),
+            _CreatorProductsSection(creatorUid: profile.uid),
             const SizedBox(height: 40),
           ],
         ),
@@ -129,6 +136,153 @@ class _SectionHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
+    );
+  }
+}
+
+/// Products this creator has listed in the app, so an admin reviewing their
+/// profile can see their catalogue alongside bio/story/portfolio/documents.
+///
+/// Products store the owning creator under either `creatorUid` or
+/// `creatorId` (both spellings exist in live data — see CLAUDE.md), so this
+/// matches against both rather than relying on a single Firestore `where`.
+class _CreatorProductsSection extends StatelessWidget {
+  final String creatorUid;
+  const _CreatorProductsSection({required this.creatorUid});
+
+  @override
+  Widget build(BuildContext context) {
+    if (creatorUid.isEmpty) return const SizedBox.shrink();
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance.collection('products').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              'Could not load products: ${snapshot.error}',
+              style: const TextStyle(color: AppColors.mutedText),
+            ),
+          );
+        }
+        if (!snapshot.hasData) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
+          );
+        }
+        final products = snapshot.data!.docs
+            .where((doc) {
+              final data = doc.data();
+              return data['creatorUid'] == creatorUid ||
+                  data['creatorId'] == creatorUid;
+            })
+            .map((doc) => CreatorProductModel.fromJson(doc.data(), doc.id))
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+        if (products.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              'No products listed yet.',
+              style: TextStyle(color: AppColors.mutedText),
+            ),
+          );
+        }
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 200,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            mainAxisExtent: 230,
+          ),
+          itemCount: products.length,
+          itemBuilder: (context, index) =>
+              _CreatorProductTile(product: products[index]),
+        );
+      },
+    );
+  }
+}
+
+class _CreatorProductTile extends StatelessWidget {
+  final CreatorProduct product;
+  const _CreatorProductTile({required this.product});
+
+  @override
+  Widget build(BuildContext context) {
+    final isApproved = product.status == 'Approved';
+    final isRejected = product.status == 'Rejected';
+    final statusColor = isApproved
+        ? (product.isActive ? Colors.green.shade700 : Colors.orange.shade800)
+        : isRejected
+        ? Colors.red
+        : AppColors.mutedText;
+    final statusLabel = isApproved
+        ? (product.isActive ? 'LIVE' : 'APPROVED · NOT LIVE')
+        : isRejected
+        ? 'REJECTED'
+        : 'PENDING';
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ProductReviewPage(product: product)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                color: AppColors.outline,
+                child: product.images.isNotEmpty
+                    ? Image.network(
+                        product.images.first,
+                        fit: BoxFit.cover,
+                        cacheWidth: 400,
+                        errorBuilder: (_, _, _) =>
+                            const Icon(Icons.broken_image, color: Colors.grey),
+                      )
+                    : const Icon(Icons.image, size: 36, color: Colors.grey),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '₹${product.price.round()} · Stock ${product.stock}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary, fontSize: 12),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    statusLabel,
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

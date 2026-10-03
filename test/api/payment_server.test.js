@@ -90,11 +90,30 @@ test('fee math matches PlatformFeeCalculator', () => {
   assert.equal(computeOrderFees({ subtotal: 2000, flatFee: 50, percentFee: 0 }).commissionAmount, 0);
 });
 
+test('honours an admin-configured commission threshold', () => {
+  const belowCustomThreshold = computeOrderFees({
+    subtotal: 1500, flatFee: 50, percentFee: 5, commissionThreshold: 2000,
+  });
+  assert.equal(belowCustomThreshold.commissionAmount, 0);
+
+  const aboveCustomThreshold = computeOrderFees({
+    subtotal: 2500, flatFee: 50, percentFee: 5, commissionThreshold: 2000,
+  });
+  assert.equal(aboveCustomThreshold.commissionAmount, 125);
+});
+
 test('reads configured economics and honours a zero percent fee', async () => {
   const economics = await loadPlatformEconomics(
     fakeAdmin({}, { platform_economics: { flatFee: 74.5, percentFee: 0 } }).firestore(),
   );
-  assert.deepEqual(economics, { flatFee: 75, percentFee: 0 });
+  assert.deepEqual(economics, { flatFee: 75, percentFee: 0, commissionThreshold: 999 });
+});
+
+test('reads an admin-configured commission threshold from settings', async () => {
+  const economics = await loadPlatformEconomics(
+    fakeAdmin({}, { platform_economics: { flatFee: 50, percentFee: 5, commissionThreshold: 1500 } }).firestore(),
+  );
+  assert.equal(economics.commissionThreshold, 1500);
 });
 
 test('verifies Razorpay checkout signatures in constant time', () => {

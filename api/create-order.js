@@ -41,7 +41,7 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: error.message });
     }
 
-    const { flatFee, percentFee } = await loadPlatformEconomics(firestore);
+    const { flatFee, percentFee, commissionThreshold } = await loadPlatformEconomics(firestore);
     const creatorCount = new Set(pricedItems.map((item) => item.creatorId)).size;
     const buyerPlatformFee = flatFee * creatorCount;
     const subtotal = pricedItems.reduce((sum, item) => sum + item.subtotal, 0);
@@ -70,6 +70,7 @@ module.exports = async (req, res) => {
         buyerPlatformFee,
         flatFeePerCreator: flatFee,
         platformFeeRate: percentFee,
+        commissionThreshold,
         amount: order.amount,
         currency: order.currency,
         items: pricedItems.map((item) => ({

@@ -7,6 +7,7 @@ abstract interface class AdminRepository {
   Future<Either<Failure, void>> updatePlatformSettings(
     double flatFee,
     double percentFee,
+    double commissionThreshold,
   );
   Future<Either<Failure, List<CreatorProfile>>> getCreatorProfiles();
   Future<Either<Failure, void>> approveCreator(String uid);

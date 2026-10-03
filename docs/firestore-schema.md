@@ -104,11 +104,14 @@ Fees are snapshotted when the order is placed (`server/fees.js`, mirrored by
 `PlatformFeeCalculator`):
 
 ```text
-commission       = subtotal > 999 ? round(subtotal × percentFee / 100) : 0
+commission       = subtotal > commissionThreshold ? round(subtotal × percentFee / 100) : 0
 buyer pays       = subtotal + flatFee          (flatFee per creator)
 platformFee      = flatFee + commission
 creatorNetAmount = subtotal - commission
 ```
+
+`commissionThreshold` defaults to 999 but, like `flatFee`/`percentFee`, is
+admin-configurable (see Platform settings below).
 
 Creators may update only `status` (forward fulfilment values),
 `consignmentNumber`, `carrierName`, `deliveredAt`, `updatedAt`. Rejections go
@@ -137,8 +140,10 @@ uid), `senderRole`, `message`, `createdAt`.
 
 ## Platform settings — `settings/platform_economics`
 
-`flatFee`, `percentFee`, `updatedAt`. Written by super admins only; read by
-checkout and the payment API (defaults 50 and 5).
+`flatFee`, `percentFee`, `commissionThreshold`, `updatedAt`. Written by super
+admins only; read by checkout and the payment API (defaults 50, 5, and 999
+respectively). All three are editable from Admin → Settings → Platform
+economics.
 
 ## Deployment note
 

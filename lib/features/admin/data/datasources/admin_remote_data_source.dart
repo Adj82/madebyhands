@@ -4,7 +4,11 @@ import 'package:madebyhands/features/creator/data/models/creator_profile_model.d
 
 abstract interface class AdminRemoteDataSource {
   Future<Map<String, dynamic>> getPlatformSettings();
-  Future<void> updatePlatformSettings(double flatFee, double percentFee);
+  Future<void> updatePlatformSettings(
+    double flatFee,
+    double percentFee,
+    double commissionThreshold,
+  );
   Future<List<CreatorProfileModel>> getCreatorProfiles();
   Future<void> approveCreator(String uid);
   Future<void> rejectCreator(String uid, String reason);
@@ -31,16 +35,21 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
         .collection('settings')
         .doc('platform_economics')
         .get();
-    return doc.data() ?? const {'flatFee': 50.0, 'percentFee': 5.0};
+    return doc.data() ??
+        const {'flatFee': 50.0, 'percentFee': 5.0, 'commissionThreshold': 999.0};
   }
 
   @override
-  Future<void> updatePlatformSettings(double flatFee, double percentFee) =>
-      firestore.collection('settings').doc('platform_economics').set({
-        'flatFee': flatFee,
-        'percentFee': percentFee,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+  Future<void> updatePlatformSettings(
+    double flatFee,
+    double percentFee,
+    double commissionThreshold,
+  ) => firestore.collection('settings').doc('platform_economics').set({
+    'flatFee': flatFee,
+    'percentFee': percentFee,
+    'commissionThreshold': commissionThreshold,
+    'updatedAt': FieldValue.serverTimestamp(),
+  }, SetOptions(merge: true));
 
   @override
   Future<List<CreatorProfileModel>> getCreatorProfiles() async {
