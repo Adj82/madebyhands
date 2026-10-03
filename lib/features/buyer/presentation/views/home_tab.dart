@@ -8,6 +8,7 @@ import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 class HomeTab extends StatefulWidget {
   final String userName;
   final VoidCallback onBrowseAll;
+  final ValueChanged<String>? onSearchSubmitted;
   final ValueChanged<String>? onCategoryTap;
   final SavedAddress? selectedAddress;
   final VoidCallback? onAddressTap;
@@ -19,6 +20,7 @@ class HomeTab extends StatefulWidget {
     super.key,
     required this.userName,
     required this.onBrowseAll,
+    this.onSearchSubmitted,
     this.onCategoryTap,
     this.selectedAddress,
     this.onAddressTap,
@@ -34,6 +36,7 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   final PageController _storyPageController = PageController();
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _homeSearchController = TextEditingController();
 
   final GlobalKey _overlayKey = GlobalKey();
   double _overlayBottom = 0;
@@ -102,11 +105,21 @@ class _HomeTabState extends State<HomeTab> {
     _storyPageController.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _homeSearchController.dispose();
     super.dispose();
   }
 
   void _openSearch() {
     widget.onBrowseAll();
+  }
+
+  void _submitSearch() {
+    final query = _homeSearchController.text.trim();
+    if (query.isEmpty) {
+      _openSearch();
+    } else {
+      widget.onSearchSubmitted?.call(query);
+    }
   }
 
   void _openCategory(String category) {
@@ -391,41 +404,44 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildSearchBar() {
-    return InkWell(
-      onTap: _openSearch,
-      borderRadius: BorderRadius.circular(22),
-      child: Container(
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFFDF8),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: const Color(0xFFC49A6C), width: 1.1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
+    return Container(
+      height: 40,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFDF8),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFC49A6C), width: 1.1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _homeSearchController,
+        textInputAction: TextInputAction.search,
+        onSubmitted: (_) => _submitSearch(),
+        style: GoogleFonts.montserrat(
+          color: const Color(0xFF331818),
+          fontSize: 12.5,
+          fontWeight: FontWeight.w500,
         ),
-        child: Row(
-          children: [
-            const Icon(Icons.search, color: Color(0xFF8B261D), size: 18),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Search handmade art, crafts and more...',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.montserrat(
-                  color: const Color(0xFF8A7F73),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
+        decoration: InputDecoration(
+          hintText: 'Search products or categories...',
+          hintStyle: GoogleFonts.montserrat(
+            color: const Color(0xFF8A7F73),
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+          prefixIcon: IconButton(
+            tooltip: 'Search products and categories',
+            onPressed: _submitSearch,
+            icon: const Icon(Icons.search, color: Color(0xFF8B261D), size: 18),
+          ),
+          border: InputBorder.none,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 11),
         ),
       ),
     );

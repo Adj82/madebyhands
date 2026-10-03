@@ -53,6 +53,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
 
   /// Category the Shop tab should filter by when opened from Home.
   final ValueNotifier<String?> _shopCategory = ValueNotifier(null);
+  final ValueNotifier<String?> _shopSearch = ValueNotifier(null);
 
   @override
   void initState() {
@@ -127,6 +128,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
   @override
   void dispose() {
     _shopCategory.dispose();
+    _shopSearch.dispose();
     _navigationCubit.close();
     _addressSubscription?.cancel();
     _notificationSubscription?.cancel();
@@ -221,6 +223,17 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
   }
 
   void _openShop() {
+    _navigationCubit.changePage(1);
+  }
+
+  void _openShopSearch(String query) {
+    final normalizedQuery = query.trim();
+    if (normalizedQuery.isEmpty) {
+      _openShop();
+      return;
+    }
+    _shopCategory.value = null;
+    _shopSearch.value = normalizedQuery;
     _navigationCubit.changePage(1);
   }
 
@@ -382,6 +395,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                       ),
                     ),
                     onBrowseAll: _openShop,
+                    onSearchSubmitted: _openShopSearch,
                     onCategoryTap: _openShopCategory,
                     onProfileTap: () => _navigationCubit.changePage(4),
                     unreadNotificationCount: _notifications
@@ -398,6 +412,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                       onProductTap: _openProduct,
                       onCreatorTap: _openCreator,
                       categoryRequest: _shopCategory,
+                      searchRequest: _shopSearch,
                     ),
                   ),
                   SafeArea(

@@ -105,6 +105,23 @@ void main() {
     expect(find.text('Blue Pottery Vase'), findsOneWidget);
   });
 
+  testWidgets('home search finds products through category names', (
+    tester,
+  ) async {
+    await tester.pumpWidget(buildDashboard());
+    await tester.pumpAndSettle();
+
+    final homeSearch = find.byType(TextField);
+    expect(homeSearch, findsOneWidget);
+    await tester.enterText(homeSearch, 'ceramics');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Explore handmade'), findsOneWidget);
+    expect(find.text('Blue Pottery Vase'), findsOneWidget);
+    expect(find.text('Handwoven Storage Basket'), findsNothing);
+  });
+
   testWidgets('product details updates quantity and bag badge', (tester) async {
     await tester.pumpWidget(buildDashboard());
     await tester.pumpAndSettle();
@@ -520,9 +537,7 @@ void main() {
     expect(restoredBloc.state.cartQuantities[product.id], product.stock);
   });
 
-  testWidgets('buyer updates profile and deletes the account', (
-    tester,
-  ) async {
+  testWidgets('buyer updates profile and deletes the account', (tester) async {
     final repository = _FakeAccountAuthRepository();
     await tester.pumpWidget(
       MaterialApp(
