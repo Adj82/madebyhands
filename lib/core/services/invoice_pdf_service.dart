@@ -6,6 +6,7 @@
 // invoice always reflects the admin-set fees that were actually in force
 // when that particular order was placed — never the current live settings.
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -13,6 +14,11 @@ import 'package:printing/printing.dart';
 
 const String _companyName = 'MADEBYHANDS';
 const String _companyAddress = 'Bhubaneswar, Patia';
+
+// Transparent-background render of the brand mark (see
+// assets/images/logo.png, the opaque version used for app icons) so it sits
+// on the invoice's white page with no visible box or background behind it.
+const String _logoAssetPath = 'assets/images/logo_mark_transparent.png';
 
 class InvoiceLineItem {
   final String name;
@@ -141,16 +147,30 @@ class InvoicePdfService {
     final boldFont = await PdfGoogleFonts.notoSansBold();
     final theme = pw.ThemeData.withFont(base: regularFont, bold: boldFont);
     final doc = pw.Document(theme: theme);
+    final logo = await _loadLogo();
 
     doc.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
-        build: (context) => _buildBody(data),
+        build: (context) => _buildBody(data, logo),
       ),
     );
 
     return doc.save();
+  }
+
+  /// Loads the brand mark for the header. Returns null (header falls back to
+  /// text-only) if the asset can't be read, so a packaging hiccup never
+  /// blocks invoice generation.
+  static Future<pw.MemoryImage?> _loadLogo() async {
+    try {
+      final bytes = await rootBundle.load(_logoAssetPath);
+      return pw.MemoryImage(bytes.buffer.asUint8List());
+    } catch (error) {
+      logInvoiceError('Invoice logo asset failed to load: $error');
+      return null;
+    }
   }
 
   /// Builds the PDF and hands it to the platform's share/print sheet — a
@@ -164,7 +184,7 @@ class InvoicePdfService {
     );
   }
 
-  static pw.Widget _buildBody(InvoiceData data) {
+  static pw.Widget _buildBody(InvoiceData data, pw.MemoryImage? logo) {
     const brand = PdfColor.fromInt(0xFF8B261D);
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -173,19 +193,28 @@ class InvoicePdfService {
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
               children: [
-                pw.Text(
-                  _companyName,
-                  style: pw.TextStyle(
-                    fontSize: 24,
-                    fontWeight: pw.FontWeight.bold,
-                    color: brand,
-                  ),
+                if (logo != null) ...[
+                  pw.Image(logo, width: 44, height: 44),
+                  pw.SizedBox(width: 12),
+                ],
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      _companyName,
+                      style: pw.TextStyle(
+                        fontSize: 24,
+                        fontWeight: pw.FontWeight.bold,
+                        color: brand,
+                      ),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(_companyAddress),
+                  ],
                 ),
-                pw.SizedBox(height: 4),
-                pw.Text(_companyAddress),
               ],
             ),
             pw.Column(
