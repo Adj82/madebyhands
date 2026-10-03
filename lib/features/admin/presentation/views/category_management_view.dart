@@ -22,44 +22,61 @@ class CategoryManagementView extends StatelessWidget {
             icon: const Icon(Icons.add),
             label: const Text('New category'),
           ),
-          body: RefreshIndicator(
-            onRefresh: () async =>
-                context.read<AdminBloc>().add(AdminLoadDataRequested()),
-            child: categories.isEmpty
-                ? ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    children: [
-                      const SizedBox(height: 160),
-                      Center(
-                        child: state.isLoading
-                            ? const CircularProgressIndicator()
-                            : const Text('No categories yet. Add one!'),
-                      ),
-                    ],
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(15, 15, 15, 90),
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: categories.length,
-                    itemBuilder: (context, index) {
-                      final category = categories[index];
-                      return Card(
-                        child: ListTile(
-                          leading: const CircleAvatar(
-                            backgroundColor: AppColors.outline,
-                            child: Icon(Icons.category, size: 20),
-                          ),
-                          title: Text(category),
-                          subtitle: const Text('Shown to creators and buyers'),
-                          trailing: IconButton(
-                            onPressed: () => _confirmDelete(context, category),
-                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                            tooltip: 'Delete category',
-                          ),
-                        ),
-                      );
-                    },
+          body: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(15, 15, 15, 0),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () => _confirmResetToDefaults(context),
+                    icon: const Icon(Icons.restart_alt, size: 18),
+                    label: const Text('Reset to defaults'),
                   ),
+                ),
+              ),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: () async =>
+                      context.read<AdminBloc>().add(AdminLoadDataRequested()),
+                  child: categories.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            const SizedBox(height: 160),
+                            Center(
+                              child: state.isLoading
+                                  ? const CircularProgressIndicator()
+                                  : const Text('No categories yet. Add one!'),
+                            ),
+                          ],
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(15, 15, 15, 90),
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: categories.length,
+                          itemBuilder: (context, index) {
+                            final category = categories[index];
+                            return Card(
+                              child: ListTile(
+                                leading: const CircleAvatar(
+                                  backgroundColor: AppColors.outline,
+                                  child: Icon(Icons.category, size: 20),
+                                ),
+                                title: Text(category),
+                                subtitle: const Text('Shown to creators and buyers'),
+                                trailing: IconButton(
+                                  onPressed: () => _confirmDelete(context, category),
+                                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                                  tooltip: 'Delete category',
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -89,6 +106,33 @@ class CategoryManagementView extends StatelessWidget {
       ),
     );
     if (confirmed == true) adminBloc.add(AdminDeleteCategoryRequested(category));
+  }
+
+  Future<void> _confirmResetToDefaults(BuildContext context) async {
+    final adminBloc = context.read<AdminBloc>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Reset categories to defaults?'),
+        content: const Text(
+          'This deletes every category currently listed here and replaces '
+          'them with the app\'s built-in default set. Existing products '
+          'keep whatever category they were tagged with; only what new '
+          'creators are offered changes.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) adminBloc.add(AdminResetCategoriesRequested());
   }
 
   void _showAddCategoryDialog(BuildContext context) {

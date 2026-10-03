@@ -15,6 +15,7 @@ abstract interface class AdminRemoteDataSource {
   Future<List<String>> getCategories({bool seedDefaults = false});
   Future<void> addCategory(String name);
   Future<void> deleteCategory(String name);
+  Future<List<String>> resetCategoriesToDefaults();
   Future<void> reviewProduct({
     required String productId,
     required bool approve,
@@ -165,6 +166,26 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
     }
     batch.delete(firestore.collection('categories').doc(_categoryId(name)));
     await batch.commit();
+  }
+
+  /// Wipes every current category document and reseeds exactly
+  /// [kProductCategories] — the admin "Reset to defaults" action. Existing
+  /// products keep whatever category strings they were tagged with; this
+  /// only changes what creators are offered going forward.
+  @override
+  Future<List<String>> resetCategoriesToDefaults() async {
+    final snapshot = await firestore.collection('categories').get();
+    final batch = firestore.batch();
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    for (final name in kProductCategories) {
+      batch.set(firestore.collection('categories').doc(_categoryId(name)), {
+        'name': name,
+      });
+    }
+    await batch.commit();
+    return List<String>.from(kProductCategories);
   }
 
   /// Approving publishes the listing; rejecting hides it with a reason the

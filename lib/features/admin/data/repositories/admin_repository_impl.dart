@@ -69,6 +69,10 @@ class AdminRepositoryImpl implements AdminRepository {
   Future<Either<Failure, void>> deleteCategory(String name) =>
       _guard(() => remoteDataSource.deleteCategory(name));
 
+  @override
+  Future<Either<Failure, List<String>>> resetCategoriesToDefaults() =>
+      _guard(remoteDataSource.resetCategoriesToDefaults);
+
   // Goes through the payment API, not a direct Firestore write: suspending
   // must disable the user's actual Firebase Auth account and revoke any
   // open session, which only the Admin SDK (server-side) can do.

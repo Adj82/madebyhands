@@ -55,6 +55,9 @@ final class AdminDeleteCategoryRequested extends AdminEvent {
   List<Object> get props => [name];
 }
 
+/// Wipes every current category and reseeds the app's built-in defaults.
+final class AdminResetCategoriesRequested extends AdminEvent {}
+
 final class AdminUpdateSettingsRequested extends AdminEvent {
   final double flatFee;
   final double percentFee;

@@ -21,6 +21,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     on<AdminRejectCreatorRequested>(_onRejectCreatorRequested);
     on<AdminAddCategoryRequested>(_onAddCategoryRequested);
     on<AdminDeleteCategoryRequested>(_onDeleteCategoryRequested);
+    on<AdminResetCategoriesRequested>(_onResetCategoriesRequested);
     on<AdminSuspendUserRequested>(_onSuspendUserRequested);
     on<AdminUpdateSettingsRequested>(_onUpdateSettingsRequested);
     on<AdminProductReviewRequested>(_onProductReviewRequested);
@@ -148,6 +149,22 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
       (_) => emit(
         state.copyWith(
           categories: state.categories.where((c) => c != event.name).toList(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onResetCategoriesRequested(
+    AdminResetCategoriesRequested event,
+    Emitter<AdminState> emit,
+  ) async {
+    final res = await _adminRepository.resetCategoriesToDefaults();
+    res.fold(
+      (failure) => emit(state.copyWith(errorMessage: failure.message)),
+      (categories) => emit(
+        state.copyWith(
+          categories: categories,
+          notice: 'Categories reset to defaults.',
         ),
       ),
     );
