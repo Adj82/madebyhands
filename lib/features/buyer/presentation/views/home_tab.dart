@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
-import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 class HomeTab extends StatefulWidget {
   final String userName;
@@ -11,6 +11,7 @@ class HomeTab extends StatefulWidget {
   final ValueChanged<String>? onCategoryTap;
   final SavedAddress? selectedAddress;
   final VoidCallback? onAddressTap;
+  final VoidCallback? onProfileTap;
   final int unreadNotificationCount;
   final VoidCallback onNotificationsTap;
 
@@ -21,6 +22,7 @@ class HomeTab extends StatefulWidget {
     this.onCategoryTap,
     this.selectedAddress,
     this.onAddressTap,
+    this.onProfileTap,
     required this.unreadNotificationCount,
     required this.onNotificationsTap,
   });
@@ -30,50 +32,42 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  late final PageController _storyPageController;
+  final PageController _storyPageController = PageController();
+  final ScrollController _scrollController = ScrollController();
 
-  // Editorial picks — titles/images are curated copy, not tied to any
-  // specific admin category (categories can be renamed/added/deleted by
-  // admin at any time, so these cards open Browse All rather than hardcode
-  // a category name that may no longer exist).
-  final List<Map<String, String>> _stories = const [
+  final GlobalKey _overlayKey = GlobalKey();
+  double _overlayBottom = 0;
+
+  final List<Map<String, String>> _stories = [
     {
       'title': 'The Story of Madhubani Art',
+      'description':
+          'Ancient folk painting tradition from Mithila celebrating nature, mythology and vibrant heritage.',
       'image':
           'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?q=80&w=800&auto=format&fit=crop',
-      'asset': 'assets/main_page_elements/painting_main.png',
     },
     {
       'title': 'The Heritage of Phulkari',
+      'description':
+          'Handcrafted floral embroidery woven with silk threads, passing down generations of stories.',
       'image':
           'https://images.unsplash.com/photo-1606744888344-493238951221?q=80&w=800&auto=format&fit=crop',
-      'asset': 'assets/main_page_elements/textile_main.png',
     },
     {
       'title': 'Royal Terracotta & Pottery',
+      'description':
+          'Earthy clay sculptures and traditional pottery shaped by hand across royal artisan guilds.',
       'image':
           'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?q=80&w=800&auto=format&fit=crop',
-      'asset': 'assets/main_page_elements/pottery_main.png',
-    },
-    {
-      'title': 'Handcrafted Cultural Heritage',
-      'image':
-          'https://images.unsplash.com/photo-1544816155-12df9643f363?q=80&w=800&auto=format&fit=crop',
-      'asset': 'assets/main_page_elements/handicraft_main.png',
     },
   ];
 
-  /// Artwork for a handful of well-known category names, purely cosmetic —
-  /// if an admin category happens to match one of these names it gets this
-  /// artwork, otherwise the tile falls back to a plain text card. This is
-  /// not a list of "available" categories; availability always comes from
-  /// admin's live categories collection.
   static const Map<String, String> _categoryArtByName = {
     'Paintings, Drawing, Fine Art & Traditional Art': 'painting_main.png',
     'Digital Art, Illustration, Design & Photography': 'digital_main.png',
     'Pottery, Ceramics, Clay & Sculpture': 'pottery_main.png',
     'Textile, Fiber, Embroidery, Toys & Dolls': 'textile_main.png',
-    'Fashion, Jewellery & Wearables': 'fashion_main.png',
+    'Fashion, Jewellery & Wearables': 'jewelry_main.png',
     'Home Décor & Lifestyle': 'homedec_main.png',
     'Wood, Metal, Leather & Natural Crafts': 'wood_main.png',
     'Paper, Books & Stationery': 'paper_main.png',
@@ -85,12 +79,29 @@ class _HomeTabState extends State<HomeTab> {
   @override
   void initState() {
     super.initState();
-    _storyPageController = PageController();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _measureOverlay() {
+    final box = _overlayKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached) return;
+    final bottom = box.localToGlobal(Offset(0, box.size.height)).dy;
+    if ((bottom - _overlayBottom).abs() > 0.5) {
+      setState(() => _overlayBottom = bottom);
+    }
   }
 
   @override
   void dispose() {
     _storyPageController.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -109,11 +120,31 @@ class _HomeTabState extends State<HomeTab> {
         ? 'there'
         : widget.userName.trim().split(' ').first;
 
+    final scrollOffset = _scrollController.hasClients
+        ? _scrollController.offset
+        : 0.0;
+
+    const storiesScrollThreshold = 290.0;
+    const brandingCollapseDistance = 150.0;
+
+    final collapseProgress =
+        ((scrollOffset - storiesScrollThreshold) / brandingCollapseDistance)
+            .clamp(0.0, 1.0);
+
+    final brandingHeightFactor = 1.0 - collapseProgress;
+    final brandingOpacity = 1.0 - collapseProgress;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _measureOverlay();
+    });
+
+    final fadeStrength = (scrollOffset / 40.0).clamp(0.0, 1.0);
+
     return Scaffold(
       backgroundColor: const Color(0xFFFAF6EE),
       body: Stack(
         children: [
-          // Background frame overlay
+          // 1. Background frame overlay
           Positioned.fill(
             child: Image.asset(
               'assets/main_page_elements/main_page_background.png',
@@ -121,30 +152,99 @@ class _HomeTabState extends State<HomeTab> {
               errorBuilder: (_, _, _) => const SizedBox.shrink(),
             ),
           ),
-          // Scrollable body sitting on top of background
-          SafeArea(
-            child: SingleChildScrollView(
-              key: const PageStorageKey('buyer-home-scroll'),
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 26.0,
-                vertical: 4.0,
+
+          // 2. Scrollable Body
+          ShaderMask(
+            blendMode: BlendMode.dstIn,
+            shaderCallback: (bounds) {
+              final h = bounds.height;
+              final searchBottom = _overlayBottom.clamp(0.0, h);
+              final hiddenUntil = searchBottom - 22.0 * fadeStrength;
+              final visibleFrom = searchBottom + 38.0 * fadeStrength;
+              final s1 = (hiddenUntil / h).clamp(0.0, 1.0);
+              final s2 = (visibleFrom / h).clamp(0.0, 1.0);
+              return LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: const [
+                  Colors.transparent,
+                  Colors.transparent,
+                  Colors.black,
+                  Colors.black,
+                ],
+                stops: [0.0, s1, s2, 1.0],
+              ).createShader(bounds);
+            },
+            child: SafeArea(
+              bottom: false,
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                key: const PageStorageKey('buyer-home-scroll'),
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 28.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 250.0),
+                    _buildHistoricalArtSection(),
+                    const SizedBox(height: 18),
+                    _buildCategoryDivider(),
+                    const SizedBox(height: 14),
+                    _buildCategoriesGrid(),
+                    const SizedBox(height: 36),
+                  ],
+                ),
               ),
+            ),
+          ),
+
+          // 3. Fixed/Sticky Top Overlay
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                // key removed from here
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildHeaderWithBrandingAndTopRightIcons(),
-                  const SizedBox(height: 6),
-                  _buildGreetingAndAddress(firstName),
-                  const SizedBox(height: 14),
-                  _buildSearchBar(),
-                  const SizedBox(height: 18),
-                  _buildHistoricalArtSection(),
-                  const SizedBox(height: 18),
-                  _buildCategoryDivider(),
-                  const SizedBox(height: 14),
-                  _buildCategoriesGrid(),
-                  const SizedBox(height: 30),
+                  // FIXED: logo + MADE BY HANDS text
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(28.0, 6.0, 28.0, 0),
+                    child: _buildHeaderWithBrandingAndTopRightIcons(),
+                  ),
+                  const SizedBox(height: 2),
+
+                  // COLLAPSING: Hello user, address, profile & notification icons
+                  Transform.translate(
+                    offset: const Offset(0, -30),
+                    child: ClipRect(
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        heightFactor: brandingHeightFactor,
+                        child: Opacity(
+                          opacity: brandingOpacity,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 28.0,
+                            ),
+                            child: _buildGreetingAndAddress(firstName),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Search Bar (lifts up as it gets pinned)
+                  Transform.translate(
+                    offset: Offset(0, -30.0 * collapseProgress),
+                    child: Padding(
+                      key: _overlayKey, // key now lives here
+                      padding: const EdgeInsets.symmetric(horizontal: 28.0),
+                      child: _buildSearchBar(),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -155,57 +255,30 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildHeaderWithBrandingAndTopRightIcons() {
-    return SizedBox(
-      width: double.infinity,
-      height: 132,
-      child: Stack(
-        alignment: Alignment.topCenter,
-        clipBehavior: Clip.none,
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 6),
-              Image.asset(
-                'assets/main_page_elements/mbh_logo.png',
-                height: 76,
-                fit: BoxFit.contain,
-                errorBuilder: (_, _, _) => const Icon(
-                  Icons.palette,
-                  size: 48,
-                  color: Color(0xFF8B261D),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Image.asset(
-                'assets/main_page_elements/madebyhands_text.png',
-                height: 45,
-                fit: BoxFit.contain,
-                errorBuilder: (_, _, _) => Text(
-                  'MADE BY HANDS',
-                  style: GoogleFonts.montserrat(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
-                    color: const Color(0xFF8B261D),
-                  ),
-                ),
-              ),
-            ],
+          Image.asset(
+            'assets/main_page_elements/mbh_logo.png',
+            height: 65,
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) =>
+                const Icon(Icons.palette, size: 40, color: Color(0xFF8B261D)),
           ),
-          Positioned(
-            top: 80,
-            right: 0,
-            child: IconButton(
-              tooltip: 'Open notifications',
-              onPressed: widget.onNotificationsTap,
-              icon: Badge(
-                isLabelVisible: widget.unreadNotificationCount > 0,
-                label: Text('${widget.unreadNotificationCount}'),
-                child: const Icon(
-                  Icons.notifications_none_rounded,
-                  color: Color(0xFF8B261D),
-                  size: 22,
+          Transform.translate(
+            offset: const Offset(0, -25),
+            child: Image.asset(
+              'assets/main_page_elements/madebyhands_text.png',
+              height: 75,
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => Text(
+                'MADE BY HANDS',
+                style: GoogleFonts.montserrat(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                  color: const Color(0xFF8B261D),
                 ),
               ),
             ),
@@ -223,51 +296,46 @@ class _HomeTabState extends State<HomeTab> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Image.asset(
-          'assets/main_page_elements/flower_left.png',
-          height: 68,
-          fit: BoxFit.contain,
-          errorBuilder: (_, _, _) => const SizedBox(width: 20),
-        ),
         Expanded(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 'Hello, $firstName',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.playfairDisplay(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
+                textAlign: TextAlign.left,
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w500,
                   color: const Color(0xFF331818),
                 ),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 1),
               InkWell(
                 onTap: widget.onAddressTap,
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 2,
+                    horizontal: 0,
+                    vertical: 1,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Icon(
                         Icons.location_on,
-                        size: 14,
+                        size: 13,
                         color: Color(0xFF8B261D),
                       ),
-                      const SizedBox(width: 3),
+                      const SizedBox(width: 2),
                       Flexible(
                         child: Text(
                           addressText,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.montserrat(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w600,
+                          style: GoogleFonts.questrial(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
                             color: const Color(0xFF5A4438),
                           ),
                         ),
@@ -275,7 +343,7 @@ class _HomeTabState extends State<HomeTab> {
                       const SizedBox(width: 2),
                       const Icon(
                         Icons.keyboard_arrow_down,
-                        size: 15,
+                        size: 14,
                         color: Color(0xFF8B261D),
                       ),
                     ],
@@ -285,11 +353,38 @@ class _HomeTabState extends State<HomeTab> {
             ],
           ),
         ),
-        Image.asset(
-          'assets/main_page_elements/flower_right.png',
-          height: 68,
-          fit: BoxFit.contain,
-          errorBuilder: (_, _, _) => const SizedBox(width: 20),
+        const SizedBox(width: 8),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            InkWell(
+              onTap: widget.onProfileTap,
+              borderRadius: BorderRadius.circular(20),
+              child: const Padding(
+                padding: EdgeInsets.all(4.0),
+                child: Icon(
+                  Icons.account_circle_outlined,
+                  color: Color(0xFF4A1F18),
+                  size: 28,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              tooltip: 'Open notifications',
+              onPressed: widget.onNotificationsTap,
+              visualDensity: VisualDensity.compact,
+              icon: Badge(
+                isLabelVisible: widget.unreadNotificationCount > 0,
+                label: Text('${widget.unreadNotificationCount}'),
+                child: const Icon(
+                  Icons.notifications_none_rounded,
+                  color: Color(0xFF4A1F18),
+                  size: 26,
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -298,25 +393,25 @@ class _HomeTabState extends State<HomeTab> {
   Widget _buildSearchBar() {
     return InkWell(
       onTap: _openSearch,
-      borderRadius: BorderRadius.circular(25),
+      borderRadius: BorderRadius.circular(22),
       child: Container(
-        height: 46,
+        height: 40,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: const Color(0xFFFFFDF8),
-          borderRadius: BorderRadius.circular(25),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(color: const Color(0xFFC49A6C), width: 1.1),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 5,
+              blurRadius: 4,
               offset: const Offset(0, 2),
             ),
           ],
         ),
         child: Row(
           children: [
-            const Icon(Icons.search, color: Color(0xFF8B261D), size: 20),
+            const Icon(Icons.search, color: Color(0xFF8B261D), size: 18),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -325,7 +420,7 @@ class _HomeTabState extends State<HomeTab> {
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.montserrat(
                   color: const Color(0xFF8A7F73),
-                  fontSize: 12.5,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -345,47 +440,31 @@ class _HomeTabState extends State<HomeTab> {
           children: [
             Text(
               'Historical Art & Stories',
-              style: GoogleFonts.playfairDisplay(
+              style: GoogleFonts.montserrat(
                 fontSize: 17,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w900,
                 color: const Color(0xFF6B1D1D),
               ),
             ),
             InkWell(
               onTap: widget.onBrowseAll,
-              child: Row(
-                children: [
-                  Text(
-                    'See All',
-                    style: GoogleFonts.montserrat(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF8B261D),
-                    ),
-                  ),
-                  const SizedBox(width: 2),
-                  const Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 14,
-                    color: Color(0xFF8B261D),
-                  ),
-                ],
+              child: const Icon(
+                Icons.arrow_forward_rounded,
+                size: 20,
+                color: Color(0xFF8B261D),
               ),
             ),
           ],
         ),
         const SizedBox(height: 10),
-        AspectRatio(
-          aspectRatio: 1.0,
+        SizedBox(
+          height: 240,
           child: PageView.builder(
             controller: _storyPageController,
             itemCount: _stories.length,
             itemBuilder: (context, index) {
               final story = _stories[index];
-              return GestureDetector(
-                onTap: _openSearch,
-                child: _buildStoryCard(story),
-              );
+              return _buildStoryCard(story);
             },
           ),
         ),
@@ -408,150 +487,118 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Widget _buildStoryImage(String? url, String? assetPath) {
-    if (url != null && url.isNotEmpty && url.startsWith('http')) {
-      return Image.network(
-        url,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) {
-          if (assetPath != null && assetPath.isNotEmpty) {
-            return Image.asset(
-              assetPath,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => _buildPlaceholderImage(),
-            );
-          }
-          return _buildPlaceholderImage();
-        },
-      );
-    } else if (assetPath != null && assetPath.isNotEmpty) {
-      return Image.asset(
-        assetPath,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => _buildPlaceholderImage(),
-      );
-    }
-    return _buildPlaceholderImage();
-  }
-
-  Widget _buildPlaceholderImage() {
-    return Container(
-      color: const Color(0xFFEAD9C6),
-      child: const Center(
-        child: Icon(Icons.palette, size: 48, color: Color(0xFF8B261D)),
-      ),
-    );
-  }
-
   Widget _buildStoryCard(Map<String, String> story) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 2),
+      margin: const EdgeInsets.only(left: 2, top: 2, right: 14, bottom: 20),
       decoration: BoxDecoration(
         color: const Color(0xFFFFFDF8),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: const Color(0xFF2A1208).withValues(alpha: 0.65),
+            blurRadius: 12,
+            spreadRadius: -2,
+            offset: const Offset(6, 8),
+          ),
+          BoxShadow(
+            color: const Color(0xFF2A1208).withValues(alpha: 0.80),
             blurRadius: 8,
-            offset: const Offset(0, 3),
+            spreadRadius: -1,
+            offset: const Offset(3, 4),
           ),
         ],
       ),
-      child: Stack(
-        children: [
-          // Artwork Image
-          Positioned.fill(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: _buildStoryImage(story['image'], story['asset']),
-            ),
-          ),
-          // Block border overlay frame
-          Positioned.fill(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.asset(
-                'assets/main_page_elements/block_border.png',
-                fit: BoxFit.fill,
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
-              ),
-            ),
-          ),
-          // Bottom Title Banner
-          Positioned(
-            left: 10,
-            right: 10,
-            bottom: 10,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFFDF8).withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFFC49A6C), width: 1),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      story['title']!,
-                      style: GoogleFonts.playfairDisplay(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF331818),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    width: 26,
-                    height: 26,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFF8B261D),
-                        width: 1.2,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.arrow_forward,
-                      size: 14,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
+          children: [
+            // 1. Artwork Image
+            Positioned.fill(
+              child: Image.network(
+                story['image']!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => Container(
+                  color: const Color(0xFFEAD9C6),
+                  child: const Center(
+                    child: Icon(
+                      Icons.image,
+                      size: 48,
                       color: Color(0xFF8B261D),
                     ),
                   ),
+                ),
+              ),
+            ),
+            // 2. Dark Gradient Overlay at Bottom
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.20),
+                      Colors.black.withValues(alpha: 0.80),
+                    ],
+                    stops: const [0.4, 0.65, 1.0],
+                  ),
+                ),
+              ),
+            ),
+            // 3. Heading (Montserrat w700) & Description (Montserrat w400, 1-2 lines) at Bottom Left
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    story['title']!,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      height: 1.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (story['description'] != null &&
+                      story['description']!.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      story['description']!,
+                      style: GoogleFonts.montserrat(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.white.withValues(alpha: 0.90),
+                        height: 1.3,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildCategoryDivider() {
-    return Image.asset(
-      'assets/main_page_elements/category.png',
-      fit: BoxFit.contain,
-      width: double.infinity,
-      errorBuilder: (_, _, _) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        alignment: Alignment.center,
-        child: Text(
-          '— CATEGORIES —',
-          style: GoogleFonts.playfairDisplay(
-            fontSize: 17,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 2,
-            color: const Color(0xFF6B1D1D),
-          ),
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        'Categories',
+        style: GoogleFonts.montserrat(
+          fontSize: 17,
+          fontWeight: FontWeight.w900,
+          color: const Color(0xFF6B1D1D),
         ),
       ),
     );
@@ -559,31 +606,24 @@ class _HomeTabState extends State<HomeTab> {
 
   Widget _buildCategoriesGrid() {
     return BlocBuilder<BuyerBloc, BuyerState>(
-      buildWhen: (previous, current) => previous.categories != current.categories,
+      buildWhen: (previous, current) =>
+          previous.categories != current.categories,
       builder: (context, state) {
-        // Admin's categories collection is the single source of truth — no
-        // hardcoded fallback list. If admin hasn't added any yet, show
-        // nothing rather than a stale constant list.
         final categories = state.categories;
         if (categories.isEmpty) return const SizedBox.shrink();
-        final count = categories.length;
-        final rowsCount = (count / 2).ceil();
-
+        final rowsCount = (categories.length / 2).ceil();
         return Column(
           children: List.generate(rowsCount, (rowIndex) {
             final firstIndex = rowIndex * 2;
             final secondIndex = firstIndex + 1;
-
             return Padding(
-              padding: const EdgeInsets.only(bottom: 12.0),
+              padding: const EdgeInsets.only(bottom: 12),
               child: Row(
                 children: [
-                  Expanded(
-                    child: _buildCategoryCard(categories[firstIndex]),
-                  ),
+                  Expanded(child: _buildCategoryCard(categories[firstIndex])),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: secondIndex < count
+                    child: secondIndex < categories.length
                         ? _buildCategoryCard(categories[secondIndex])
                         : const SizedBox.shrink(),
                   ),
@@ -596,54 +636,93 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Widget _buildCategoryCard(String name) {
-    final art = _categoryArtByName[name];
+  Widget _buildCategoryCard(String category) {
+    final art = _categoryArtByName[category];
     return GestureDetector(
-      onTap: () => _openCategory(name),
+      onTap: () => _openCategory(category),
       child: AspectRatio(
-        aspectRatio: 3 / 4,
+        aspectRatio: 3 / 4.5,
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 5,
-                offset: const Offset(0, 2),
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
               ),
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: art == null
-                ? _buildCategoryTextFallback(name)
-                : Image.asset(
-                    'assets/main_page_elements/$art',
-                    semanticLabel: name,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, _, _) => _buildCategoryTextFallback(name),
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/main_page_elements/category_border.jpeg',
+                    fit: BoxFit.fill,
+                    errorBuilder: (_, _, _) =>
+                        Container(color: const Color(0xFFF5EFE3)),
                   ),
+                ),
+                Positioned.fill(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          height: 150,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: art == null
+                                ? _categoryPlaceholder()
+                                : Image.asset(
+                                    'assets/main_page_elements/$art',
+                                    semanticLabel: category,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) =>
+                                        _categoryPlaceholder(),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Expanded(
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 2.0,
+                              ),
+                              child: Text(
+                                category,
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.montserrat(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  height: 1.18,
+                                  color: const Color(0xFF5C1D1D),
+                                ),
+                                maxLines: 4,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCategoryTextFallback(String name) {
-    return Container(
-      color: const Color(0xFFF5EFE3),
-      padding: const EdgeInsets.all(8),
-      alignment: Alignment.center,
-      child: Text(
-        name,
-        textAlign: TextAlign.center,
-        style: GoogleFonts.playfairDisplay(
-          fontSize: 11.5,
-          fontWeight: FontWeight.bold,
-          color: const Color(0xFF6B1D1D),
-        ),
-      ),
-    );
-  }
+  Widget _categoryPlaceholder() => Container(
+    color: const Color(0xFFEAD9C6),
+    alignment: Alignment.center,
+    child: const Icon(Icons.palette, color: Color(0xFF8B261D), size: 32),
+  );
 }
-

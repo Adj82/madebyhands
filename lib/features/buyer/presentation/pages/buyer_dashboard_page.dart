@@ -13,6 +13,7 @@ import 'package:madebyhands/features/buyer/presentation/bloc/buyer_cubit.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/order_history_page.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/buyer_notifications_page.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/buyer_account_page.dart';
+import 'package:madebyhands/features/buyer/presentation/pages/category_details_page.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/checkout_page.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/product_details_page.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/public_creator_storefront_page.dart';
@@ -147,7 +148,8 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                 previous.creators != current.creators,
             builder: (context, state) {
               // Show live stock and price when the listing changes.
-              final product = state.products
+              final product =
+                  state.products
                       .where((item) => item.id == initialProduct.id)
                       .firstOrNull ??
                   initialProduct;
@@ -223,8 +225,23 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
   }
 
   void _openShopCategory(String category) {
-    _shopCategory.value = category;
-    _navigationCubit.changePage(1);
+    final buyerBloc = context.read<BuyerBloc>();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: buyerBloc,
+          child: CategoryDetailsPage(
+            categoryTitle: category,
+            userId: _currentUser.uid,
+            onProductTap: _openProduct,
+            onOpenCart: () {
+              Navigator.of(context).pop();
+              _navigationCubit.changePage(3);
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   void _openNotifications() {
@@ -327,97 +344,36 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
           ..hideCurrentSnackBar()
           ..showSnackBar(SnackBar(content: Text(state.errorMessage!))),
         child: BlocBuilder<BuyerCubit, int>(
-        builder: (context, selectedIndex) {
-          return BlocBuilder<BuyerBloc, BuyerState>(
-            // The tabs listen to the bloc themselves; the shell only swaps
-            // between loading, error and content.
-            buildWhen: (previous, current) =>
-                _shellMode(previous) != _shellMode(current),
-            builder: (context, buyerState) {
-              if (buyerState.isLoadingProducts && buyerState.products.isEmpty) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
-              }
+          builder: (context, selectedIndex) {
+            return BlocBuilder<BuyerBloc, BuyerState>(
+              // The tabs listen to the bloc themselves; the shell only swaps
+              // between loading, error and content.
+              buildWhen: (previous, current) =>
+                  _shellMode(previous) != _shellMode(current),
+              builder: (context, buyerState) {
+                if (buyerState.isLoadingProducts &&
+                    buyerState.products.isEmpty) {
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
+                }
 
-              if (buyerState.errorMessage != null &&
-                  buyerState.products.isEmpty) {
-                return Scaffold(
-                  body: BuyerEmptyState(
-                    icon: Icons.cloud_off_outlined,
-                    title: 'Something went wrong',
-                    message: buyerState.errorMessage!,
-                  ),
-                );
-              }
+                if (buyerState.errorMessage != null &&
+                    buyerState.products.isEmpty) {
+                  return Scaffold(
+                    body: BuyerEmptyState(
+                      icon: Icons.cloud_off_outlined,
+                      title: 'Something went wrong',
+                      message: buyerState.errorMessage!,
+                    ),
+                  );
+                }
 
-              final pages = [
-                HomeTab(
-                  userName: _currentUser.name,
-                  selectedAddress: _selectedAddress,
-                  onAddressTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => SavedAddressesPage(
-                        userId: _currentUser.uid,
-                        repository: context.read<BuyerBloc>().repository,
-                      ),
-                    ),
-                  ),
-                  onBrowseAll: _openShop,
-                  onCategoryTap: _openShopCategory,
-                  unreadNotificationCount: _notifications
-                      .where(
-                        (notification) =>
-                            !_readNotificationIds.contains(notification.id),
-                      )
-                      .length,
-                  onNotificationsTap: _openNotifications,
-                ),
-                SafeArea(
-                  child: SearchTab(
-                    userId: _currentUser.uid,
-                    onProductTap: _openProduct,
-                    onCreatorTap: _openCreator,
-                    categoryRequest: _shopCategory,
-                  ),
-                ),
-                SafeArea(
-                  child: SavedTab(
-                    userId: _currentUser.uid,
-                    onProductTap: _openProduct,
-                    onBrowse: () => _navigationCubit.changePage(1),
-                  ),
-                ),
-                SafeArea(
-                  child: CartTab(
-                    onBrowse: () => _navigationCubit.changePage(1),
-                    onCheckout: _openCheckout,
-                    onProductTap: _openProduct,
-                  ),
-                ),
-                SafeArea(
-                  child: ProfileTab(
-                    user: _currentUser,
-                    onAccount: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => BuyerAccountPage(
-                          user: _currentUser,
-                          repository: serviceLocator(),
-                          onProfileUpdated: (user) {
-                            if (mounted) setState(() => _currentUser = user);
-                          },
-                        ),
-                      ),
-                    ),
-                    onOrders: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => OrderHistoryPage(
-                          userId: _currentUser.uid,
-                          repository: context.read<BuyerBloc>().repository,
-                        ),
-                      ),
-                    ),
-                    onAddresses: () => Navigator.of(context).push(
+                final pages = [
+                  HomeTab(
+                    userName: _currentUser.name,
+                    selectedAddress: _selectedAddress,
+                    onAddressTap: () => Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => SavedAddressesPage(
                           userId: _currentUser.uid,
@@ -425,105 +381,172 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                         ),
                       ),
                     ),
-                    onSupport: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => SupportCenterPage(
-                          user: _currentUser,
-                          repository: serviceLocator(),
+                    onBrowseAll: _openShop,
+                    onCategoryTap: _openShopCategory,
+                    onProfileTap: () => _navigationCubit.changePage(4),
+                    unreadNotificationCount: _notifications
+                        .where(
+                          (notification) =>
+                              !_readNotificationIds.contains(notification.id),
+                        )
+                        .length,
+                    onNotificationsTap: _openNotifications,
+                  ),
+                  SafeArea(
+                    child: SearchTab(
+                      userId: _currentUser.uid,
+                      onProductTap: _openProduct,
+                      onCreatorTap: _openCreator,
+                      categoryRequest: _shopCategory,
+                    ),
+                  ),
+                  SafeArea(
+                    child: SavedTab(
+                      userId: _currentUser.uid,
+                      onProductTap: _openProduct,
+                      onBrowse: () => _navigationCubit.changePage(1),
+                    ),
+                  ),
+                  SafeArea(
+                    child: CartTab(
+                      onBrowse: () => _navigationCubit.changePage(1),
+                      onCheckout: _openCheckout,
+                      onProductTap: _openProduct,
+                    ),
+                  ),
+                  SafeArea(
+                    child: ProfileTab(
+                      user: _currentUser,
+                      onAccount: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => BuyerAccountPage(
+                            user: _currentUser,
+                            repository: serviceLocator(),
+                            onProfileUpdated: (user) {
+                              if (mounted) setState(() => _currentUser = user);
+                            },
+                          ),
+                        ),
+                      ),
+                      onOrders: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => OrderHistoryPage(
+                            userId: _currentUser.uid,
+                            repository: context.read<BuyerBloc>().repository,
+                          ),
+                        ),
+                      ),
+                      onAddresses: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => SavedAddressesPage(
+                            userId: _currentUser.uid,
+                            repository: context.read<BuyerBloc>().repository,
+                          ),
+                        ),
+                      ),
+                      onSupport: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => SupportCenterPage(
+                            user: _currentUser,
+                            repository: serviceLocator(),
+                          ),
+                        ),
+                      ),
+                      onLogout: widget.onLogout,
+                    ),
+                  ),
+                ];
+
+                final safeIndex = selectedIndex.clamp(0, pages.length - 1);
+
+                return Scaffold(
+                  backgroundColor: const Color(0xFFFAF6EE),
+                  body: IndexedStack(index: safeIndex, children: pages),
+                  bottomNavigationBar: Container(
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFAF6EE),
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                      child: NavigationBarTheme(
+                        data: NavigationBarThemeData(
+                          height: 78,
+                          backgroundColor: const Color(0xFFFAF6EE),
+                          indicatorColor: const Color(0xFFF2DEDD),
+                          iconTheme: WidgetStateProperty.resolveWith((states) {
+                            return IconThemeData(
+                              color: states.contains(WidgetState.selected)
+                                  ? const Color(0xFF8B261D)
+                                  : const Color(
+                                      0xFF8B261D,
+                                    ).withValues(alpha: 0.55),
+                            );
+                          }),
+                          labelTextStyle: WidgetStateProperty.resolveWith((
+                            states,
+                          ) {
+                            return GoogleFonts.montserrat(
+                              fontSize: 11.5,
+                              fontWeight: states.contains(WidgetState.selected)
+                                  ? FontWeight.bold
+                                  : FontWeight.w600,
+                              color: states.contains(WidgetState.selected)
+                                  ? const Color(0xFF8B261D)
+                                  : const Color(
+                                      0xFF8B261D,
+                                    ).withValues(alpha: 0.6),
+                            );
+                          }),
+                        ),
+                        child: NavigationBar(
+                          height: 78,
+                          selectedIndex: safeIndex,
+                          onDestinationSelected: _navigationCubit.changePage,
+                          destinations: const [
+                            NavigationDestination(
+                              icon: Icon(Icons.home_outlined),
+                              selectedIcon: Icon(Icons.home),
+                              label: 'Home',
+                            ),
+                            NavigationDestination(
+                              icon: Icon(Icons.search),
+                              selectedIcon: Icon(Icons.search),
+                              label: 'Shop',
+                            ),
+                            NavigationDestination(
+                              icon: Icon(Icons.favorite_border),
+                              selectedIcon: Icon(Icons.favorite),
+                              label: 'Wishlist',
+                            ),
+                            NavigationDestination(
+                              icon: _CartBadge(
+                                icon: Icons.shopping_bag_outlined,
+                              ),
+                              selectedIcon: _CartBadge(
+                                icon: Icons.shopping_bag,
+                              ),
+                              label: 'Cart',
+                            ),
+                            NavigationDestination(
+                              icon: Icon(Icons.person_outline),
+                              selectedIcon: Icon(Icons.person),
+                              label: 'Account',
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    onLogout: widget.onLogout,
                   ),
-                ),
-              ];
-
-              final safeIndex = selectedIndex.clamp(0, pages.length - 1);
-
-              return Scaffold(
-                backgroundColor: const Color(0xFFFAF6EE),
-                body: IndexedStack(index: safeIndex, children: pages),
-                bottomNavigationBar: Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFAF6EE),
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                    child: NavigationBarTheme(
-                      data: NavigationBarThemeData(
-                        height: 78,
-                        backgroundColor: const Color(0xFFFAF6EE),
-                        indicatorColor: const Color(0xFFF2DEDD),
-                        iconTheme: WidgetStateProperty.resolveWith((states) {
-                          return IconThemeData(
-                            color: states.contains(WidgetState.selected)
-                                ? const Color(0xFF8B261D)
-                                : const Color(
-                                    0xFF8B261D,
-                                  ).withValues(alpha: 0.55),
-                          );
-                        }),
-                        labelTextStyle: WidgetStateProperty.resolveWith((
-                          states,
-                        ) {
-                          return GoogleFonts.montserrat(
-                            fontSize: 11.5,
-                            fontWeight: states.contains(WidgetState.selected)
-                                ? FontWeight.bold
-                                : FontWeight.w600,
-                            color: states.contains(WidgetState.selected)
-                                ? const Color(0xFF8B261D)
-                                : const Color(
-                                    0xFF8B261D,
-                                  ).withValues(alpha: 0.6),
-                          );
-                        }),
-                      ),
-                      child: NavigationBar(
-                        height: 78,
-                        selectedIndex: safeIndex,
-                        onDestinationSelected: _navigationCubit.changePage,
-                        destinations: const [
-                          NavigationDestination(
-                            icon: Icon(Icons.home_outlined),
-                            selectedIcon: Icon(Icons.home),
-                            label: 'Home',
-                          ),
-                          NavigationDestination(
-                            icon: Icon(Icons.search),
-                            selectedIcon: Icon(Icons.search),
-                            label: 'Shop',
-                          ),
-                          NavigationDestination(
-                            icon: Icon(Icons.favorite_border),
-                            selectedIcon: Icon(Icons.favorite),
-                            label: 'Wishlist',
-                          ),
-                          NavigationDestination(
-                            icon: _CartBadge(icon: Icons.shopping_bag_outlined),
-                            selectedIcon: _CartBadge(icon: Icons.shopping_bag),
-                            label: 'Cart',
-                          ),
-                          NavigationDestination(
-                            icon: Icon(Icons.person_outline),
-                            selectedIcon: Icon(Icons.person),
-                            label: 'Account',
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -544,8 +567,10 @@ class _CartBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocSelector<BuyerBloc, BuyerState, int>(
-      selector: (state) =>
-          state.cartQuantities.values.fold(0, (total, quantity) => total + quantity),
+      selector: (state) => state.cartQuantities.values.fold(
+        0,
+        (total, quantity) => total + quantity,
+      ),
       builder: (context, count) => Badge(
         isLabelVisible: count > 0,
         label: Text('$count'),

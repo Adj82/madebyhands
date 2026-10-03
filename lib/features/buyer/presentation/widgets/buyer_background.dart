@@ -7,14 +7,6 @@ class BuyerBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        image: DecorationImage(
-          image: AssetImage('assets/main_page_elements/mbh_bg.png'),
-          fit: BoxFit.cover,
-        ),
-      ),
-      child: child,
-    );
+    return Container(color: const Color(0xFFFFF4F2), child: child);
   }
 }

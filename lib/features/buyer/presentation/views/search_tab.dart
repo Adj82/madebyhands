@@ -74,7 +74,8 @@ class _SearchTabState extends State<SearchTab> {
     }
 
     // The notifier may fire during the first build; defer setState then.
-    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(apply);
       });
@@ -490,7 +491,7 @@ class _SearchTabState extends State<SearchTab> {
                           maxCrossAxisExtent: 240,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
-                          childAspectRatio: 0.67,
+                          childAspectRatio: 0.65,
                         ),
                     delegate: SliverChildBuilderDelegate(
                       childCount: products.length,

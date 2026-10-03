@@ -38,9 +38,9 @@ class SavedTab extends StatelessWidget {
                 child: Text(
                   'Saved pieces',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF8B261D),
-                      ),
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF8B261D),
+                  ),
                 ),
               ),
               Expanded(
@@ -56,11 +56,11 @@ class SavedTab extends StatelessWidget {
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
                         gridDelegate:
                             const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 240,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 0.67,
-                        ),
+                              maxCrossAxisExtent: 240,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                              childAspectRatio: 0.65,
+                            ),
                         itemCount: products.length,
                         itemBuilder: (context, index) {
                           final product = products[index];
@@ -69,11 +69,11 @@ class SavedTab extends StatelessWidget {
                             isSaved: true,
                             onTap: () => onProductTap(product),
                             onSave: () => context.read<BuyerBloc>().add(
-                                  BuyerToggleFavorite(
-                                    userId: userId,
-                                    product: product,
-                                  ),
-                                ),
+                              BuyerToggleFavorite(
+                                userId: userId,
+                                product: product,
+                              ),
+                            ),
                           );
                         },
                       ),

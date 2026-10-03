@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_thumbnail.dart';
@@ -23,13 +24,10 @@ class ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 1,
-      color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
+      color: const Color(0xFFFFF8F6),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(
-          color: const Color(0xFF8B261D).withValues(alpha: 0.35),
-          width: 0.8,
-        ),
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: Color(0xFFE5DDD5), width: 1.5),
       ),
       clipBehavior: Clip.antiAlias,
       margin: EdgeInsets.zero,
@@ -45,29 +43,29 @@ class ProductCard extends StatelessWidget {
                   ProductThumbnail(product: product, radius: 0, iconSize: 58),
                   if (onSave != null)
                     Positioned(
-                    top: 8,
-                    right: 8,
-                    child: IconButton.filledTonal(
-                      tooltip: isSaved ? 'Remove from saved' : 'Save item',
-                      onPressed: onSave,
-                      icon: Icon(
-                        isSaved ? Icons.favorite : Icons.favorite_border,
-                      ),
-                      style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFFFAF6EE).withValues(
-                          alpha: 0.92,
+                      top: 8,
+                      right: 8,
+                      child: IconButton.filledTonal(
+                        tooltip: isSaved ? 'Remove from saved' : 'Save item',
+                        onPressed: onSave,
+                        icon: Icon(
+                          isSaved ? Icons.favorite : Icons.favorite_border,
                         ),
-                        foregroundColor: isSaved
-                            ? const Color(0xFF8B261D)
-                            : const Color(0xFF8B261D).withValues(alpha: 0.7),
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(
+                            0xFFFAF6EE,
+                          ).withValues(alpha: 0.92),
+                          foregroundColor: isSaved
+                              ? const Color(0xFF8B261D)
+                              : const Color(0xFF8B261D).withValues(alpha: 0.7),
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -75,10 +73,11 @@ class ProductCard extends StatelessWidget {
                     product.name,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: GoogleFonts.montserrat(
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
                       height: 1.2,
-                      color: Color(0xFF8B261D),
+                      color: const Color(0xFF221512),
                     ),
                   ),
                   const SizedBox(height: 5),
@@ -86,8 +85,9 @@ class ProductCard extends StatelessWidget {
                     product.artisan,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w500,
                       color: AppColors.mutedText,
                     ),
                   ),
@@ -96,11 +96,11 @@ class ProductCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          '₹${product.price}',
-                          style: const TextStyle(
-                            fontSize: 16,
+                          '₹ ${product.price}',
+                          style: GoogleFonts.montserrat(
+                            fontSize: 14,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF2C1810),
+                            color: const Color(0xFF221512),
                           ),
                         ),
                       ),
@@ -112,7 +112,10 @@ class ProductCard extends StatelessWidget {
                         ),
                         Text(
                           product.rating.toStringAsFixed(1),
-                          style: const TextStyle(fontSize: 12),
+                          style: GoogleFonts.montserrat(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ],
                     ],
