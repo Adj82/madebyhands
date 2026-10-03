@@ -336,7 +336,7 @@ class _SearchTabState extends State<SearchTab> {
                           Icons.search,
                           color: Color(0xFF8B261D),
                         ),
-                        hintText: 'Search products, crafts or artisans',
+                        hintText: 'Search products, categories or creators',
                         filled: true,
                         fillColor: const Color(
                           0xFFFAF6EE,

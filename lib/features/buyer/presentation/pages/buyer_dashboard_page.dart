@@ -155,6 +155,17 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                       .where((item) => item.id == initialProduct.id)
                       .firstOrNull ??
                   initialProduct;
+              final artisanName = product.artisan.trim().toLowerCase();
+              final productCreator = state.creators.where((creator) {
+                if (product.creatorUid.isNotEmpty &&
+                    creator.uid == product.creatorUid) {
+                  return true;
+                }
+                if (artisanName.isEmpty) return false;
+                return creator.displayName.trim().toLowerCase() ==
+                        artisanName ||
+                    creator.name.trim().toLowerCase() == artisanName;
+              }).firstOrNull;
               return ProductDetailsPage(
                 product: product,
                 isSaved: state.favoriteIds.contains(product.id),
@@ -190,14 +201,9 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                 buyerRepository: buyerBloc.repository,
                 buyerId: _currentUser.uid,
                 buyerName: _currentUser.name,
-                onCreatorTap: product.creatorUid.isEmpty
+                onCreatorTap: productCreator == null
                     ? null
-                    : () {
-                        final creator = state.creators
-                            .where((item) => item.uid == product.creatorUid)
-                            .firstOrNull;
-                        if (creator != null) _openCreator(creator);
-                      },
+                    : () => _openCreator(productCreator),
               );
             },
           ),

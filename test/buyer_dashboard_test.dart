@@ -487,6 +487,17 @@ void main() {
     );
     expect(detailsPage.product.materials, 'Natural dyed jute and cotton');
     expect(detailsPage.product.dimensions, '32 × 28 cm');
+    await tester.scrollUntilVisible(
+      find.text('Made by Asha Weaves'),
+      250,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('Made by Asha Weaves'));
+    await tester.pumpAndSettle();
+    expect(find.text('Creator story'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
     final productDetailsScroll = find
         .descendant(
           of: find.byType(ProductDetailsPage),
