@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
-import 'package:madebyhands/features/creator/domain/entities/creator_notification.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
-import 'package:madebyhands/features/creator/presentation/pages/creator_notifications_page.dart';
 import 'package:madebyhands/features/creator/presentation/pages/creator_verification_page.dart';
 import 'package:madebyhands/features/orders/domain/order_status.dart';
 import 'package:madebyhands/init_dependencies.dart';
@@ -22,8 +20,6 @@ class CreatorHomeView extends StatefulWidget {
 
 class _CreatorHomeViewState extends State<CreatorHomeView> {
   final CreatorRepository _repository = serviceLocator<CreatorRepository>();
-  late final Stream<List<CreatorNotification>> _notifications = _repository
-      .watchNotifications(widget.profile.uid);
   late final Stream<List<CreatorOrder>> _orders = _repository.watchCreatorOrders(
     widget.profile.uid,
   );
@@ -36,11 +32,6 @@ class _CreatorHomeViewState extends State<CreatorHomeView> {
         return ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            _NotificationSummary(
-              notifications: _notifications,
-              creatorUid: profile.uid,
-            ),
-            const SizedBox(height: 20),
             _StorefrontCard(profile: profile),
             const SizedBox(height: 24),
             _VerificationStatusCard(profile: profile),
@@ -52,78 +43,6 @@ class _CreatorHomeViewState extends State<CreatorHomeView> {
             const SizedBox(height: 15),
             _PerformanceSummary(orders: _orders),
           ],
-        );
-      },
-    );
-  }
-}
-
-class _NotificationSummary extends StatelessWidget {
-  final Stream<List<CreatorNotification>> notifications;
-  final String creatorUid;
-
-  const _NotificationSummary({required this.notifications, required this.creatorUid});
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<List<CreatorNotification>>(
-      stream: notifications,
-      builder: (context, snapshot) {
-        final unread = (snapshot.data ?? const <CreatorNotification>[])
-            .where((n) => !n.isRead)
-            .toList();
-        var title = "You're all caught up!";
-        var message = 'New orders and updates will show up here.';
-        if (unread.isNotEmpty) {
-          title = unread.length == 1 ? '1 new notification' : '${unread.length} new notifications';
-          final latest = unread.first;
-          message = latest.title.isNotEmpty ? '${latest.title}: ${latest.message}' : latest.message;
-        }
-
-        return InkWell(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => CreatorNotificationsPage(creatorUid: creatorUid)),
-          ),
-          borderRadius: BorderRadius.circular(15),
-          child: Ink(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              children: [
-                Badge(
-                  isLabelVisible: unread.isNotEmpty,
-                  label: Text('${unread.length}'),
-                  child: const Icon(Icons.notifications_active_outlined, color: AppColors.accent),
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                      Text(
-                        message,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right, color: AppColors.mutedText, size: 20),
-              ],
-            ),
-          ),
         );
       },
     );
