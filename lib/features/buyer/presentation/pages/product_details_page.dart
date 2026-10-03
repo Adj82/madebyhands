@@ -167,9 +167,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
             Text(
               product.name,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF2C1810),
-                  ),
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF2C1810),
+              ),
             ),
             const SizedBox(height: 10),
             InkWell(
@@ -179,12 +179,27 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
                   children: [
-                    const Icon(Icons.storefront_outlined, size: 20, color: Color(0xFF8B261D)),
-                    const SizedBox(width: 6),
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF2DEDD),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.person_rounded,
+                        size: 22,
+                        color: Color(0xFF8B261D),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         'Made by ${product.artisan}',
-                        style: const TextStyle(color: AppColors.mutedText),
+                        style: const TextStyle(
+                          color: Color(0xFF2C1810),
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     if (widget.onCreatorTap != null)
@@ -204,9 +219,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 Text(
                   '₹$unitPrice',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        color: const Color(0xFF8B261D),
-                      ),
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF8B261D),
+                  ),
                 ),
                 if (customizationSelection.additionalPrice > 0) ...[
                   const SizedBox(width: 8),
@@ -313,8 +328,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                   child: !product.isAvailable || product.stock <= 0
                       ? OutlinedButton.icon(
                           onPressed: null,
-                          icon:
-                              const Icon(Icons.remove_shopping_cart_outlined),
+                          icon: const Icon(Icons.remove_shopping_cart_outlined),
                           label: const Text('Out of stock'),
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(
@@ -322,7 +336,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                               width: 1.2,
                             ),
                             foregroundColor: const Color(0xFF8B261D),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            minimumSize: const Size.fromHeight(52),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
@@ -344,7 +358,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                               width: 1.5,
                             ),
                             foregroundColor: const Color(0xFF8B261D),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            minimumSize: const Size.fromHeight(52),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
@@ -392,12 +406,11 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                               ),
                               IconButton(
                                 tooltip: 'Increase quantity',
-                                onPressed:
-                                    widget.cartQuantity >= product.stock
-                                        ? null
-                                        : () => widget.onCartQuantityChanged(
-                                            widget.cartQuantity + 1,
-                                          ),
+                                onPressed: widget.cartQuantity >= product.stock
+                                    ? null
+                                    : () => widget.onCartQuantityChanged(
+                                        widget.cartQuantity + 1,
+                                      ),
                                 icon: const Icon(Icons.add),
                                 color: const Color(0xFF8B261D),
                               ),
@@ -414,7 +427,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF8B261D),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      minimumSize: const Size.fromHeight(52),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -448,50 +461,50 @@ class _ProductCustomizationSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: const Color(0xFF8B261D).withValues(alpha: 0.8),
-            width: 1.0,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(
+        color: const Color(0xFF8B261D).withValues(alpha: 0.8),
+        width: 1.0,
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
           children: [
-            const Row(
-              children: [
-                Icon(Icons.tune_rounded, color: Color(0xFF8B261D)),
-                SizedBox(width: 10),
-                Text(
-                  'Customize this product',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF8B261D),
-                  ),
-                ),
-              ],
+            Icon(Icons.tune_rounded, color: Color(0xFF8B261D)),
+            SizedBox(width: 10),
+            Text(
+              'Customize this product',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF8B261D),
+              ),
             ),
-            const SizedBox(height: 6),
-            const Text(
-              'Selections are optional and will be shared with the creator.',
-              style: TextStyle(color: AppColors.mutedText),
-            ),
-            ...product.customizations
-                .where((customization) => customization.options.isNotEmpty)
-                .map(
-                  (customization) => _CustomizationChoice(
-                    customization: customization,
-                    selectedValues: values[customization.name] ?? const [],
-                    onChanged: (selection) =>
-                        onChanged(customization.name, selection),
-                  ),
-                ),
           ],
         ),
-      );
+        const SizedBox(height: 6),
+        const Text(
+          'Selections are optional and will be shared with the creator.',
+          style: TextStyle(color: AppColors.mutedText),
+        ),
+        ...product.customizations
+            .where((customization) => customization.options.isNotEmpty)
+            .map(
+              (customization) => _CustomizationChoice(
+                customization: customization,
+                selectedValues: values[customization.name] ?? const [],
+                onChanged: (selection) =>
+                    onChanged(customization.name, selection),
+              ),
+            ),
+      ],
+    ),
+  );
 }
 
 class _CustomizationChoice extends StatelessWidget {
@@ -507,95 +520,93 @@ class _CustomizationChoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    padding: const EdgeInsets.only(top: 14),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    customization.name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF8B261D),
-                    ),
-                  ),
+            Expanded(
+              child: Text(
+                customization.name,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF8B261D),
                 ),
-                if (customization.additionalPrice > 0)
-                  Text(
-                    '+₹${customization.additionalPrice}',
-                    style: const TextStyle(
-                      color: Color(0xFF8B261D),
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-              ],
+              ),
             ),
-            if (customization.description.isNotEmpty) ...[
-              const SizedBox(height: 4),
+            if (customization.additionalPrice > 0)
               Text(
-                customization.description,
-                style: const TextStyle(color: AppColors.mutedText),
-              ),
-            ],
-            if (customization.images.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 72,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: customization.images.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) => ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.network(
-                      customization.images[index],
-                      width: 72,
-                      height: 72,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(
-                        width: 72,
-                        color: AppColors.background,
-                        child: const Icon(Icons.broken_image_outlined),
-                      ),
-                    ),
-                  ),
+                '+₹${customization.additionalPrice}',
+                style: const TextStyle(
+                  color: Color(0xFF8B261D),
+                  fontWeight: FontWeight.w800,
                 ),
-              ),
-            ],
-            const SizedBox(height: 10),
-            Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: customization.options.map((option) {
-                  final selected = selectedValues.contains(option);
-                  return customization.isMultipleSelection
-                      ? FilterChip(
-                          label: Text(option),
-                          selected: selected,
-                          selectedColor: const Color(0xFFF2DEDD),
-                          checkmarkColor: const Color(0xFF8B261D),
-                          onSelected: (isSelected) {
-                            final updated = List<String>.from(selectedValues);
-                            isSelected
-                                ? updated.add(option)
-                                : updated.remove(option);
-                            onChanged(updated);
-                          },
-                        )
-                      : ChoiceChip(
-                          label: Text(option),
-                          selected: selected,
-                          selectedColor: const Color(0xFFF2DEDD),
-                          onSelected: (isSelected) =>
-                              onChanged(isSelected ? [option] : []),
-                        );
-                }).toList(),
               ),
           ],
         ),
-      );
+        if (customization.description.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            customization.description,
+            style: const TextStyle(color: AppColors.mutedText),
+          ),
+        ],
+        if (customization.images.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 72,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: customization.images.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, index) => ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.network(
+                  customization.images[index],
+                  width: 72,
+                  height: 72,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    width: 72,
+                    color: AppColors.background,
+                    child: const Icon(Icons.broken_image_outlined),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: customization.options.map((option) {
+            final selected = selectedValues.contains(option);
+            return customization.isMultipleSelection
+                ? FilterChip(
+                    label: Text(option),
+                    selected: selected,
+                    selectedColor: const Color(0xFFF2DEDD),
+                    checkmarkColor: const Color(0xFF8B261D),
+                    onSelected: (isSelected) {
+                      final updated = List<String>.from(selectedValues);
+                      isSelected ? updated.add(option) : updated.remove(option);
+                      onChanged(updated);
+                    },
+                  )
+                : ChoiceChip(
+                    label: Text(option),
+                    selected: selected,
+                    selectedColor: const Color(0xFFF2DEDD),
+                    onSelected: (isSelected) =>
+                        onChanged(isSelected ? [option] : []),
+                  );
+          }).toList(),
+        ),
+      ],
+    ),
+  );
 }
 
 class _ProductReviewsSection extends StatelessWidget {
@@ -661,7 +672,9 @@ class _ProductReviewsSection extends StatelessWidget {
               builder: (context, eligibilitySnapshot) {
                 if (eligibilitySnapshot.connectionState ==
                     ConnectionState.waiting) {
-                  return const LinearProgressIndicator(color: Color(0xFF8B261D));
+                  return const LinearProgressIndicator(
+                    color: Color(0xFF8B261D),
+                  );
                 }
                 final result = eligibilitySnapshot.data;
                 if (result?.canReview == true) {
@@ -761,9 +774,9 @@ class _ProductReviewsSection extends StatelessWidget {
                 Text(
                   existing == null ? 'Write a review' : 'Edit your review',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        color: const Color(0xFF8B261D),
-                      ),
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF8B261D),
+                  ),
                 ),
                 const SizedBox(height: 6),
                 const Text(
@@ -883,64 +896,62 @@ class _ReviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: const Color(0xFF8B261D).withValues(alpha: 0.3),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    width: double.infinity,
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: const Color(0xFF8B261D).withValues(alpha: 0.3)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    review.buyerName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF8B261D),
-                    ),
-                  ),
+            Expanded(
+              child: Text(
+                review.buyerName,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF8B261D),
                 ),
-                ...List.generate(
-                  5,
-                  (index) => Icon(
-                    index < review.rating
-                        ? Icons.star_rounded
-                        : Icons.star_border_rounded,
-                    size: 17,
-                    color: const Color(0xFFE0A72F),
-                  ),
-                ),
-              ],
-            ),
-            if (review.verifiedPurchase) ...[
-              const SizedBox(height: 4),
-              const Row(
-                children: [
-                  Icon(Icons.verified, size: 16, color: Color(0xFF8B261D)),
-                  SizedBox(width: 5),
-                  Text(
-                    'Verified purchase',
-                    style: TextStyle(
-                      color: Color(0xFF8B261D),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
               ),
-            ],
-            const SizedBox(height: 10),
-            Text(review.comment, style: const TextStyle(height: 1.4)),
+            ),
+            ...List.generate(
+              5,
+              (index) => Icon(
+                index < review.rating
+                    ? Icons.star_rounded
+                    : Icons.star_border_rounded,
+                size: 17,
+                color: const Color(0xFFE0A72F),
+              ),
+            ),
           ],
         ),
-      );
+        if (review.verifiedPurchase) ...[
+          const SizedBox(height: 4),
+          const Row(
+            children: [
+              Icon(Icons.verified, size: 16, color: Color(0xFF8B261D)),
+              SizedBox(width: 5),
+              Text(
+                'Verified purchase',
+                style: TextStyle(
+                  color: Color(0xFF8B261D),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 10),
+        Text(review.comment, style: const TextStyle(height: 1.4)),
+      ],
+    ),
+  );
 }
 
 class _DetailLine extends StatelessWidget {
@@ -951,23 +962,23 @@ class _DetailLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Row(
-          children: [
-            Icon(icon, size: 21, color: const Color(0xFF8B261D)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                text,
-                style: const TextStyle(
-                  color: AppColors.text,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Row(
+      children: [
+        Icon(icon, size: 21, color: const Color(0xFF8B261D)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: AppColors.text,
+              fontWeight: FontWeight.w500,
             ),
-          ],
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 /// Swipeable product photos with a page indicator, or the category
@@ -987,7 +998,9 @@ class _ProductGalleryState extends State<_ProductGallery> {
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
-    final images = product.images.where((url) => url.trim().isNotEmpty).toList();
+    final images = product.images
+        .where((url) => url.trim().isNotEmpty)
+        .toList();
     final placeholder = DecoratedBox(
       decoration: BoxDecoration(color: product.color),
       child: Center(
@@ -1035,7 +1048,9 @@ class _ProductGalleryState extends State<_ProductGallery> {
                               width: i == _page ? 18 : 7,
                               height: 7,
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: i == _page ? 0.95 : 0.6),
+                                color: Colors.white.withValues(
+                                  alpha: i == _page ? 0.95 : 0.6,
+                                ),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                             ),

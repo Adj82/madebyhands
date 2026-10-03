@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 abstract final class AppColors {
   // Artistic Earthy Palette
-  static const background = Color(0xFFF9F6F0); // Warm Cream
+  static const background = Color(0xFFFFF4F1); // Warm Cream Rose
   static const surface = Color(0xFFFFFFFF);
   static const primary = Color(0xFF6B7E43); // Sage Green
   static const primaryDark = Color(0xFF3E4B25);
@@ -12,7 +12,7 @@ abstract final class AppColors {
   static const text = Color(0xFF2D3128); // Deep Charcoal Green
   static const mutedText = Color(0xFF8A8F82);
   static const outline = Color(0xFFEAE7DC);
-  
+
   // New "Baked" colors from references
   static const sienna = Color(0xFF8B4513);
   static const gold = Color(0xFFE7C889);
@@ -40,7 +40,7 @@ class AppTheme {
       foregroundColor: AppColors.text,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
-      titleTextStyle: GoogleFonts.playfairDisplay(
+      titleTextStyle: GoogleFonts.montserrat(
         color: AppColors.text,
         fontSize: 20,
         fontWeight: FontWeight.bold,
@@ -83,31 +83,30 @@ class AppTheme {
         ),
       ),
     ),
-    textTheme: GoogleFonts.montserratTextTheme().copyWith(
-      displayLarge: GoogleFonts.playfairDisplay(
-        fontWeight: FontWeight.w900,
-        color: AppColors.text,
-      ),
-      displayMedium: GoogleFonts.playfairDisplay(
-        fontWeight: FontWeight.w800,
-        color: AppColors.text,
-      ),
-      headlineLarge: GoogleFonts.playfairDisplay(
-        fontWeight: FontWeight.bold,
-        color: AppColors.text,
-      ),
-      headlineMedium: GoogleFonts.playfairDisplay(
-        fontWeight: FontWeight.bold,
-        color: AppColors.text,
-      ),
-      titleLarge: GoogleFonts.playfairDisplay(
-        fontWeight: FontWeight.bold,
-        color: AppColors.text,
-      ),
-    ).apply(
-      bodyColor: AppColors.text,
-      displayColor: AppColors.text,
-    ),
+    textTheme: GoogleFonts.montserratTextTheme()
+        .copyWith(
+          displayLarge: GoogleFonts.playfairDisplay(
+            fontWeight: FontWeight.w900,
+            color: AppColors.text,
+          ),
+          displayMedium: GoogleFonts.playfairDisplay(
+            fontWeight: FontWeight.w800,
+            color: AppColors.text,
+          ),
+          headlineLarge: GoogleFonts.playfairDisplay(
+            fontWeight: FontWeight.bold,
+            color: AppColors.text,
+          ),
+          headlineMedium: GoogleFonts.playfairDisplay(
+            fontWeight: FontWeight.bold,
+            color: AppColors.text,
+          ),
+          titleLarge: GoogleFonts.playfairDisplay(
+            fontWeight: FontWeight.bold,
+            color: AppColors.text,
+          ),
+        )
+        .apply(bodyColor: AppColors.text, displayColor: AppColors.text),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Colors.white,

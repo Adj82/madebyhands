@@ -96,7 +96,7 @@ class _StorefrontBody extends StatelessWidget {
                 maxCrossAxisExtent: 240,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: 0.67,
+                childAspectRatio: 0.65,
               ),
               delegate: SliverChildBuilderDelegate(
                 childCount: products.length,
@@ -105,7 +105,9 @@ class _StorefrontBody extends StatelessWidget {
                   return ProductCard(
                     product: product,
                     isSaved: favoriteIds.contains(product.id),
-                    onTap: onProductTap == null ? null : () => onProductTap(product),
+                    onTap: onProductTap == null
+                        ? null
+                        : () => onProductTap(product),
                     onSave: onSave == null ? null : () => onSave(product),
                   );
                 },
@@ -199,7 +201,10 @@ class _CreatorHeader extends StatelessWidget {
                 avatar: const Icon(Icons.link, size: 18),
                 label: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 200),
-                  child: Text(_linkLabel(link), overflow: TextOverflow.ellipsis),
+                  child: Text(
+                    _linkLabel(link),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 onPressed: () => _openLink(context, link),
               );

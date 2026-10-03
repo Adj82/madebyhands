@@ -20,12 +20,16 @@ class SearchTab extends StatefulWidget {
   /// filtered to one category. The tab clears it once applied.
   final ValueNotifier<String?>? categoryRequest;
 
+  /// Query submitted from another tab, such as the Home search field.
+  final ValueNotifier<String?>? searchRequest;
+
   const SearchTab({
     super.key,
     required this.userId,
     required this.onProductTap,
     this.onCreatorTap,
     this.categoryRequest,
+    this.searchRequest,
   });
 
   @override
@@ -41,7 +45,9 @@ class _SearchTabState extends State<SearchTab> {
   void initState() {
     super.initState();
     widget.categoryRequest?.addListener(_applyCategoryRequest);
+    widget.searchRequest?.addListener(_applySearchRequest);
     _applyCategoryRequest();
+    _applySearchRequest();
   }
 
   @override
@@ -51,11 +57,16 @@ class _SearchTabState extends State<SearchTab> {
       oldWidget.categoryRequest?.removeListener(_applyCategoryRequest);
       widget.categoryRequest?.addListener(_applyCategoryRequest);
     }
+    if (oldWidget.searchRequest != widget.searchRequest) {
+      oldWidget.searchRequest?.removeListener(_applySearchRequest);
+      widget.searchRequest?.addListener(_applySearchRequest);
+    }
   }
 
   @override
   void dispose() {
     widget.categoryRequest?.removeListener(_applyCategoryRequest);
+    widget.searchRequest?.removeListener(_applySearchRequest);
     _searchController.dispose();
     super.dispose();
   }
@@ -74,7 +85,35 @@ class _SearchTabState extends State<SearchTab> {
     }
 
     // The notifier may fire during the first build; defer setState then.
-    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(apply);
+      });
+    } else if (mounted) {
+      setState(apply);
+    } else {
+      apply();
+    }
+  }
+
+  void _applySearchRequest() {
+    final request = widget.searchRequest;
+    final query = request?.value?.trim();
+    if (request == null || query == null || query.isEmpty) return;
+    request.value = null;
+
+    void apply() {
+      _searchController.text = query;
+      _searchController.selection = TextSelection.collapsed(
+        offset: query.length,
+      );
+      _query = query;
+      _selectedCategories.clear();
+    }
+
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(apply);
       });
@@ -226,8 +265,17 @@ class _SearchTabState extends State<SearchTab> {
         buildWhen: (previous, current) =>
             previous.products != current.products ||
             previous.creators != current.creators ||
+            previous.categories != current.categories ||
             previous.favoriteIds != current.favoriteIds,
         builder: (context, state) {
+          final normalizedCategoryQuery = normalizeCategory(_query);
+          final matchingCategories = state.categories
+              .where(
+                (category) => normalizeCategory(
+                  category,
+                ).contains(normalizedCategoryQuery),
+              )
+              .toList();
           final products = state.products.where((product) {
             final normalizedQuery = _query.trim().toLowerCase();
             final matchesCategory = _matchesCategory(product);
@@ -235,7 +283,13 @@ class _SearchTabState extends State<SearchTab> {
                 normalizedQuery.isEmpty ||
                 product.name.toLowerCase().contains(normalizedQuery) ||
                 product.artisan.toLowerCase().contains(normalizedQuery) ||
-                product.categoryLabel.toLowerCase().contains(normalizedQuery);
+                product.description.toLowerCase().contains(normalizedQuery) ||
+                product.materials.toLowerCase().contains(normalizedQuery) ||
+                product.categoryLabel.toLowerCase().contains(normalizedQuery) ||
+                matchingCategories.any(
+                  (category) =>
+                      productMatchesCategory(product.allCategories, category),
+                );
             return matchesCategory && matchesQuery;
           }).toList();
           final normalizedQuery = _query.trim().toLowerCase();
@@ -282,7 +336,7 @@ class _SearchTabState extends State<SearchTab> {
                           Icons.search,
                           color: Color(0xFF8B261D),
                         ),
-                        hintText: 'Search products, crafts or artisans',
+                        hintText: 'Search products, categories or creators',
                         filled: true,
                         fillColor: const Color(
                           0xFFFAF6EE,
@@ -490,7 +544,7 @@ class _SearchTabState extends State<SearchTab> {
                           maxCrossAxisExtent: 240,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
-                          childAspectRatio: 0.67,
+                          childAspectRatio: 0.65,
                         ),
                     delegate: SliverChildBuilderDelegate(
                       childCount: products.length,
