@@ -26,15 +26,60 @@ class CategoryDetailsPage extends StatefulWidget {
 }
 
 class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
+  static const double _cornerRadius = 28;
+  static const double _flare = 22;
+
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _tabScrollController = ScrollController();
+  final GlobalKey _selectedTabKey = GlobalKey();
   bool _showSearch = false;
   String _query = '';
   String _subcategory = 'All';
+  double _leftCorner = _cornerRadius;
+  double _rightCorner = _cornerRadius;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabScrollController.addListener(_updateCorners);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateCorners());
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _tabScrollController
+      ..removeListener(_updateCorners)
+      ..dispose();
     super.dispose();
+  }
+
+  void _updateCorners() {
+    if (!mounted) return;
+    final box =
+        _selectedTabKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached || !box.hasSize) return;
+
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final tabLeft = box.localToGlobal(Offset.zero).dx - _flare;
+    final tabRight = box.localToGlobal(Offset(box.size.width, 0)).dx + _flare;
+    final leftBase = tabLeft.clamp(0.0, _cornerRadius);
+    final leftFade = (1 - tabRight / _cornerRadius).clamp(0.0, 1.0);
+    final rightBase = (screenWidth - tabRight).clamp(0.0, _cornerRadius);
+    final rightFade = (1 - (screenWidth - tabLeft) / _cornerRadius).clamp(
+      0.0,
+      1.0,
+    );
+    final newLeft = leftBase + (_cornerRadius - leftBase) * leftFade;
+    final newRight = rightBase + (_cornerRadius - rightBase) * rightFade;
+
+    if ((newLeft - _leftCorner).abs() > 0.3 ||
+        (newRight - _rightCorner).abs() > 0.3) {
+      setState(() {
+        _leftCorner = newLeft;
+        _rightCorner = newRight;
+      });
+    }
   }
 
   String get _key => normalizeCategory(widget.categoryTitle);
@@ -154,7 +199,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFFF4F2),
+      backgroundColor: const Color(0xFF31251F),
       body: BlocBuilder<BuyerBloc, BuyerState>(
         builder: (context, state) {
           final normalizedQuery = _query.trim().toLowerCase();
@@ -181,72 +226,101 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
             physics: const BouncingScrollPhysics(),
             slivers: [
               SliverToBoxAdapter(child: _buildHero(context, state)),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-                sliver: SliverToBoxAdapter(
-                  child: Text(
-                    '${categoryProducts.length} ${categoryProducts.length == 1 ? 'item' : 'items'}',
-                    textAlign: TextAlign.right,
-                    style: GoogleFonts.montserrat(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF5A4438),
-                    ),
-                  ),
+              SliverToBoxAdapter(
+                child: _buildProductContent(
+                  context,
+                  state,
+                  categoryProducts,
+                  normalizedQuery,
                 ),
               ),
-              if (state.isLoadingProducts && state.products.isEmpty)
-                const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (categoryProducts.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _EmptyCategory(
-                    category: widget.categoryTitle,
-                    hasSearch:
-                        normalizedQuery.isNotEmpty || _subcategory != 'All',
-                    onClear: () {
-                      _searchController.clear();
-                      setState(() {
-                        _query = '';
-                        _subcategory = 'All';
-                      });
-                    },
-                  ),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                  sliver: SliverGrid.builder(
-                    itemCount: categoryProducts.length,
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 14,
-                          mainAxisSpacing: 16,
-                          childAspectRatio: 0.65,
-                        ),
-                    itemBuilder: (context, index) {
-                      final product = categoryProducts[index];
-                      return ProductCard(
-                        product: product,
-                        isSaved: state.favoriteIds.contains(product.id),
-                        onTap: () => widget.onProductTap(product),
-                        onSave: () => context.read<BuyerBloc>().add(
-                          BuyerToggleFavorite(
-                            userId: widget.userId,
-                            product: product,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildProductContent(
+    BuildContext context,
+    BuyerState state,
+    List<Product> products,
+    String normalizedQuery,
+  ) {
+    return Container(
+      width: double.infinity,
+      constraints: BoxConstraints(
+        minHeight: (MediaQuery.sizeOf(context).height - 330).clamp(280, 900),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF4F2),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(_leftCorner),
+          topRight: Radius.circular(_rightCorner),
+        ),
+      ),
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              '${products.length} ${products.length == 1 ? 'item' : 'items'}',
+              style: GoogleFonts.montserrat(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF5A4438),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (state.isLoadingProducts && state.products.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 72),
+              child: CircularProgressIndicator(),
+            )
+          else if (products.isEmpty)
+            SizedBox(
+              height: 260,
+              child: _EmptyCategory(
+                category: widget.categoryTitle,
+                hasSearch: normalizedQuery.isNotEmpty || _subcategory != 'All',
+                onClear: () {
+                  _searchController.clear();
+                  setState(() {
+                    _query = '';
+                    _subcategory = 'All';
+                  });
+                },
+              ),
+            )
+          else
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: products.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.65,
+              ),
+              itemBuilder: (context, index) {
+                final product = products[index];
+                return ProductCard(
+                  product: product,
+                  isSaved: state.favoriteIds.contains(product.id),
+                  onTap: () => widget.onProductTap(product),
+                  onSave: () => context.read<BuyerBloc>().add(
+                    BuyerToggleFavorite(
+                      userId: widget.userId,
+                      product: product,
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
       ),
     );
   }
@@ -361,24 +435,68 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
           SizedBox(
             height: 48,
             child: ListView.separated(
+              controller: _tabScrollController,
               scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.none,
+              padding: const EdgeInsets.symmetric(horizontal: 1),
               itemCount: _filters.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
               itemBuilder: (context, index) {
                 final filter = _filters[index];
                 final selected = filter == _subcategory;
-                return ChoiceChip(
-                  label: Text(filter),
-                  selected: selected,
-                  onSelected: (_) => setState(() => _subcategory = filter),
-                  backgroundColor: Colors.black.withValues(alpha: 0.3),
-                  selectedColor: const Color(0xFFFFF4F2),
-                  side: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
-                  labelStyle: TextStyle(
-                    color: selected ? const Color(0xFF331818) : Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  showCheckmark: false,
+                return GestureDetector(
+                  onTap: () {
+                    setState(() => _subcategory = filter);
+                    WidgetsBinding.instance.addPostFrameCallback(
+                      (_) => _updateCorners(),
+                    );
+                  },
+                  child: selected
+                      ? CustomPaint(
+                          key: _selectedTabKey,
+                          painter: const _SelectedTabPainter(
+                            color: Color(0xFFFFF4F2),
+                            topRadius: 21,
+                            flareRadius: _flare,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 9.5,
+                            ),
+                            child: Text(
+                              filter,
+                              style: GoogleFonts.montserrat(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF331818),
+                              ),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          margin: const EdgeInsets.only(bottom: 4.5),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 7.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Text(
+                            filter,
+                            style: GoogleFonts.montserrat(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
                 );
               },
             ),
@@ -387,6 +505,44 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
       ),
     );
   }
+}
+
+class _SelectedTabPainter extends CustomPainter {
+  final Color color;
+  final double topRadius;
+  final double flareRadius;
+
+  const _SelectedTabPainter({
+    required this.color,
+    required this.topRadius,
+    required this.flareRadius,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final width = size.width;
+    final height = size.height;
+    final path = Path()
+      ..moveTo(-flareRadius, height)
+      ..quadraticBezierTo(0, height, 0, height - flareRadius)
+      ..lineTo(0, topRadius)
+      ..quadraticBezierTo(0, 0, topRadius, 0)
+      ..lineTo(width - topRadius, 0)
+      ..quadraticBezierTo(width, 0, width, topRadius)
+      ..lineTo(width, height - flareRadius)
+      ..quadraticBezierTo(width, height, width + flareRadius, height)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SelectedTabPainter oldDelegate) =>
+      oldDelegate.color != color ||
+      oldDelegate.topRadius != topRadius ||
+      oldDelegate.flareRadius != flareRadius;
 }
 
 class _EmptyCategory extends StatelessWidget {

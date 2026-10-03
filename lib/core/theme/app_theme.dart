@@ -40,7 +40,7 @@ class AppTheme {
       foregroundColor: AppColors.text,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
-      titleTextStyle: GoogleFonts.playfairDisplay(
+      titleTextStyle: GoogleFonts.montserrat(
         color: AppColors.text,
         fontSize: 20,
         fontWeight: FontWeight.bold,
