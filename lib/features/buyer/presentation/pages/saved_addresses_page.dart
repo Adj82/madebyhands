@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:madebyhands/core/error/failures.dart';
 import 'package:flutter/services.dart';
+import 'package:madebyhands/core/constants/indian_states.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
@@ -321,23 +322,28 @@ class _AddressFormState extends State<_AddressForm> {
     text: widget.address?.addressLine ?? '',
   );
   late final _city = TextEditingController(text: widget.address?.city ?? '');
-  late final _state = TextEditingController(text: widget.address?.state ?? '');
   late final _postalCode = TextEditingController(
     text: widget.address?.postalCode ?? '',
   );
   late bool _isDefault = widget.address?.isDefault ?? false;
 
+  /// The stored value may be free text from before this field became a
+  /// dropdown (or casing may differ); only preselect it if it matches one of
+  /// the canonical names, otherwise leave unselected rather than crash.
+  late String? _state = _matchKnownState(widget.address?.state);
+
+  static String? _matchKnownState(String? stored) {
+    final trimmed = (stored ?? '').trim().toLowerCase();
+    if (trimmed.isEmpty) return null;
+    for (final name in kIndianStatesAndUnionTerritories) {
+      if (name.toLowerCase() == trimmed) return name;
+    }
+    return null;
+  }
+
   @override
   void dispose() {
-    for (final controller in [
-      _label,
-      _name,
-      _phone,
-      _line,
-      _city,
-      _state,
-      _postalCode,
-    ]) {
+    for (final controller in [_label, _name, _phone, _line, _city, _postalCode]) {
       controller.dispose();
     }
     super.dispose();
@@ -419,13 +425,30 @@ class _AddressFormState extends State<_AddressForm> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: _field(
-                    _state,
-                    'State',
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
-                      LengthLimitingTextInputFormatter(40),
-                    ],
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _state,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'State',
+                        labelStyle: TextStyle(color: Color(0xFF8B261D)),
+                      ),
+                      items: kIndianStatesAndUnionTerritories
+                          .map(
+                            (name) => DropdownMenuItem(
+                              value: name,
+                              child: Text(
+                                name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) => setState(() => _state = value),
+                      validator: (value) =>
+                          value == null || value.isEmpty ? 'Required' : null,
+                    ),
                   ),
                 ),
               ],
@@ -501,7 +524,7 @@ class _AddressFormState extends State<_AddressForm> {
         phone: _phone.text.trim(),
         addressLine: _line.text.trim(),
         city: _city.text.trim(),
-        state: _state.text.trim(),
+        state: _state ?? '',
         postalCode: _postalCode.text.trim(),
         isDefault: _isDefault,
       ),
