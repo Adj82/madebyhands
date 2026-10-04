@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/admin/domain/entities/admin_log_entry.dart';
+import 'package:madebyhands/features/admin/domain/repositories/admin_log_repository.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:madebyhands/init_dependencies.dart';
 
 /// Lists super admins and managers. Only super admins may change roles;
 /// `firestore.rules` enforces the same restriction.
@@ -166,6 +169,13 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
         'role': role,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      await serviceLocator<AdminLogRepository>().log(
+        category: AdminLogCategory.access,
+        action: 'access.role_changed',
+        summary:
+            'Changed the role of ${user.name.isEmpty ? user.email : '${user.name} (${user.email})'} to ${_roleName(role)}.',
+        targetId: user.uid,
+      );
       messenger.showSnackBar(
         SnackBar(content: Text('${user.name.isEmpty ? user.email : user.name} is now ${_roleName(role)}.')),
       );
@@ -252,6 +262,12 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
         'role': role,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      await serviceLocator<AdminLogRepository>().log(
+        category: AdminLogCategory.access,
+        action: 'access.granted',
+        summary: 'Granted ${_roleName(role)} access to $email.',
+        targetId: query.docs.first.id,
+      );
       messenger.showSnackBar(
         SnackBar(content: Text('Granted ${_roleName(role)} access to $email.')),
       );

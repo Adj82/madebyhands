@@ -16,10 +16,17 @@ final class AdminCategoriesRequested extends AdminEvent {}
 final class AdminSuspendUserRequested extends AdminEvent {
   final String uid;
   final bool isSuspended;
-  const AdminSuspendUserRequested(this.uid, this.isSuspended);
+
+  /// Name or email of the user, for the activity log only.
+  final String userLabel;
+  const AdminSuspendUserRequested(
+    this.uid,
+    this.isSuspended, {
+    this.userLabel = '',
+  });
 
   @override
-  List<Object> get props => [uid, isSuspended];
+  List<Object> get props => [uid, isSuspended, userLabel];
 }
 
 final class AdminApproveCreatorRequested extends AdminEvent {
@@ -79,14 +86,24 @@ final class AdminProductReviewRequested extends AdminEvent {
   final String reviewerEmail;
   final String? rejectionReason;
 
+  /// Product name, for the activity log only.
+  final String productName;
+
   const AdminProductReviewRequested({
     required this.productId,
     required this.approve,
     required this.reviewerName,
     required this.reviewerEmail,
     this.rejectionReason,
+    this.productName = '',
   });
 
   @override
-  List<Object> get props => [productId, approve, reviewerName, reviewerEmail];
+  List<Object> get props => [
+    productId,
+    approve,
+    reviewerName,
+    reviewerEmail,
+    productName,
+  ];
 }

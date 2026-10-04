@@ -70,6 +70,8 @@ Product categories live in `lib/core/constants/product_categories.dart` (`kProdu
 
 Styling: light theme only (`AppTheme.lightThemeMode`). Take colors from `AppColors` in `lib/core/theme/app_theme.dart` (cream / sage / terracotta) rather than literals; fonts are Playfair Display + Montserrat via `google_fonts`. `flutter_screenutil` is initialized with `designSize: Size(360, 690)`, so sizes use `.sp`/`.h`/`.w`.
 
+Buyer screens have their own look, taken from the Home tab and the product cards (rose-cream page, deep-maroon heavy Montserrat headings, gold-outlined pill fields, maroon pill buttons): `BuyerTheme` / `BuyerColors` in `lib/features/buyer/presentation/theme/buyer_theme.dart`. `BuyerBackground` applies that theme along with the page colour, so wrap every buyer page in it and style through the theme (`Card`, `FilledButton`, `AppBar`, `TextField`, … need no per-widget colours); use `BuyerHeading` / `BuyerPageHeader` for headings. A page that opens dialogs or sheets from its `State` context must keep that state *below* `BuyerBackground` (see `CheckoutPage` → `_CheckoutBody`), or they fall back to the app theme. The Home tab itself is deliberately left on the app theme inside the dashboard. `SupportCenterPage` is shared with creators and takes the buyer look through a `pageWrapper`.
+
 Cart contents and quantities are **buyer UI state backed by SharedPreferences**, never Firestore. Checkout re-sends the whole cart to the API.
 
 ## Payment flow
@@ -106,6 +108,7 @@ The rules are load-bearing, not advisory — deploy them alongside API changes.
 - Creators may update orders only via a key whitelist (`status`, `updatedAt`, `consignmentNumber`, `carrierName`, `deliveredAt`) and only to forward fulfilment statuses (`Confirmed` … `Delivered`). Rejection goes through the API. Payout/payment/refund fields are super-admin only. Adding a creator-editable order field requires a rules change.
 - Users may self-update only `name`, `phone`, `email`, `updatedAt`; only super admins change roles.
 - Products: only verified creators create them, always `Pending Approval` + inactive; creator edits go back to review; creators may toggle `isActive` (approved listings only) and `stock` directly.
+- `admin_logs` is the admin activity log: append-only, created only by the acting admin/manager (`actorUid == auth.uid`), readable only by super admins. New admin actions that change data should call `AdminLogRepository.log` (AdminBloc does for its events; views that write directly do it themselves). Logging is best-effort and must never block the action.
 - `creator_verifications` (documents) and `creator_bank_accounts` (payout details) are private to the owner and admins / super admins.
 - Product ownership is checked against **either** `creatorUid` **or** `creatorId`; both spellings exist in the data, and `server/checkout.js` falls back the same way.
 - Storage rules are not in this repo. Uploads go to `creator_profiles/{uid}/…` and `products/{uid}/…`.
@@ -120,7 +123,7 @@ Use Razorpay **test** credentials until checkout and verification have been exer
 
 ## Tests
 
-`test/` holds three Flutter test files and does not initialize Firebase. Widget tests inject `MockBuyerRepository` (`lib/features/buyer/data/mock_buyer_repository.dart`) and call `SharedPreferences.setMockInitialValues({})` in `setUp`. Keep new tests off live Firebase by depending on repository interfaces.
+`test/` holds eight Flutter test files and does not initialize Firebase. Widget tests inject `MockBuyerRepository` (`lib/features/buyer/data/mock_buyer_repository.dart`) and call `SharedPreferences.setMockInitialValues({})` in `setUp`. Keep new tests off live Firebase by depending on repository interfaces.
 
 `test/api/` holds Node tests for the payment API (`npm test`) using a fake Firestore and stubbed Razorpay/auth; they need no network or credentials.
 

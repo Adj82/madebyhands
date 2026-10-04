@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/about_madebyhands_page.dart';
+import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_heading.dart';
 
 class ProfileTab extends StatelessWidget {
   final UserEntity user;
@@ -22,6 +23,31 @@ class ProfileTab extends StatelessWidget {
     required this.onLogout,
   });
 
+  Future<void> _confirmLogout(BuildContext context) async {
+    final shouldLogout =
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Log out?'),
+            content: const Text(
+              'You can sign back in with your Google account.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Log out'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (shouldLogout) onLogout();
+  }
+
   @override
   Widget build(BuildContext context) {
     final initial = user.name.trim().isEmpty
@@ -32,38 +58,26 @@ class ProfileTab extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
         children: [
-          Text(
-            'Your profile',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF8B261D),
-                ),
-          ),
-          const SizedBox(height: 22),
+          const BuyerPageHeader(title: 'Your profile'),
+          const SizedBox(height: 18),
           Card(
-            elevation: 1,
-            color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: const BorderSide(
-                color: Color(0xFF8B261D),
-                width: 1.0,
-              ),
-            ),
             child: Padding(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: const Color(0xFFF2DEDD),
-                    child: Text(
+                  Container(
+                    width: 58,
+                    height: 58,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: BuyerColors.blush,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: BuyerColors.gold, width: 1.1),
+                    ),
+                    child: BuyerHeading(
                       initial,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF8B261D),
-                      ),
+                      size: 24,
+                      color: BuyerColors.maroon,
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -71,18 +85,23 @@ class ProfileTab extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        BuyerHeading(
                           user.name.isEmpty ? 'Buyer' : user.name,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF8B261D),
-                          ),
+                          size: 18,
+                          color: BuyerColors.ink,
+                          weight: FontWeight.w700,
+                          maxLines: 1,
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         Text(
                           user.email,
-                          style: const TextStyle(color: AppColors.mutedText),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: BuyerColors.body,
+                          ),
                         ),
                       ],
                     ),
@@ -91,7 +110,7 @@ class ProfileTab extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           _ProfileTile(
             icon: Icons.manage_accounts_outlined,
             title: 'Account settings',
@@ -121,52 +140,14 @@ class ProfileTab extends StatelessWidget {
             title: 'About MadeByHands',
             subtitle: 'Our mission, terms & privacy policy',
             onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const AboutMadeByHandsPage(),
-              ),
+              MaterialPageRoute(builder: (_) => const AboutMadeByHandsPage()),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           OutlinedButton.icon(
-            onPressed: () async {
-              final shouldLogout =
-                  await showDialog<bool>(
-                    context: context,
-                    builder: (dialogContext) => AlertDialog(
-                      backgroundColor: const Color(0xFFFAF6EE),
-                      title: const Text(
-                        'Log out?',
-                        style: TextStyle(color: Color(0xFF8B261D)),
-                      ),
-                      content: const Text(
-                        'You can sign back in with your Google account.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(dialogContext, false),
-                          child: const Text('Cancel'),
-                        ),
-                        FilledButton(
-                          onPressed: () => Navigator.pop(dialogContext, true),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF8B261D),
-                          ),
-                          child: const Text('Log out'),
-                        ),
-                      ],
-                    ),
-                  ) ??
-                  false;
-              if (shouldLogout) onLogout();
-            },
-            icon: const Icon(Icons.logout, color: Color(0xFF8B261D)),
-            label: const Text(
-              'Log out',
-              style: TextStyle(color: Color(0xFF8B261D)),
-            ),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFF8B261D)),
-            ),
+            onPressed: () => _confirmLogout(context),
+            icon: const Icon(Icons.logout, size: 18),
+            label: const Text('Log out'),
           ),
         ],
       ),
@@ -188,32 +169,25 @@ class _ProfileTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Card(
-        margin: const EdgeInsets.only(bottom: 10),
-        color: const Color(0xFFFAF6EE).withValues(alpha: 0.9),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: const Color(0xFF8B261D).withValues(alpha: 0.3),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Card(
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: const BoxDecoration(
+            color: BuyerColors.blush,
+            shape: BoxShape.circle,
           ),
+          child: Icon(icon, size: 20, color: BuyerColors.maroon),
         ),
-        child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-          leading: Icon(icon, color: const Color(0xFF8B261D)),
-          title: Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF8B261D),
-            ),
-          ),
-          subtitle: Text(
-            subtitle,
-            style: const TextStyle(color: AppColors.mutedText),
-          ),
-          trailing: const Icon(Icons.chevron_right, color: Color(0xFF8B261D)),
-          onTap: onTap,
-        ),
-      );
+        title: Text(title),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: onTap,
+      ),
+    ),
+  );
 }

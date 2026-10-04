@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_heading.dart';
 
 class BuyerEmptyState extends StatelessWidget {
   final IconData icon;
@@ -19,54 +20,39 @@ class BuyerEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 68, color: const Color(0xFF8B261D)),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF8B261D),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.mutedText, height: 1.4),
-              ),
-              if (actionLabel != null) ...[
-                const SizedBox(height: 20),
-                FilledButton(
-                  onPressed: onAction,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF8B261D),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 28,
-                      vertical: 14,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: Text(
-                    actionLabel!,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-              ],
-            ],
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 92,
+            height: 92,
+            decoration: BoxDecoration(
+              color: BuyerColors.card,
+              shape: BoxShape.circle,
+              border: Border.all(color: BuyerColors.gold, width: 1.1),
+            ),
+            child: Icon(icon, size: 42, color: BuyerColors.maroon),
           ),
-        ),
-      );
+          const SizedBox(height: 18),
+          BuyerHeading(title, size: 20, textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: BuyerColors.body, height: 1.45),
+          ),
+          if (actionLabel != null) ...[
+            const SizedBox(height: 22),
+            FilledButton(
+              onPressed: onAction,
+              style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
+              child: Text(actionLabel!),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
 }

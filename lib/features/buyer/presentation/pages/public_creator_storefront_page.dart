@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/public_creator.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_heading.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -21,21 +23,29 @@ class PublicCreatorStorefrontPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(creator.displayName)),
-      body: BlocBuilder<BuyerBloc, BuyerState>(
-        buildWhen: (previous, current) =>
-            previous.products != current.products ||
-            previous.favoriteIds != current.favoriteIds,
-        builder: (context, state) => _StorefrontBody(
-          creator: creator,
-          products: state.products
-              .where((product) => product.creatorUid == creator.uid)
-              .toList(),
-          favoriteIds: state.favoriteIds,
-          onProductTap: onProductTap,
-          onSave: (product) => context.read<BuyerBloc>().add(
-            BuyerToggleFavorite(userId: buyerId, product: product),
+    return BuyerBackground(
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            creator.displayName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        body: BlocBuilder<BuyerBloc, BuyerState>(
+          buildWhen: (previous, current) =>
+              previous.products != current.products ||
+              previous.favoriteIds != current.favoriteIds,
+          builder: (context, state) => _StorefrontBody(
+            creator: creator,
+            products: state.products
+                .where((product) => product.creatorUid == creator.uid)
+                .toList(),
+            favoriteIds: state.favoriteIds,
+            onProductTap: onProductTap,
+            onSave: (product) => context.read<BuyerBloc>().add(
+              BuyerToggleFavorite(userId: buyerId, product: product),
+            ),
           ),
         ),
       ),
@@ -67,12 +77,15 @@ class _StorefrontBody extends StatelessWidget {
         SliverToBoxAdapter(child: _CreatorHeader(creator: creator)),
         if (creator.portfolio.isNotEmpty)
           SliverToBoxAdapter(child: _Portfolio(images: creator.portfolio)),
+        const SliverPadding(
+          padding: EdgeInsets.fromLTRB(20, 22, 20, 0),
+          sliver: SliverToBoxAdapter(child: Divider(height: 1)),
+        ),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
           sliver: SliverToBoxAdapter(
-            child: Text(
+            child: BuyerHeading(
               'Storefront · ${products.length} ${products.length == 1 ? 'product' : 'products'}',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
             ),
           ),
         ),
@@ -84,6 +97,7 @@ class _StorefrontBody extends StatelessWidget {
                 child: Text(
                   'No available products from this creator yet.',
                   textAlign: TextAlign.center,
+                  style: TextStyle(color: BuyerColors.body),
                 ),
               ),
             ),
@@ -126,23 +140,23 @@ class _CreatorHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+    padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             CircleAvatar(
-              radius: 42,
-              backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+              radius: 38,
+              backgroundColor: BuyerColors.blush,
               backgroundImage: creator.profileImage.isEmpty
                   ? null
                   : NetworkImage(creator.profileImage),
               child: creator.profileImage.isEmpty
-                  ? const Icon(Icons.storefront, size: 36)
+                  ? const Icon(Icons.storefront, size: 32)
                   : null,
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,46 +164,57 @@ class _CreatorHeader extends StatelessWidget {
                   Row(
                     children: [
                       Flexible(
-                        child: Text(
+                        child: BuyerHeading(
                           creator.displayName,
-                          style: const TextStyle(
-                            fontSize: 23,
-                            fontWeight: FontWeight.w900,
-                          ),
+                          size: 20,
+                          color: BuyerColors.ink,
+                          weight: FontWeight.w800,
                         ),
                       ),
                       if (creator.isVerified) ...[
                         const SizedBox(width: 6),
-                        const Icon(
-                          Icons.verified,
-                          color: AppColors.primary,
-                          size: 20,
-                        ),
+                        const Icon(Icons.verified, size: 18),
                       ],
                     ],
                   ),
-                  if (creator.location.isNotEmpty)
-                    Text(
-                      creator.location,
-                      style: const TextStyle(color: AppColors.mutedText),
+                  if (creator.location.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on, size: 14),
+                        const SizedBox(width: 3),
+                        Flexible(
+                          child: Text(
+                            creator.location,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: BuyerColors.body,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+                  ],
                 ],
               ),
             ),
           ],
         ),
         if (creator.bio.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          Text(creator.bio, style: const TextStyle(height: 1.5)),
+          const SizedBox(height: 16),
+          Text(
+            creator.bio,
+            style: const TextStyle(height: 1.5, color: BuyerColors.body),
+          ),
         ],
         if (creator.story.isNotEmpty) ...[
           const SizedBox(height: 20),
-          const Text(
-            'Creator story',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-          ),
+          const BuyerHeading('Creator story'),
           const SizedBox(height: 6),
-          Text(creator.story, style: const TextStyle(height: 1.5)),
+          Text(
+            creator.story,
+            style: const TextStyle(height: 1.5, color: BuyerColors.body),
+          ),
         ],
         if (creator.socialLinks.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -261,7 +286,7 @@ class _Portfolio extends StatelessWidget {
             errorBuilder: (_, _, _) => const SizedBox(
               width: 150,
               child: ColoredBox(
-                color: AppColors.surface,
+                color: BuyerColors.sand,
                 child: Icon(Icons.broken_image_outlined),
               ),
             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_heading.dart';
 
 class BuyerTermsAndConditionsPage extends StatelessWidget {
   const BuyerTermsAndConditionsPage({super.key});
@@ -9,48 +10,31 @@ class BuyerTermsAndConditionsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BuyerBackground(
       child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          title: const Text(
-            'Terms & Conditions',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF8B261D),
-            ),
-          ),
-          iconTheme: const IconThemeData(color: Color(0xFF8B261D)),
-        ),
+        appBar: AppBar(title: const Text('Terms & Conditions')),
         body: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
           child: Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(18, 20, 18, 4),
             decoration: BoxDecoration(
-              color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
+              color: BuyerColors.card,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: const Color(0xFF8B261D),
-                width: 0.8,
-              ),
+              border: Border.all(color: BuyerColors.line, width: 1.5),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                const BuyerHeading(
                   'MadeByHands Buyer Terms & Conditions',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF8B261D),
-                  ),
+                  size: 19,
                 ),
                 const SizedBox(height: 6),
                 const Text(
                   'Effective Date: September 2026',
-                  style: TextStyle(fontSize: 12, color: AppColors.mutedText),
+                  style: TextStyle(fontSize: 12, color: BuyerColors.muted),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
+                const Divider(height: 1),
+                const SizedBox(height: 18),
                 _buildSection(
                   title: '1. Account Usage & Registration',
                   content:
@@ -91,25 +75,18 @@ class BuyerTermsAndConditionsPage extends StatelessWidget {
 
   Widget _buildSection({required String title, required String content}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20.0),
+      padding: const EdgeInsets.only(bottom: 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF8B261D),
-            ),
-          ),
+          BuyerHeading(title, size: 15),
           const SizedBox(height: 6),
           Text(
             content,
             style: const TextStyle(
               fontSize: 13,
-              height: 1.5,
-              color: AppColors.text,
+              height: 1.55,
+              color: BuyerColors.body,
             ),
           ),
         ],

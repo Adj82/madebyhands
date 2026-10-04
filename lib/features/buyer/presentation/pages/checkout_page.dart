@@ -1,19 +1,21 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
 import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/core/services/razorpay_service.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/order_history_page.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/saved_addresses_page.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_heading.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_thumbnail.dart';
 import 'package:madebyhands/features/orders/domain/entities/marketplace_order.dart';
 
-class CheckoutPage extends StatefulWidget {
+class CheckoutPage extends StatelessWidget {
   final UserEntity user;
   final List<Product> products;
   final Map<String, int> quantities;
@@ -32,10 +34,22 @@ class CheckoutPage extends StatefulWidget {
   });
 
   @override
-  State<CheckoutPage> createState() => _CheckoutPageState();
+  Widget build(BuildContext context) =>
+      BuyerBackground(child: _CheckoutBody(page: this));
 }
 
-class _CheckoutPageState extends State<CheckoutPage> {
+/// Holds the page state below [BuyerBackground], so dialogs and sheets opened
+/// from the state's own context inherit the buyer theme.
+class _CheckoutBody extends StatefulWidget {
+  final CheckoutPage page;
+
+  const _CheckoutBody({required this.page});
+
+  @override
+  State<_CheckoutBody> createState() => _CheckoutPageState();
+}
+
+class _CheckoutPageState extends State<_CheckoutBody> {
   late final Stream<List<SavedAddress>> _addresses;
   final RazorpayService _razorpayService = RazorpayService();
   PlatformFeeSettings _feeSettings = const PlatformFeeSettings();
@@ -59,7 +73,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
   @override
   void initState() {
     super.initState();
-    _addresses = widget.buyerRepository.watchAddresses(widget.user.uid);
+    _addresses = widget.page.buyerRepository.watchAddresses(
+      widget.page.user.uid,
+    );
     _razorpayService.init(
       onSuccess: _onPaymentSuccess,
       onFailure: _onPaymentFailure,
@@ -77,7 +93,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
   /// read from Firestore. The server total stays authoritative either way.
   Future<void> _loadFeeSettings() async {
     try {
-      final settings = await widget.buyerRepository.getPlatformFeeSettings();
+      final settings = await widget.page.buyerRepository
+          .getPlatformFeeSettings();
       if (mounted) setState(() => _feeSettings = settings);
     } catch (_) {
       // Keep the default preview; create-order still prices the cart.
@@ -85,19 +102,20 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   ProductCustomizationSelection _selectionFor(Product product) =>
-      widget.customizations[product.id] ?? const ProductCustomizationSelection();
+      widget.page.customizations[product.id] ??
+      const ProductCustomizationSelection();
 
-  int get _subtotal => widget.products.fold(
+  int get _subtotal => widget.page.products.fold(
     0,
     (sum, product) =>
         sum +
         _selectionFor(product).unitPriceFor(product) *
-            (widget.quantities[product.id] ?? 0),
+            (widget.page.quantities[product.id] ?? 0),
   );
 
   /// Distinct creators, counted the way `api/create-order.js` groups priced
   /// items, so the fee preview matches the amount Razorpay will charge.
-  int get _creatorCount => widget.products
+  int get _creatorCount => widget.page.products
       .map((product) => product.creatorUid)
       .where((creatorUid) => creatorUid.isNotEmpty)
       .toSet()
@@ -107,11 +125,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   int get _total => _subtotal + _platformFee;
 
-  List<Map<String, dynamic>> get _cartLines => widget.products
+  List<Map<String, dynamic>> get _cartLines => widget.page.products
       .map(
         (product) => <String, dynamic>{
           'productId': product.id,
-          'quantity': widget.quantities[product.id] ?? 0,
+          'quantity': widget.page.quantities[product.id] ?? 0,
           'customizations': _selectionFor(product).values,
         },
       )
@@ -137,9 +155,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
       _razorpayService.openCheckout(
         order: order,
         description: 'MadeByHands order',
-        name: widget.user.name,
-        phone: address.phone.isNotEmpty ? address.phone : widget.user.phone,
-        email: widget.user.email,
+        name: widget.page.user.name,
+        phone: address.phone.isNotEmpty
+            ? address.phone
+            : widget.page.user.phone,
+        email: widget.page.user.email,
       );
     } catch (error) {
       if (!mounted) return;
@@ -167,11 +187,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
     try {
       final orderIds = await _razorpayService.finalizePaidOrder(
         payment: payment,
-        buyerPhone: address.phone.isNotEmpty ? address.phone : widget.user.phone,
+        buyerPhone: address.phone.isNotEmpty
+            ? address.phone
+            : widget.page.user.phone,
         address: _addressPayload(address),
       );
       _capturedPayment = null;
-      widget.onOrderPlaced();
+      widget.page.onOrderPlaced();
       if (!mounted) return;
       setState(() => _busy = false);
       await _showSuccessDialog(payment.paymentId ?? '', orderIds.length);
@@ -189,8 +211,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   Future<void> _showSuccessDialog(String paymentId, int orderCount) {
     final navigator = Navigator.of(context);
-    final user = widget.user;
-    final repository = widget.buyerRepository;
+    final user = widget.page.user;
+    final repository = widget.page.buyerRepository;
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -238,10 +260,18 @@ class _CheckoutPageState extends State<CheckoutPage> {
     if (address == null || !mounted) return;
     try {
       _newAddressAwaitingSelection = address;
-      await widget.buyerRepository.saveAddress(widget.user.uid, address);
+      await widget.page.buyerRepository.saveAddress(
+        widget.page.user.uid,
+        address,
+      );
     } catch (error) {
       _newAddressAwaitingSelection = null;
-      if (mounted) _showMessage('Could not save address: ${friendlyErrorMessage(error)}', isError: true);
+      if (mounted) {
+        _showMessage(
+          'Could not save address: ${friendlyErrorMessage(error)}',
+          isError: true,
+        );
+      }
     }
   }
 
@@ -309,41 +339,45 @@ class _CheckoutPageState extends State<CheckoutPage> {
             }
             final addresses = snapshot.data!;
             final selected = _resolveSelectedAddress(addresses);
+            final locked = _busy || _capturedPayment != null;
             return ListView(
               padding: EdgeInsets.fromLTRB(
                 20,
+                8,
                 20,
-                20,
-                MediaQuery.paddingOf(context).bottom + 20,
+                MediaQuery.paddingOf(context).bottom + 24,
               ),
               children: [
                 Row(
                   children: [
-                    const Expanded(
-                      child: Text(
-                        'Delivery address',
-                        style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
-                      ),
-                    ),
+                    const Expanded(child: BuyerHeading('Delivery address')),
                     TextButton.icon(
-                      onPressed: _busy || _capturedPayment != null ? null : _addNewAddress,
-                      icon: const Icon(Icons.add_location_alt_outlined),
+                      onPressed: locked ? null : _addNewAddress,
+                      icon: const Icon(
+                        Icons.add_location_alt_outlined,
+                        size: 18,
+                      ),
                       label: const Text('Add new'),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 if (addresses.isEmpty)
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(18),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const Text('Add a delivery address before paying.'),
+                          const Text(
+                            'Add a delivery address before paying.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: BuyerColors.body),
+                          ),
                           const SizedBox(height: 12),
                           OutlinedButton.icon(
                             onPressed: _busy ? null : _addNewAddress,
-                            icon: const Icon(Icons.add),
+                            icon: const Icon(Icons.add, size: 18),
                             label: const Text('Add new address'),
                           ),
                         ],
@@ -351,120 +385,107 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     ),
                   )
                 else
-                  ...addresses.map((address) {
-                    final isSelected = selected?.id == address.id;
-                    return Card(
-                      color: isSelected ? AppColors.primary.withValues(alpha: 0.08) : null,
-                      child: ListTile(
-                        onTap: _busy || _capturedPayment != null
+                  for (final address in addresses)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _AddressOption(
+                        address: address,
+                        isSelected: selected?.id == address.id,
+                        onTap: locked
                             ? null
-                            : () => setState(() => _selectedAddressId = address.id),
-                        leading: Icon(
-                          isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-                          color: AppColors.primary,
-                        ),
-                        title: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                address.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                            : () => setState(
+                                () => _selectedAddressId = address.id,
                               ),
-                            ),
-                            if (isSelected)
-                              const Chip(
-                                label: Text('Selected'),
-                                visualDensity: VisualDensity.compact,
-                              ),
-                          ],
-                        ),
-                        subtitle: Text(
-                          '${address.recipientName}\n${address.formatted}\n${address.phone}',
-                        ),
                       ),
-                    );
-                  }),
-                const SizedBox(height: 24),
-                const Text(
-                  'Secure payment',
-                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
-                ),
+                    ),
+                const SizedBox(height: 14),
+                const BuyerHeading('Secure payment'),
                 const SizedBox(height: 10),
                 const Card(
                   child: ListTile(
-                    leading: Icon(Icons.lock_outline, color: AppColors.primary),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 6,
+                    ),
+                    leading: Icon(Icons.lock_outline),
                     title: Text('Razorpay Checkout'),
-                    subtitle: Text(
-                      'Pay by UPI, card or net banking. Card details are handled by Razorpay and never stored by MadeByHands.',
+                    subtitle: Padding(
+                      padding: EdgeInsets.only(top: 3),
+                      child: Text(
+                        'Pay by UPI, card or net banking. Card details are handled by Razorpay and never stored by MadeByHands.',
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 24),
-                const Text(
-                  'Order summary',
-                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
-                ),
+                const BuyerHeading('Order summary'),
                 const SizedBox(height: 10),
-                ...widget.products.map((product) {
-                  final customization = _selectionFor(product);
-                  return Card(
-                    child: ListTile(
-                      key: ValueKey('checkout-product-${product.id}'),
-                      onTap: () => _showProductInformation(product, customization),
-                      leading: ProductThumbnail(product: product, size: 44, radius: 22),
-                      title: Text(product.name, maxLines: 2, overflow: TextOverflow.ellipsis),
-                      subtitle: Text(
-                        [
-                          'By ${product.artisan}',
-                          ...customization.values.entries.map(
-                            (entry) => '${entry.key}: ${entry.value.join(', ')}',
-                          ),
-                        ].join('\n'),
-                      ),
-                      trailing: Text(
-                        '${widget.quantities[product.id] ?? 0} × ₹${customization.unitPriceFor(product)}',
-                      ),
-                    ),
-                  );
-                }),
-                const Divider(),
-                _summaryRow('Items subtotal', '₹$_subtotal'),
-                _summaryRow(
-                  _creatorCount > 1
-                      ? 'Platform fee (₹${_feeSettings.flatFeePerCreator} × $_creatorCount creators)'
-                      : 'Platform fee',
-                  '₹$_platformFee',
-                ),
+                for (final product in widget.page.products)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _summaryItem(product),
+                  ),
                 const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text('Total payable', style: TextStyle(fontSize: 16)),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                    child: Column(
+                      children: [
+                        _summaryRow('Items subtotal', '₹$_subtotal'),
+                        _summaryRow(
+                          _creatorCount > 1
+                              ? 'Platform fee (₹${_feeSettings.flatFeePerCreator} × $_creatorCount creators)'
+                              : 'Platform fee',
+                          '₹$_platformFee',
+                        ),
+                        const Divider(height: 20),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Total payable',
+                                style: TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '₹$_total',
+                              style: const TextStyle(
+                                fontSize: 21,
+                                height: 1.1,
+                                fontWeight: FontWeight.w800,
+                                color: BuyerColors.maroon,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    Text(
-                      '₹$_total',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 20),
                 if (_capturedPayment != null)
                   FilledButton.icon(
                     onPressed: _busy ? null : _confirmOrder,
-                    icon: _busy ? const _ButtonSpinner() : const Icon(Icons.refresh),
+                    icon: _busy
+                        ? const _ButtonSpinner()
+                        : const Icon(Icons.refresh, size: 18),
                     label: const Text('Retry order confirmation'),
                   )
                 else
                   FilledButton.icon(
-                    onPressed: selected == null || _busy || widget.products.isEmpty
+                    onPressed:
+                        selected == null ||
+                            _busy ||
+                            widget.page.products.isEmpty
                         ? null
                         : () => _pay(selected),
-                    icon: _busy ? const _ButtonSpinner() : const Icon(Icons.lock_outline),
+                    icon: _busy
+                        ? const _ButtonSpinner()
+                        : const Icon(Icons.lock_outline, size: 18),
                     label: Text('Pay securely · ₹$_total'),
                   ),
               ],
@@ -475,13 +496,44 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
+  Widget _summaryItem(Product product) {
+    final customization = _selectionFor(product);
+    return Card(
+      child: ListTile(
+        key: ValueKey('checkout-product-${product.id}'),
+        onTap: () => _showProductInformation(product, customization),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        leading: ProductThumbnail(product: product, size: 48, radius: 12),
+        title: Text(product.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+        subtitle: Text(
+          [
+            'By ${product.artisan}',
+            ...customization.values.entries.map(
+              (entry) => '${entry.key}: ${entry.value.join(', ')}',
+            ),
+          ].join('\n'),
+        ),
+        trailing: Text(
+          '${widget.page.quantities[product.id] ?? 0} × ₹${customization.unitPriceFor(product)}',
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: BuyerColors.maroon,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _summaryRow(String label, String value) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 6),
+    padding: const EdgeInsets.symmetric(vertical: 5),
     child: Row(
       children: [
-        Expanded(child: Text(label)),
+        Expanded(
+          child: Text(label, style: const TextStyle(color: BuyerColors.body)),
+        ),
         const SizedBox(width: 12),
-        Text(value),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
       ],
     ),
   );
@@ -501,22 +553,50 @@ class _CheckoutPageState extends State<CheckoutPage> {
         children: [
           AspectRatio(
             aspectRatio: 1.8,
-            child: ProductThumbnail(product: product, radius: 20, iconSize: 72),
+            child: ProductThumbnail(product: product, radius: 16, iconSize: 72),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            product.category.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 11,
+              color: BuyerColors.maroon,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 6),
+          BuyerHeading(
+            product.name,
+            size: 22,
+            color: BuyerColors.ink,
+            weight: FontWeight.w700,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Made by ${product.artisan}',
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              color: BuyerColors.body,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            product.description,
+            style: const TextStyle(height: 1.5, color: BuyerColors.body),
           ),
           const SizedBox(height: 18),
-          Text(product.category.toUpperCase()),
-          const SizedBox(height: 6),
-          Text(product.name, style: Theme.of(sheetContext).textTheme.headlineSmall),
-          const SizedBox(height: 6),
-          Text('Made by ${product.artisan}'),
-          const SizedBox(height: 14),
-          Text(product.description),
-          const SizedBox(height: 18),
           if (!customization.isEmpty) ...[
-            const Text('Your customization'),
+            const BuyerHeading('Your customization', size: 15),
             const SizedBox(height: 8),
             ...customization.values.entries.map(
-              (entry) => Text('${entry.key}: ${entry.value.join(', ')}'),
+              (entry) => Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Text(
+                  '${entry.key}: ${entry.value.join(', ')}',
+                  style: const TextStyle(color: BuyerColors.body),
+                ),
+              ),
             ),
             const SizedBox(height: 12),
           ],
@@ -524,7 +604,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
           if (customization.additionalPrice > 0)
             _priceRow('Customization', customization.additionalPrice),
           const Divider(height: 24),
-          _priceRow('Price per item', customization.unitPriceFor(product), emphasized: true),
+          _priceRow(
+            'Price per item',
+            customization.unitPriceFor(product),
+            emphasized: true,
+          ),
         ],
       ),
     ),
@@ -539,7 +623,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
               child: Text(
                 label,
                 style: TextStyle(
-                  fontWeight: emphasized ? FontWeight.w800 : FontWeight.w500,
+                  fontWeight: emphasized ? FontWeight.w700 : FontWeight.w500,
+                  color: emphasized ? BuyerColors.ink : BuyerColors.body,
                 ),
               ),
             ),
@@ -547,13 +632,102 @@ class _CheckoutPageState extends State<CheckoutPage> {
               '₹$amount',
               style: TextStyle(
                 fontSize: emphasized ? 18 : 14,
-                fontWeight: emphasized ? FontWeight.w900 : FontWeight.w600,
-                color: emphasized ? AppColors.primary : AppColors.text,
+                fontWeight: emphasized ? FontWeight.w800 : FontWeight.w700,
+                color: emphasized ? BuyerColors.maroon : BuyerColors.ink,
               ),
             ),
           ],
         ),
       );
+}
+
+/// One selectable delivery address on the checkout page.
+class _AddressOption extends StatelessWidget {
+  final SavedAddress address;
+  final bool isSelected;
+  final VoidCallback? onTap;
+
+  const _AddressOption({
+    required this.address,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => Card(
+    color: isSelected ? BuyerColors.blush : null,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(20),
+      side: BorderSide(
+        color: isSelected ? BuyerColors.maroon : BuyerColors.line,
+        width: 1.5,
+      ),
+    ),
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+              size: 22,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: BuyerHeading(
+                          address.label,
+                          size: 15,
+                          color: BuyerColors.ink,
+                          weight: FontWeight.w700,
+                          maxLines: 1,
+                        ),
+                      ),
+                      if (isSelected)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: BuyerColors.maroon,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'Selected',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${address.recipientName}\n${address.formatted}\n${address.phone}',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      height: 1.45,
+                      color: BuyerColors.body,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _ButtonSpinner extends StatelessWidget {

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product_review.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_heading.dart';
 
 class ProductDetailsPage extends StatefulWidget {
   final Product product;
@@ -114,18 +115,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
 
     return BuyerBackground(
       child: Scaffold(
-        backgroundColor: Colors.transparent,
         appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          title: const Text(
-            'Product details',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF8B261D),
-            ),
-          ),
-          iconTheme: const IconThemeData(color: Color(0xFF8B261D)),
+          title: const Text('Product details'),
           actions: [
             IconButton(
               tooltip: 'Open cart',
@@ -133,10 +124,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
               icon: Badge(
                 isLabelVisible: widget.cartCount > 0,
                 label: Text('${widget.cartCount}'),
-                child: const Icon(
-                  Icons.shopping_bag_outlined,
-                  color: Color(0xFF8B261D),
-                ),
+                child: const Icon(Icons.shopping_bag_outlined),
               ),
             ),
             IconButton(
@@ -146,32 +134,32 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 setState(() => _isSaved = !_isSaved);
               },
               icon: Icon(_isSaved ? Icons.favorite : Icons.favorite_border),
-              color: const Color(0xFF8B261D),
             ),
+            const SizedBox(width: 4),
           ],
         ),
         body: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
           children: [
             _ProductGallery(product: product),
-            const SizedBox(height: 24),
+            const SizedBox(height: 18),
             Text(
               product.categoryLabel.toUpperCase(),
               style: const TextStyle(
-                color: Color(0xFF8B261D),
+                fontSize: 11,
+                color: BuyerColors.maroon,
                 fontWeight: FontWeight.w800,
-                letterSpacing: 1.1,
+                letterSpacing: 1.2,
               ),
+            ),
+            const SizedBox(height: 6),
+            BuyerHeading(
+              product.name,
+              size: 22,
+              color: BuyerColors.ink,
+              weight: FontWeight.w800,
             ),
             const SizedBox(height: 8),
-            Text(
-              product.name,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF2C1810),
-              ),
-            ),
-            const SizedBox(height: 10),
             InkWell(
               onTap: widget.onCreatorTap,
               borderRadius: BorderRadius.circular(10),
@@ -183,13 +171,13 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       width: 38,
                       height: 38,
                       decoration: const BoxDecoration(
-                        color: Color(0xFFF2DEDD),
+                        color: BuyerColors.blush,
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
                         Icons.person_rounded,
                         size: 22,
-                        color: Color(0xFF8B261D),
+                        color: BuyerColors.maroon,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -197,7 +185,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       child: Text(
                         'Made by ${product.artisan}',
                         style: const TextStyle(
-                          color: Color(0xFF2C1810),
+                          color: BuyerColors.ink,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -206,33 +194,36 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       const Icon(
                         Icons.chevron_right,
                         size: 20,
-                        color: Color(0xFF8B261D),
+                        color: BuyerColors.maroon,
                       ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 12),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
                   '₹$unitPrice',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    color: const Color(0xFF8B261D),
+                  style: const TextStyle(
+                    fontSize: 23,
+                    height: 1.1,
+                    fontWeight: FontWeight.w800,
+                    color: BuyerColors.maroon,
                   ),
                 ),
                 if (customizationSelection.additionalPrice > 0) ...[
                   const SizedBox(width: 8),
                   Flexible(
                     child: Padding(
-                      padding: const EdgeInsets.only(bottom: 3),
+                      padding: const EdgeInsets.only(bottom: 2),
                       child: Text(
                         'includes ₹${customizationSelection.additionalPrice} customization',
                         style: const TextStyle(
-                          color: Color(0xFF8B261D),
-                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          color: BuyerColors.body,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -240,37 +231,25 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 ],
               ],
             ),
-            const SizedBox(height: 22),
-            const Text(
-              'About this piece',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF8B261D),
-              ),
-            ),
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 16),
+            const BuyerHeading('About this piece'),
             const SizedBox(height: 8),
             Text(
               product.description,
               style: const TextStyle(
-                fontSize: 16,
+                fontSize: 14,
                 height: 1.55,
-                color: AppColors.mutedText,
+                color: BuyerColors.body,
               ),
             ),
             if (product.materials.isNotEmpty ||
                 product.dimensions.isNotEmpty ||
                 product.shippingInfo.isNotEmpty) ...[
-              const SizedBox(height: 22),
-              const Text(
-                'Product information',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF8B261D),
-                ),
-              ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 20),
+              const BuyerHeading('Product information'),
+              const SizedBox(height: 10),
               if (product.materials.isNotEmpty)
                 _DetailLine(
                   icon: Icons.texture,
@@ -289,14 +268,14 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
             ],
             if (product.isCustomizable &&
                 product.customizations.any((c) => c.options.isNotEmpty)) ...[
-              const SizedBox(height: 24),
+              const SizedBox(height: 10),
               _ProductCustomizationSection(
                 product: product,
                 values: _customizationValues,
                 onChanged: _updateCustomization,
               ),
             ],
-            const SizedBox(height: 22),
+            const SizedBox(height: 18),
             const _DetailLine(
               icon: Icons.handyman_outlined,
               text: 'Handmade in India',
@@ -306,7 +285,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 icon: Icons.inventory_2_outlined,
                 text: 'Only ${product.stock} left',
               ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 4),
+            const Divider(height: 1),
+            const SizedBox(height: 16),
             _ProductReviewsSection(
               product: product,
               reviewStream: _reviews,
@@ -318,8 +299,11 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
           ],
         ),
         bottomNavigationBar: Container(
-          color: const Color(0xFFFAF6EE),
-          padding: const EdgeInsets.all(16),
+          decoration: const BoxDecoration(
+            color: BuyerColors.card,
+            border: Border(top: BorderSide(color: BuyerColors.line)),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           child: SafeArea(
             top: false,
             child: Row(
@@ -328,18 +312,13 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                   child: !product.isAvailable || product.stock <= 0
                       ? OutlinedButton.icon(
                           onPressed: null,
-                          icon: const Icon(Icons.remove_shopping_cart_outlined),
-                          label: const Text('Out of stock'),
+                          icon: const Icon(
+                            Icons.remove_shopping_cart_outlined,
+                            size: 18,
+                          ),
+                          label: const _ButtonLabel('Out of stock'),
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(
-                              color: Color(0xFF8B261D),
-                              width: 1.2,
-                            ),
-                            foregroundColor: const Color(0xFF8B261D),
-                            minimumSize: const Size.fromHeight(52),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
+                            padding: _barButtonPadding,
                           ),
                         )
                       : widget.cartQuantity == 0
@@ -353,55 +332,37 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                             );
                           },
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(
-                              color: Color(0xFF8B261D),
-                              width: 1.5,
-                            ),
-                            foregroundColor: const Color(0xFF8B261D),
-                            minimumSize: const Size.fromHeight(52),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
+                            padding: _barButtonPadding,
                           ),
-                          icon: const Icon(
-                            Icons.add_shopping_cart,
-                            color: Color(0xFF8B261D),
-                          ),
-                          label: const Text(
-                            'Add to cart',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF8B261D),
-                            ),
-                          ),
+                          icon: const Icon(Icons.add_shopping_cart, size: 18),
+                          label: const _ButtonLabel('Add to cart'),
                         )
                       : Container(
-                          height: 52,
+                          height: 48,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFAF6EE),
-                            borderRadius: BorderRadius.circular(16),
+                            color: BuyerColors.field,
+                            borderRadius: BorderRadius.circular(24),
                             border: Border.all(
-                              color: const Color(0xFF8B261D),
-                              width: 1.5,
+                              color: BuyerColors.maroon,
+                              width: 1.2,
                             ),
                           ),
                           child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               IconButton(
                                 tooltip: 'Decrease quantity',
                                 onPressed: () => widget.onCartQuantityChanged(
                                   widget.cartQuantity - 1,
                                 ),
-                                icon: const Icon(Icons.remove),
-                                color: const Color(0xFF8B261D),
+                                icon: const Icon(Icons.remove, size: 20),
                               ),
                               Text(
                                 '${widget.cartQuantity}',
                                 style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF8B261D),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: BuyerColors.maroon,
                                 ),
                               ),
                               IconButton(
@@ -411,8 +372,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                     : () => widget.onCartQuantityChanged(
                                         widget.cartQuantity + 1,
                                       ),
-                                icon: const Icon(Icons.add),
-                                color: const Color(0xFF8B261D),
+                                icon: const Icon(Icons.add, size: 20),
+                                disabledColor: BuyerColors.goldSoft,
                               ),
                             ],
                           ),
@@ -424,18 +385,10 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     onPressed: !product.isAvailable || product.stock <= 0
                         ? null
                         : () => widget.onBuyNow(customizationSelection),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF8B261D),
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(52),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    icon: const Icon(Icons.bolt),
-                    label: Text(
+                    style: FilledButton.styleFrom(padding: _barButtonPadding),
+                    icon: const Icon(Icons.bolt, size: 18),
+                    label: _ButtonLabel(
                       'Buy now  ·  ₹${unitPrice * (widget.cartQuantity == 0 ? 1 : widget.cartQuantity)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
@@ -446,6 +399,24 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       ),
     );
   }
+
+  /// The two bottom-bar buttons share half the width each, so they use
+  /// tighter padding than the theme default to keep their labels on one line.
+  static const _barButtonPadding = EdgeInsets.symmetric(horizontal: 12);
+}
+
+/// A single-line button label that shrinks rather than wraps when the button
+/// is narrow (e.g. a large total on a small phone).
+class _ButtonLabel extends StatelessWidget {
+  final String text;
+
+  const _ButtonLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => FittedBox(
+    fit: BoxFit.scaleDown,
+    child: Text(text, maxLines: 1, softWrap: false),
+  );
 }
 
 class _ProductCustomizationSection extends StatelessWidget {
@@ -461,36 +432,26 @@ class _ProductCustomizationSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(18),
+    padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
+      color: BuyerColors.card,
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(
-        color: const Color(0xFF8B261D).withValues(alpha: 0.8),
-        width: 1.0,
-      ),
+      border: Border.all(color: BuyerColors.line, width: 1.5),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Row(
           children: [
-            Icon(Icons.tune_rounded, color: Color(0xFF8B261D)),
-            SizedBox(width: 10),
-            Text(
-              'Customize this product',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF8B261D),
-              ),
-            ),
+            Icon(Icons.tune_rounded, size: 20),
+            SizedBox(width: 8),
+            Expanded(child: BuyerHeading('Customize this product')),
           ],
         ),
         const SizedBox(height: 6),
         const Text(
           'Selections are optional and will be shared with the creator.',
-          style: TextStyle(color: AppColors.mutedText),
+          style: TextStyle(fontSize: 12.5, color: BuyerColors.body),
         ),
         ...product.customizations
             .where((customization) => customization.options.isNotEmpty)
@@ -530,8 +491,8 @@ class _CustomizationChoice extends StatelessWidget {
               child: Text(
                 customization.name,
                 style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF8B261D),
+                  fontWeight: FontWeight.w700,
+                  color: BuyerColors.ink,
                 ),
               ),
             ),
@@ -539,7 +500,7 @@ class _CustomizationChoice extends StatelessWidget {
               Text(
                 '+₹${customization.additionalPrice}',
                 style: const TextStyle(
-                  color: Color(0xFF8B261D),
+                  color: BuyerColors.maroon,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -549,7 +510,7 @@ class _CustomizationChoice extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             customization.description,
-            style: const TextStyle(color: AppColors.mutedText),
+            style: const TextStyle(fontSize: 12.5, color: BuyerColors.body),
           ),
         ],
         if (customization.images.isNotEmpty) ...[
@@ -569,7 +530,7 @@ class _CustomizationChoice extends StatelessWidget {
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => Container(
                     width: 72,
-                    color: AppColors.background,
+                    color: BuyerColors.paper,
                     child: const Icon(Icons.broken_image_outlined),
                   ),
                 ),
@@ -587,8 +548,6 @@ class _CustomizationChoice extends StatelessWidget {
                 ? FilterChip(
                     label: Text(option),
                     selected: selected,
-                    selectedColor: const Color(0xFFF2DEDD),
-                    checkmarkColor: const Color(0xFF8B261D),
                     onSelected: (isSelected) {
                       final updated = List<String>.from(selectedValues);
                       isSelected ? updated.add(option) : updated.remove(option);
@@ -598,7 +557,6 @@ class _CustomizationChoice extends StatelessWidget {
                 : ChoiceChip(
                     label: Text(option),
                     selected: selected,
-                    selectedColor: const Color(0xFFF2DEDD),
                     onSelected: (isSelected) =>
                         onChanged(isSelected ? [option] : []),
                   );
@@ -642,18 +600,14 @@ class _ProductReviewsSection extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Expanded(
-                  child: Text(
-                    'Reviews & ratings',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF8B261D),
-                    ),
-                  ),
-                ),
+                const Expanded(child: BuyerHeading('Reviews & ratings')),
                 if (average > 0) ...[
-                  const Icon(Icons.star_rounded, color: Color(0xFFE0A72F)),
+                  const Icon(
+                    Icons.star_rounded,
+                    size: 20,
+                    color: BuyerColors.star,
+                  ),
+                  const SizedBox(width: 2),
                   Text(
                     average.toStringAsFixed(1),
                     style: const TextStyle(fontWeight: FontWeight.w800),
@@ -662,7 +616,7 @@ class _ProductReviewsSection extends StatelessWidget {
                 ],
                 Text(
                   '(${reviews.length})',
-                  style: const TextStyle(color: AppColors.mutedText),
+                  style: const TextStyle(color: BuyerColors.muted),
                 ),
               ],
             ),
@@ -672,9 +626,7 @@ class _ProductReviewsSection extends StatelessWidget {
               builder: (context, eligibilitySnapshot) {
                 if (eligibilitySnapshot.connectionState ==
                     ConnectionState.waiting) {
-                  return const LinearProgressIndicator(
-                    color: Color(0xFF8B261D),
-                  );
+                  return const LinearProgressIndicator();
                 }
                 final result = eligibilitySnapshot.data;
                 if (result?.canReview == true) {
@@ -684,25 +636,11 @@ class _ProductReviewsSection extends StatelessWidget {
                       existing: ownReview.isEmpty ? null : ownReview.first,
                     ),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(
-                        color: Color(0xFF8B261D),
-                        width: 1.2,
-                      ),
-                      foregroundColor: const Color(0xFF8B261D),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
+                      minimumSize: const Size(0, 42),
                     ),
-                    icon: const Icon(
-                      Icons.rate_review_outlined,
-                      color: Color(0xFF8B261D),
-                    ),
+                    icon: const Icon(Icons.rate_review_outlined, size: 18),
                     label: Text(
                       ownReview.isEmpty ? 'Write a review' : 'Edit your review',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF8B261D),
-                      ),
                     ),
                   );
                 }
@@ -712,14 +650,14 @@ class _ProductReviewsSection extends StatelessWidget {
                     const Icon(
                       Icons.verified_outlined,
                       size: 20,
-                      color: AppColors.mutedText,
+                      color: BuyerColors.muted,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         result?.message ??
                             'Could not verify your purchase right now.',
-                        style: const TextStyle(color: AppColors.mutedText),
+                        style: const TextStyle(color: BuyerColors.muted),
                       ),
                     ),
                   ],
@@ -730,12 +668,12 @@ class _ProductReviewsSection extends StatelessWidget {
             if (snapshot.hasError)
               const Text(
                 'Reviews are unavailable right now.',
-                style: TextStyle(color: AppColors.mutedText),
+                style: TextStyle(color: BuyerColors.body),
               )
             else if (reviews.isEmpty)
               const Text(
                 'No reviews yet. Verified buyers can be the first to review.',
-                style: TextStyle(color: AppColors.mutedText),
+                style: TextStyle(color: BuyerColors.body),
               )
             else
               ...reviews.map((review) => _ReviewCard(review: review)),
@@ -757,7 +695,6 @@ class _ProductReviewsSection extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: const Color(0xFFFAF6EE),
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) => Padding(
           padding: EdgeInsets.fromLTRB(
@@ -771,22 +708,26 @@ class _ProductReviewsSection extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                BuyerHeading(
                   existing == null ? 'Write a review' : 'Edit your review',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    color: const Color(0xFF8B261D),
-                  ),
+                  size: 19,
                 ),
                 const SizedBox(height: 6),
-                const Text(
-                  'Verified purchase',
-                  style: TextStyle(
-                    color: Color(0xFF8B261D),
-                    fontWeight: FontWeight.w700,
-                  ),
+                const Row(
+                  children: [
+                    Icon(Icons.verified, size: 16),
+                    SizedBox(width: 5),
+                    Text(
+                      'Verified purchase',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: BuyerColors.maroon,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Row(
                   children: List.generate(5, (index) {
                     final value = index + 1;
@@ -799,7 +740,7 @@ class _ProductReviewsSection extends StatelessWidget {
                         value <= selectedRating
                             ? Icons.star_rounded
                             : Icons.star_border_rounded,
-                        color: const Color(0xFFE0A72F),
+                        color: BuyerColors.star,
                       ),
                     );
                   }),
@@ -869,9 +810,6 @@ class _ProductReviewsSection extends StatelessWidget {
                               );
                             }
                           },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF8B261D),
-                    ),
                     child: Text(isSaving ? 'Saving…' : 'Submit review'),
                   ),
                 ),
@@ -898,11 +836,11 @@ class _ReviewCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     width: double.infinity,
     margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.all(16),
+    padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: const Color(0xFF8B261D).withValues(alpha: 0.3)),
+      color: BuyerColors.card,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: BuyerColors.line, width: 1.5),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -913,8 +851,8 @@ class _ReviewCard extends StatelessWidget {
               child: Text(
                 review.buyerName,
                 style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF8B261D),
+                  fontWeight: FontWeight.w700,
+                  color: BuyerColors.ink,
                 ),
               ),
             ),
@@ -925,7 +863,7 @@ class _ReviewCard extends StatelessWidget {
                     ? Icons.star_rounded
                     : Icons.star_border_rounded,
                 size: 17,
-                color: const Color(0xFFE0A72F),
+                color: BuyerColors.star,
               ),
             ),
           ],
@@ -934,12 +872,12 @@ class _ReviewCard extends StatelessWidget {
           const SizedBox(height: 4),
           const Row(
             children: [
-              Icon(Icons.verified, size: 16, color: Color(0xFF8B261D)),
+              Icon(Icons.verified, size: 16, color: BuyerColors.maroon),
               SizedBox(width: 5),
               Text(
                 'Verified purchase',
                 style: TextStyle(
-                  color: Color(0xFF8B261D),
+                  color: BuyerColors.maroon,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
@@ -948,7 +886,10 @@ class _ReviewCard extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 10),
-        Text(review.comment, style: const TextStyle(height: 1.4)),
+        Text(
+          review.comment,
+          style: const TextStyle(height: 1.45, color: BuyerColors.body),
+        ),
       ],
     ),
   );
@@ -965,14 +906,14 @@ class _DetailLine extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: 12),
     child: Row(
       children: [
-        Icon(icon, size: 21, color: const Color(0xFF8B261D)),
-        const SizedBox(width: 12),
+        Icon(icon, size: 19, color: BuyerColors.maroon),
+        const SizedBox(width: 10),
         Expanded(
           child: Text(
             text,
             style: const TextStyle(
-              color: AppColors.text,
-              fontWeight: FontWeight.w500,
+              color: BuyerColors.body,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -1007,7 +948,7 @@ class _ProductGalleryState extends State<_ProductGallery> {
         child: Icon(
           product.icon,
           size: 112,
-          color: AppColors.text.withValues(alpha: 0.62),
+          color: BuyerColors.ink.withValues(alpha: 0.62),
         ),
       ),
     );
@@ -1015,7 +956,7 @@ class _ProductGalleryState extends State<_ProductGallery> {
     return AspectRatio(
       aspectRatio: 1.15,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(24),
         child: images.isEmpty
             ? placeholder
             : Stack(

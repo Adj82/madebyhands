@@ -4,6 +4,7 @@ import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_empty_state.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_heading.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
 
 class SavedTab extends StatelessWidget {
@@ -35,12 +36,11 @@ class SavedTab extends StatelessWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-                child: Text(
-                  'Saved pieces',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF8B261D),
-                  ),
+                child: BuyerPageHeader(
+                  title: 'Saved pieces',
+                  subtitle: products.isEmpty
+                      ? 'Pieces you love, kept in one place.'
+                      : '${products.length} ${products.length == 1 ? 'piece' : 'pieces'} on your wishlist',
                 ),
               ),
               Expanded(

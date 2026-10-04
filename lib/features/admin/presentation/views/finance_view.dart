@@ -5,10 +5,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/admin/domain/entities/admin_log_entry.dart';
+import 'package:madebyhands/features/admin/domain/repositories/admin_log_repository.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/admin/presentation/widgets/small_stat.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/orders/domain/order_status.dart';
+import 'package:madebyhands/init_dependencies.dart';
 
 /// Super-admin finance: platform revenue and creator payout releases.
 ///
@@ -610,6 +613,13 @@ Future<void> _showReleaseSheet(BuildContext context, _PayoutOrder order) async {
                           );
                         }
                         await batch.commit();
+                        await serviceLocator<AdminLogRepository>().log(
+                          category: AdminLogCategory.payout,
+                          action: 'payout.released',
+                          summary:
+                              'Released ₹${order.amount} payout to ${order.creatorName} for order #${order.shortId}.',
+                          targetId: order.id,
+                        );
                         messenger.showSnackBar(
                           SnackBar(
                             content: Text(

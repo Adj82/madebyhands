@@ -23,6 +23,8 @@ import 'package:madebyhands/features/buyer/presentation/views/home_tab.dart';
 import 'package:madebyhands/features/buyer/presentation/views/profile_tab.dart';
 import 'package:madebyhands/features/buyer/presentation/views/saved_tab.dart';
 import 'package:madebyhands/features/buyer/presentation/views/search_tab.dart';
+import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_empty_state.dart';
 import 'package:madebyhands/init_dependencies.dart';
 import 'package:madebyhands/features/support/presentation/pages/support_center_page.dart';
@@ -352,6 +354,13 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Home keeps the app theme it was designed against; every other buyer
+    // surface, including dialogs opened from the tabs, uses the buyer theme.
+    final appTheme = Theme.of(context);
+    return Theme(data: BuyerTheme.data, child: _buildShell(context, appTheme));
+  }
+
+  Widget _buildShell(BuildContext context, ThemeData appTheme) {
     return BlocProvider.value(
       value: _navigationCubit,
       child: BlocListener<BuyerBloc, BuyerState>(
@@ -372,45 +381,52 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
               builder: (context, buyerState) {
                 if (buyerState.isLoadingProducts &&
                     buyerState.products.isEmpty) {
-                  return const Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
+                  return const BuyerBackground(
+                    child: Scaffold(
+                      body: Center(child: CircularProgressIndicator()),
+                    ),
                   );
                 }
 
                 if (buyerState.errorMessage != null &&
                     buyerState.products.isEmpty) {
-                  return Scaffold(
-                    body: BuyerEmptyState(
-                      icon: Icons.cloud_off_outlined,
-                      title: 'Something went wrong',
-                      message: buyerState.errorMessage!,
+                  return BuyerBackground(
+                    child: Scaffold(
+                      body: BuyerEmptyState(
+                        icon: Icons.cloud_off_outlined,
+                        title: 'Something went wrong',
+                        message: buyerState.errorMessage!,
+                      ),
                     ),
                   );
                 }
 
                 final pages = [
-                  HomeTab(
-                    userName: _currentUser.name,
-                    selectedAddress: _selectedAddress,
-                    onAddressTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => SavedAddressesPage(
-                          userId: _currentUser.uid,
-                          repository: context.read<BuyerBloc>().repository,
+                  Theme(
+                    data: appTheme,
+                    child: HomeTab(
+                      userName: _currentUser.name,
+                      selectedAddress: _selectedAddress,
+                      onAddressTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => SavedAddressesPage(
+                            userId: _currentUser.uid,
+                            repository: context.read<BuyerBloc>().repository,
+                          ),
                         ),
                       ),
+                      onBrowseAll: _openShop,
+                      onSearchSubmitted: _openShopSearch,
+                      onCategoryTap: _openShopCategory,
+                      onProfileTap: () => _navigationCubit.changePage(4),
+                      unreadNotificationCount: _notifications
+                          .where(
+                            (notification) =>
+                                !_readNotificationIds.contains(notification.id),
+                          )
+                          .length,
+                      onNotificationsTap: _openNotifications,
                     ),
-                    onBrowseAll: _openShop,
-                    onSearchSubmitted: _openShopSearch,
-                    onCategoryTap: _openShopCategory,
-                    onProfileTap: () => _navigationCubit.changePage(4),
-                    unreadNotificationCount: _notifications
-                        .where(
-                          (notification) =>
-                              !_readNotificationIds.contains(notification.id),
-                        )
-                        .length,
-                    onNotificationsTap: _openNotifications,
                   ),
                   SafeArea(
                     child: SearchTab(
@@ -467,9 +483,13 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                       ),
                       onSupport: () => Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => SupportCenterPage(
-                            user: _currentUser,
-                            repository: serviceLocator(),
+                          builder: (_) => BuyerBackground(
+                            child: SupportCenterPage(
+                              user: _currentUser,
+                              repository: serviceLocator(),
+                              pageWrapper: (page) =>
+                                  BuyerBackground(child: page),
+                            ),
                           ),
                         ),
                       ),

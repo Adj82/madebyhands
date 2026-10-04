@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
 import 'package:madebyhands/core/constants/couriers.dart';
 import 'package:madebyhands/core/services/invoice_pdf_service.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/buyer_order.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_heading.dart';
 import 'package:madebyhands/features/orders/domain/order_status.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -17,24 +18,17 @@ class OrderDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BuyerBackground(
       child: Scaffold(
-        backgroundColor: Colors.transparent,
         appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
           title: Text(
             'Order #${order.id.length > 8 ? order.id.substring(order.id.length - 8).toUpperCase() : order.id.toUpperCase()}',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF8B261D),
-            ),
           ),
-          iconTheme: const IconThemeData(color: Color(0xFF8B261D)),
           actions: [
             IconButton(
               tooltip: 'Download invoice',
               icon: const Icon(Icons.download_outlined),
               onPressed: () => _downloadInvoice(context, order),
             ),
+            const SizedBox(width: 4),
           ],
         ),
         body: orderUpdates == null
@@ -90,7 +84,9 @@ Future<void> _downloadInvoice(BuildContext context, BuyerOrder order) async {
     logInvoiceError(error);
     if (context.mounted) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Could not generate the invoice. Please try again.')),
+        const SnackBar(
+          content: Text('Could not generate the invoice. Please try again.'),
+        ),
       );
     }
   }
@@ -114,34 +110,34 @@ class _OrderDetailBody extends StatelessWidget {
     ].any((value) => value != null && value.trim().isNotEmpty);
 
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
       children: [
         if (updateError != null) ...[
           Text(updateError!, style: const TextStyle(color: Colors.redAccent)),
           const SizedBox(height: 10),
         ],
         Card(
-          elevation: 1,
-          color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: const BorderSide(color: Color(0xFF8B261D), width: 0.8),
-          ),
           child: Padding(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                CircleAvatar(
-                  backgroundColor: isStopped
-                      ? Colors.red.withValues(alpha: 0.12)
-                      : const Color(0xFFF2DEDD),
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: isStopped
+                        ? Colors.red.withValues(alpha: 0.12)
+                        : BuyerColors.blush,
+                    shape: BoxShape.circle,
+                  ),
                   child: Icon(
                     isStopped
                         ? Icons.cancel_outlined
                         : normalizedStatus == OrderStatus.delivered
                         ? Icons.check_circle_outline
                         : Icons.local_shipping_outlined,
-                    color: isStopped ? Colors.red : const Color(0xFF8B261D),
+                    size: 22,
+                    color: isStopped ? Colors.red : BuyerColors.maroon,
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -149,23 +145,23 @@ class _OrderDetailBody extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        // Buyers only ever see Confirmed/Delivered (or
-                        // Rejected/Cancelled, unchanged) — not the full
-                        // creator/admin fulfilment pipeline.
+                      // Buyers see Placed / Confirmed / Dispatched /
+                      // Delivered (or Rejected / Cancelled) — not the full
+                      // creator/admin fulfilment pipeline.
+                      BuyerHeading(
                         OrderStatus.buyerLabel(order.status),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF8B261D),
-                        ),
+                        size: 18,
+                        color: isStopped ? Colors.red : BuyerColors.maroonDeep,
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
                       Text(
                         order.updatedAt == null
                             ? 'Placed on ${_date(order.createdAt)}'
                             : 'Last updated ${_dateTime(order.updatedAt!)}',
-                        style: const TextStyle(color: AppColors.mutedText),
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: BuyerColors.muted,
+                        ),
                       ),
                     ],
                   ),
@@ -174,141 +170,77 @@ class _OrderDetailBody extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 14),
         if (isStopped)
           _StoppedOrderCard(order: order)
         else
           _ShipmentTimeline(currentStatus: normalizedStatus),
         if (hasTracking) ...[
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           _TrackingCard(order: order),
         ],
         const SizedBox(height: 22),
-        const Text(
-          'Items',
-          style: TextStyle(
-            fontSize: 19,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF8B261D),
-          ),
-        ),
+        const BuyerHeading('Items'),
         const SizedBox(height: 10),
-        ...order.items.map(
-          (item) => Card(
-            elevation: 1,
-            color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(
-                color: const Color(0xFF8B261D).withValues(alpha: 0.3),
-              ),
-            ),
-            margin: const EdgeInsets.only(bottom: 10),
-            child: ListTile(
-              leading: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox.square(
-                  dimension: 44,
-                  child: item.image.isEmpty
-                      ? const Icon(Icons.inventory_2_outlined, color: Color(0xFF8B261D))
-                      : Image.network(
-                          item.image,
-                          fit: BoxFit.cover,
-                          cacheWidth: 132,
-                          errorBuilder: (_, _, _) => const Icon(
-                            Icons.inventory_2_outlined,
-                            color: Color(0xFF8B261D),
-                          ),
-                        ),
-                ),
-              ),
-              title: Text(
-                item.name,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF8B261D),
-                ),
-              ),
-              subtitle: Text(
-                [
-                  'Quantity: ${item.quantity}  ·  ₹${item.unitPrice} each',
-                  for (final entry in item.customizations.entries)
-                    '${entry.key}: ${entry.value.join(', ')}',
-                ].join('\n'),
-              ),
-              trailing: Text(
-                '₹${item.total}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF8B261D),
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        const Text(
-          'Delivery address',
-          style: TextStyle(
-            fontSize: 19,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF8B261D),
-          ),
-        ),
+        for (final item in order.items)
+          _OrderItemCard(order: order, item: item),
+        const SizedBox(height: 12),
+        const BuyerHeading('Delivery address'),
         const SizedBox(height: 10),
         Card(
-          elevation: 1,
-          color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(
-              color: const Color(0xFF8B261D).withValues(alpha: 0.3),
-            ),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            leading: const Icon(
-              Icons.location_on_outlined,
-              color: Color(0xFF8B261D),
-            ),
-            title: Text(
-              order.deliveryAddress,
-              style: const TextStyle(height: 1.4, color: AppColors.text),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        Card(
-          elevation: 1,
-          color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0xFF8B261D), width: 0.8),
-          ),
           child: Padding(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.location_on_outlined, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    order.deliveryAddress,
+                    style: const TextStyle(
+                      height: 1.45,
+                      color: BuyerColors.body,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 22),
+        const BuyerHeading('Payment summary'),
+        const SizedBox(height: 10),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
             child: Column(
               children: [
                 if (order.subtotal > 0 && order.platformFee > 0) ...[
                   _AmountRow(label: 'Items', amount: order.subtotal),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   _AmountRow(label: 'Platform fee', amount: order.platformFee),
-                  const Divider(height: 20),
+                  const Divider(height: 22),
                 ],
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     const Expanded(
                       child: Text(
                         'Order total',
-                        style: TextStyle(fontSize: 17, color: Color(0xFF2C1810)),
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     Text(
                       '₹${order.total}',
                       style: const TextStyle(
                         fontSize: 21,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF8B261D),
+                        height: 1.1,
+                        fontWeight: FontWeight.w800,
+                        color: BuyerColors.maroon,
                       ),
                     ),
                   ],
@@ -326,6 +258,268 @@ class _OrderDetailBody extends StatelessWidget {
 
   static String _dateTime(DateTime date) =>
       '${_date(date)} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+}
+
+/// One purchased item. Tapping it opens the full item and order info.
+class _OrderItemCard extends StatelessWidget {
+  final BuyerOrder order;
+  final BuyerOrderItem item;
+
+  const _OrderItemCard({required this.order, required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Card(
+        child: InkWell(
+          onTap: () => _showItemSheet(context, order, item),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ItemImage(url: item.image, size: 52, radius: 12),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      BuyerHeading(
+                        item.name,
+                        size: 14.5,
+                        color: BuyerColors.ink,
+                        weight: FontWeight.w700,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        [
+                          'Quantity: ${item.quantity}  ·  ₹${item.unitPrice} each',
+                          for (final entry in item.customizations.entries)
+                            '${entry.key}: ${entry.value.join(', ')}',
+                        ].join('\n'),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          height: 1.4,
+                          color: BuyerColors.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '₹${item.total}',
+                      style: const TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: BuyerColors.maroon,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Icon(
+                      Icons.chevron_right,
+                      size: 20,
+                      color: BuyerColors.muted,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ItemImage extends StatelessWidget {
+  final String url;
+  final double? size;
+  final double radius;
+
+  const _ItemImage({required this.url, required this.radius, this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    const placeholder = ColoredBox(
+      color: BuyerColors.sand,
+      child: Center(child: Icon(Icons.inventory_2_outlined)),
+    );
+    final image = url.isEmpty
+        ? placeholder
+        : Image.network(
+            url,
+            fit: BoxFit.cover,
+            cacheWidth: size == null ? 900 : (size! * 3).round(),
+            errorBuilder: (_, _, _) => placeholder,
+          );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: size == null
+          ? AspectRatio(aspectRatio: 4 / 3, child: image)
+          : SizedBox.square(dimension: size, child: image),
+    );
+  }
+}
+
+Future<void> _showItemSheet(
+  BuildContext context,
+  BuyerOrder order,
+  BuyerOrderItem item,
+) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+    ),
+    builder: (_) => _ItemInfoSheet(order: order, item: item),
+  );
+}
+
+class _ItemInfoSheet extends StatelessWidget {
+  final BuyerOrder order;
+  final BuyerOrderItem item;
+
+  const _ItemInfoSheet({required this.order, required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final shortId = order.id.length > 8
+        ? order.id.substring(order.id.length - 8).toUpperCase()
+        : order.id.toUpperCase();
+    final hasBreakdown = item.baseUnitPrice > 0 && item.customizationPrice > 0;
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _ItemImage(url: item.image, radius: 20),
+            const SizedBox(height: 16),
+            BuyerHeading(item.name, size: 20),
+            const SizedBox(height: 14),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                child: Column(
+                  children: [
+                    _SheetLine(label: 'Quantity', value: '${item.quantity}'),
+                    if (hasBreakdown) ...[
+                      _SheetLine(
+                        label: 'Base price',
+                        value: '₹${item.baseUnitPrice}',
+                      ),
+                      _SheetLine(
+                        label: 'Customisation',
+                        value: '₹${item.customizationPrice}',
+                      ),
+                    ],
+                    _SheetLine(
+                      label: 'Price each',
+                      value: '₹${item.unitPrice}',
+                    ),
+                    _SheetLine(
+                      label: 'Item total',
+                      value: '₹${item.total}',
+                      emphasised: true,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (item.customizations.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              const BuyerHeading('Your customisation'),
+              const SizedBox(height: 10),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                  child: Column(
+                    children: [
+                      for (final entry in item.customizations.entries)
+                        _SheetLine(
+                          label: entry.key,
+                          value: entry.value.join(', '),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 18),
+            const BuyerHeading('Order info'),
+            const SizedBox(height: 10),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                child: Column(
+                  children: [
+                    _SheetLine(label: 'Order', value: '#$shortId'),
+                    _SheetLine(
+                      label: 'Placed on',
+                      value: _OrderDetailBody._date(order.createdAt),
+                    ),
+                    _SheetLine(
+                      label: 'Status',
+                      value: OrderStatus.buyerLabel(order.status),
+                    ),
+                    _SheetLine(
+                      label: 'Deliver to',
+                      value: order.deliveryAddress,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetLine extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool emphasised;
+
+  const _SheetLine({
+    required this.label,
+    required this.value,
+    this.emphasised = false,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 12),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 104,
+          child: Text(label, style: const TextStyle(color: BuyerColors.muted)),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              height: 1.4,
+              fontWeight: emphasised ? FontWeight.w800 : FontWeight.w600,
+              color: emphasised ? BuyerColors.maroon : BuyerColors.ink,
+              fontSize: emphasised ? 15.5 : null,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _ShipmentTimeline extends StatelessWidget {
@@ -351,26 +545,13 @@ class _ShipmentTimeline extends StatelessWidget {
     );
     final bucket = OrderStatus.buyerStatus(currentStatus);
     return Card(
-      elevation: 1,
-      color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: Color(0xFF8B261D), width: 0.8),
-      ),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Order progress',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF8B261D),
-              ),
-            ),
-            const SizedBox(height: 16),
+            const BuyerHeading('Order progress'),
+            const SizedBox(height: 14),
             for (var index = 0; index < _buyerFlow.length; index++)
               _TimelineStep(
                 label: OrderStatus.label(_buyerFlow[index]),
@@ -383,7 +564,7 @@ class _ShipmentTimeline extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF8B261D).withValues(alpha: 0.06),
+                  color: BuyerColors.blush.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Row(
@@ -392,14 +573,18 @@ class _ShipmentTimeline extends StatelessWidget {
                     Icon(
                       Icons.hourglass_top,
                       size: 18,
-                      color: Color(0xFF8B261D),
+                      color: BuyerColors.maroon,
                     ),
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'Your order has been confirmed by the creator. '
                         'Tracking details will be available soon once it ships.',
-                        style: TextStyle(color: Color(0xFF8B261D)),
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.4,
+                          color: BuyerColors.maroonDeep,
+                        ),
                       ),
                     ),
                   ],
@@ -411,7 +596,7 @@ class _ShipmentTimeline extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF8B261D).withValues(alpha: 0.06),
+                  color: BuyerColors.blush.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Row(
@@ -420,14 +605,18 @@ class _ShipmentTimeline extends StatelessWidget {
                     Icon(
                       Icons.local_shipping_outlined,
                       size: 18,
-                      color: Color(0xFF8B261D),
+                      color: BuyerColors.maroon,
                     ),
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'Your order is on its way! You can track it with the '
                         'details provided below.',
-                        style: TextStyle(color: Color(0xFF8B261D)),
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.4,
+                          color: BuyerColors.maroonDeep,
+                        ),
                       ),
                     ),
                   ],
@@ -472,16 +661,14 @@ class _TimelineStep extends StatelessWidget {
                       ? Icons.radio_button_checked
                       : Icons.radio_button_unchecked,
                   size: 20,
-                  color: active ? const Color(0xFF8B261D) : AppColors.outline,
+                  color: active ? BuyerColors.maroon : BuyerColors.goldSoft,
                 ),
                 if (showConnector)
                   Expanded(
                     child: Container(
                       width: 2,
                       margin: const EdgeInsets.symmetric(vertical: 3),
-                      color: isComplete
-                          ? const Color(0xFF8B261D)
-                          : AppColors.outline,
+                      color: isComplete ? BuyerColors.maroon : BuyerColors.line,
                     ),
                   ),
               ],
@@ -490,12 +677,18 @@ class _TimelineStep extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 18),
+              // Room for the connector down to the next step; the last
+              // step ends flush so the card has no trailing gap.
+              padding: EdgeInsets.only(top: 1, bottom: showConnector ? 18 : 0),
               child: Text(
                 label,
                 style: TextStyle(
                   fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
-                  color: active ? const Color(0xFF8B261D) : AppColors.mutedText,
+                  color: isCurrent
+                      ? BuyerColors.maroon
+                      : active
+                      ? BuyerColors.ink
+                      : BuyerColors.muted,
                 ),
               ),
             ),
@@ -514,29 +707,16 @@ class _TrackingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 1,
-      color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: Color(0xFF8B261D), width: 0.8),
-      ),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Row(
               children: [
-                Icon(Icons.pin_drop_outlined, color: Color(0xFF8B261D)),
-                SizedBox(width: 10),
-                Text(
-                  'Tracking details',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF8B261D),
-                  ),
-                ),
+                Icon(Icons.pin_drop_outlined, size: 20),
+                SizedBox(width: 8),
+                Expanded(child: BuyerHeading('Tracking details')),
               ],
             ),
             if (_hasValue(order.carrierName))
@@ -558,15 +738,16 @@ class _TrackingCard extends StatelessWidget {
                   );
                   if (!opened && context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Could not open the tracking page.')),
+                      const SnackBar(
+                        content: Text('Could not open the tracking page.'),
+                      ),
                     );
                   }
                 },
                 icon: const Icon(Icons.open_in_new, size: 18),
                 label: const Text('Track shipment'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF8B261D),
-                  side: const BorderSide(color: Color(0xFF8B261D)),
+                  minimumSize: const Size.fromHeight(44),
                 ),
               ),
             ],
@@ -601,7 +782,9 @@ class _AmountRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      Expanded(child: Text(label, style: const TextStyle(color: AppColors.mutedText))),
+      Expanded(
+        child: Text(label, style: const TextStyle(color: BuyerColors.body)),
+      ),
       Text('₹$amount', style: const TextStyle(fontWeight: FontWeight.w700)),
     ],
   );
@@ -615,29 +798,26 @@ class _TrackingRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 130,
-              child: Text(
-                label,
-                style: const TextStyle(color: AppColors.mutedText),
-              ),
-            ),
-            Expanded(
-              child: SelectableText(
-                value,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF8B261D),
-                ),
-              ),
-            ),
-          ],
+    padding: const EdgeInsets.only(top: 12),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 130,
+          child: Text(label, style: const TextStyle(color: BuyerColors.muted)),
         ),
-      );
+        Expanded(
+          child: SelectableText(
+            value,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: BuyerColors.ink,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _StoppedOrderCard extends StatelessWidget {
@@ -647,53 +827,47 @@ class _StoppedOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Card(
-        elevation: 1,
-        color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: Colors.red, width: 0.8),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.info_outline, color: Colors.red),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      OrderStatus.normalize(order.status) ==
-                              OrderStatus.rejected
-                          ? 'Order rejected by the creator'
-                          : OrderStatus.label(order.status),
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      order.rejectionReason?.trim().isNotEmpty == true
-                          ? (OrderStatus.normalize(order.status) ==
-                                    OrderStatus.rejected
-                                ? 'Reason: ${order.rejectionReason}'
-                                : order.rejectionReason!)
-                          : 'Please contact support if you need more information.',
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      refundStatusLabel(order.refundStatus ?? ''),
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ],
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(20),
+      side: BorderSide(color: Colors.red.withValues(alpha: 0.6)),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline, color: Colors.red),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                BuyerHeading(
+                  OrderStatus.normalize(order.status) == OrderStatus.rejected
+                      ? 'Order rejected by the creator'
+                      : OrderStatus.label(order.status),
+                  size: 16,
+                  color: Colors.red,
                 ),
-              ),
-            ],
+                const SizedBox(height: 6),
+                Text(
+                  order.rejectionReason?.trim().isNotEmpty == true
+                      ? (OrderStatus.normalize(order.status) ==
+                                OrderStatus.rejected
+                            ? 'Reason: ${order.rejectionReason}'
+                            : order.rejectionReason!)
+                      : 'Please contact support if you need more information.',
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  refundStatusLabel(order.refundStatus ?? ''),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
           ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 }

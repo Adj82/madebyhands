@@ -1,14 +1,15 @@
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/material.dart';
+import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/constants/product_categories.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/public_creator.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/explore_storefronts_page.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_empty_state.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_heading.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
 
 class SearchTab extends StatefulWidget {
@@ -141,10 +142,6 @@ class _SearchTabState extends State<SearchTab> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: const Color(0xFFFAF6EE),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => FractionallySizedBox(
           heightFactor: 0.88,
@@ -159,18 +156,11 @@ class _SearchTabState extends State<SearchTab> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Filter by category',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF8B261D),
-                            ),
-                          ),
+                          BuyerHeading('Filter by category', size: 19),
                           SizedBox(height: 4),
                           Text(
                             'Select one or more categories',
-                            style: TextStyle(color: AppColors.mutedText),
+                            style: TextStyle(color: BuyerColors.body),
                           ),
                         ],
                       ),
@@ -178,7 +168,7 @@ class _SearchTabState extends State<SearchTab> {
                     IconButton(
                       tooltip: 'Close filters',
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close, color: Color(0xFF8B261D)),
+                      icon: const Icon(Icons.close),
                     ),
                   ],
                 ),
@@ -197,7 +187,6 @@ class _SearchTabState extends State<SearchTab> {
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       controlAffinity: ListTileControlAffinity.leading,
-                      activeColor: const Color(0xFF8B261D),
                       onChanged: (selected) {
                         setModalState(() {
                           selected == true
@@ -212,16 +201,12 @@ class _SearchTabState extends State<SearchTab> {
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                 decoration: const BoxDecoration(
-                  color: Color(0xFFFAF6EE),
-                  border: Border(top: BorderSide(color: AppColors.outline)),
+                  border: Border(top: BorderSide(color: BuyerColors.line)),
                 ),
                 child: Row(
                   children: [
                     TextButton(
                       onPressed: () => setModalState(draftSelection.clear),
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF8B261D),
-                      ),
                       child: const Text('Clear all'),
                     ),
                     const SizedBox(width: 12),
@@ -230,9 +215,6 @@ class _SearchTabState extends State<SearchTab> {
                         onPressed: () => Navigator.pop(
                           context,
                           Set<String>.from(draftSelection),
-                        ),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF8B261D),
                         ),
                         child: Text(
                           draftSelection.isEmpty
@@ -314,76 +296,63 @@ class _SearchTabState extends State<SearchTab> {
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
                 sliver: SliverList.list(
                   children: [
-                    Text(
-                      'Explore handmade',
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF8B261D),
-                          ),
+                    const BuyerPageHeader(
+                      title: 'Explore handmade',
+                      subtitle: 'Find a piece with a story behind it.',
                     ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Find a piece with a story behind it.',
-                      style: TextStyle(color: AppColors.mutedText),
-                    ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 14),
                     TextField(
                       controller: _searchController,
                       onChanged: (value) => setState(() => _query = value),
-                      decoration: InputDecoration(
-                        prefixIcon: const Icon(
-                          Icons.search,
-                          color: Color(0xFF8B261D),
-                        ),
+                      textInputAction: TextInputAction.search,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search, size: 20),
                         hintText: 'Search products, categories or creators',
-                        filled: true,
-                        fillColor: const Color(
-                          0xFFFAF6EE,
-                        ).withValues(alpha: 0.9),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         OutlinedButton.icon(
                           onPressed: _openCategoryFilter,
-                          icon: const Icon(
-                            Icons.tune,
-                            color: Color(0xFF8B261D),
-                          ),
+                          icon: const Icon(Icons.tune, size: 18),
                           label: Text(
                             _selectedCategories.isEmpty
                                 ? 'Filter'
                                 : 'Filter (${_selectedCategories.length})',
-                            style: const TextStyle(
-                              color: Color(0xFF8B261D),
-                              fontWeight: FontWeight.bold,
-                            ),
                           ),
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFF8B261D)),
-                            minimumSize: const Size(0, 46),
+                            minimumSize: const Size(0, 40),
                             padding: const EdgeInsets.symmetric(horizontal: 16),
+                            side: const BorderSide(
+                              color: BuyerColors.gold,
+                              width: 1.1,
+                            ),
                           ),
                         ),
                         if (_selectedCategories.isNotEmpty) ...[
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 6),
                           TextButton(
                             onPressed: () =>
                                 setState(_selectedCategories.clear),
-                            child: const Text(
-                              'Clear',
-                              style: TextStyle(color: Color(0xFF8B261D)),
-                            ),
+                            child: const Text('Clear'),
                           ),
                         ],
+                        const Spacer(),
+                        Text(
+                          '${products.length} ${products.length == 1 ? 'piece' : 'pieces'}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: BuyerColors.body,
+                          ),
+                        ),
                       ],
                     ),
                     if (_selectedCategories.isNotEmpty) ...[
                       const SizedBox(height: 10),
                       SizedBox(
-                        height: 34,
+                        height: 36,
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
                           itemCount: _selectedCategories.length,
@@ -393,72 +362,49 @@ class _SearchTabState extends State<SearchTab> {
                               index,
                             );
                             return InputChip(
-                              backgroundColor: const Color(0xFFF2DEDD),
+                              backgroundColor: BuyerColors.blush,
                               label: Text(
                                 category,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Color(0xFF8B261D),
-                                  fontWeight: FontWeight.bold,
-                                ),
                               ),
                               onDeleted: () => setState(
                                 () => _selectedCategories.remove(category),
                               ),
-                              deleteIconColor: const Color(0xFF8B261D),
                             );
                           },
                         ),
                       ),
                     ],
-                    const SizedBox(height: 18),
-                    if (_query.trim().isEmpty)
+                    const SizedBox(height: 16),
+                    if (_query.trim().isEmpty) ...[
                       Card(
-                        elevation: 1,
-                        color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: const BorderSide(
-                            color: Color(0xFF8B261D),
-                            width: 1.2,
-                          ),
-                        ),
                         child: ListTile(
                           contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
+                            horizontal: 14,
+                            vertical: 6,
                           ),
                           leading: Container(
                             padding: const EdgeInsets.all(10),
                             decoration: const BoxDecoration(
-                              color: Color(0xFF8B261D),
+                              color: BuyerColors.maroon,
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
                               Icons.storefront,
                               color: Colors.white,
-                              size: 22,
+                              size: 20,
                             ),
                           ),
-                          title: const Text(
-                            'Explore Storefronts by Creators',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: Color(0xFF8B261D),
-                            ),
-                          ),
-                          subtitle: const Text(
-                            'Discover verified artisans & full studio collections',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.mutedText,
+                          title: const Text('Explore Storefronts by Creators'),
+                          subtitle: const Padding(
+                            padding: EdgeInsets.only(top: 3),
+                            child: Text(
+                              'Discover verified artisans & full studio collections',
                             ),
                           ),
                           trailing: const Icon(
-                            Icons.arrow_forward_ios,
-                            size: 16,
-                            color: Color(0xFF8B261D),
+                            Icons.arrow_forward_rounded,
+                            size: 20,
                           ),
                           onTap: () {
                             Navigator.push(
@@ -473,22 +419,17 @@ class _SearchTabState extends State<SearchTab> {
                           },
                         ),
                       ),
-                    if (_query.trim().isEmpty) const SizedBox(height: 20),
+                      const SizedBox(height: 18),
+                    ],
                     if (creators.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Creators',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF8B261D),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ...creators.map(
-                        (creator) => Card(
+                      const BuyerHeading('Creators'),
+                      const SizedBox(height: 10),
+                      for (final creator in creators) ...[
+                        Card(
                           child: ListTile(
                             leading: CircleAvatar(
+                              backgroundColor: BuyerColors.blush,
+                              foregroundColor: BuyerColors.maroon,
                               backgroundImage: creator.profileImage.isNotEmpty
                                   ? NetworkImage(creator.profileImage)
                                   : null,
@@ -512,17 +453,10 @@ class _SearchTabState extends State<SearchTab> {
                                 : () => widget.onCreatorTap!(creator),
                           ),
                         ),
-                      ),
+                        const SizedBox(height: 10),
+                      ],
                       const SizedBox(height: 8),
                     ],
-                    Text(
-                      '${products.length} pieces',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF2C1810),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
                   ],
                 ),
               ),

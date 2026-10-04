@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
 import 'package:madebyhands/core/error/failures.dart';
 import 'package:flutter/services.dart';
 import 'package:madebyhands/core/constants/indian_states.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_empty_state.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_heading.dart';
 
 Future<SavedAddress?> showSavedAddressForm(
   BuildContext context, {
@@ -14,11 +16,11 @@ Future<SavedAddress?> showSavedAddressForm(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
-  backgroundColor: const Color(0xFFFAF6EE),
+  showDragHandle: true,
   builder: (_) => _AddressForm(address: existing),
 );
 
-class SavedAddressesPage extends StatefulWidget {
+class SavedAddressesPage extends StatelessWidget {
   final String userId;
   final BuyerRepository repository;
 
@@ -29,218 +31,194 @@ class SavedAddressesPage extends StatefulWidget {
   });
 
   @override
-  State<SavedAddressesPage> createState() => _SavedAddressesPageState();
+  Widget build(BuildContext context) =>
+      BuyerBackground(child: _SavedAddressesBody(page: this));
 }
 
-class _SavedAddressesPageState extends State<SavedAddressesPage> {
-  late final Stream<List<SavedAddress>> _addresses = widget.repository
-      .watchAddresses(widget.userId);
+/// Holds the page state below [BuyerBackground], so dialogs and sheets opened
+/// from the state's own context inherit the buyer theme.
+class _SavedAddressesBody extends StatefulWidget {
+  final SavedAddressesPage page;
 
-  String get userId => widget.userId;
-  BuyerRepository get repository => widget.repository;
+  const _SavedAddressesBody({required this.page});
+
+  @override
+  State<_SavedAddressesBody> createState() => _SavedAddressesPageState();
+}
+
+class _SavedAddressesPageState extends State<_SavedAddressesBody> {
+  late final Stream<List<SavedAddress>> _addresses = widget.page.repository
+      .watchAddresses(widget.page.userId);
+
+  String get userId => widget.page.userId;
+  BuyerRepository get repository => widget.page.repository;
 
   @override
   Widget build(BuildContext context) {
-    return BuyerBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          title: const Text(
-            'Saved addresses',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF8B261D),
-            ),
-          ),
-          iconTheme: const IconThemeData(color: Color(0xFF8B261D)),
-        ),
-        body: StreamBuilder<List<SavedAddress>>(
-          stream: _addresses,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(
-                child: Text(
-                  'Could not load addresses: ${friendlyErrorMessage(snapshot.error!)}',
-                ),
-              );
-            }
-            if (!snapshot.hasData) {
-              return const Center(
-                child: CircularProgressIndicator(color: Color(0xFF8B261D)),
-              );
-            }
-            final addresses = snapshot.data!;
-            if (addresses.isEmpty) {
-              return const Center(
+    return Scaffold(
+      appBar: AppBar(title: const Text('Saved addresses')),
+      body: StreamBuilder<List<SavedAddress>>(
+        stream: _addresses,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return BuyerEmptyState(
+              icon: Icons.cloud_off_outlined,
+              title: 'Could not load addresses',
+              message: friendlyErrorMessage(snapshot.error!),
+            );
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final addresses = snapshot.data!;
+          if (addresses.isEmpty) {
+            return const BuyerEmptyState(
+              icon: Icons.location_on_outlined,
+              title: 'No saved addresses',
+              message: 'Add an address for quicker checkout.',
+            );
+          }
+          return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+            itemCount: addresses.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final address = addresses[index];
+              return Card(
                 child: Padding(
-                  padding: EdgeInsets.all(32),
+                  padding: const EdgeInsets.fromLTRB(16, 6, 4, 14),
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.location_on_outlined,
-                        size: 64,
-                        color: Color(0xFF8B261D),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_on_outlined,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: BuyerHeading(
+                                    address.label,
+                                    size: 16,
+                                    color: BuyerColors.ink,
+                                    weight: FontWeight.w700,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                                if (address.isDefault) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: BuyerColors.blush,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Text(
+                                      'Default',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: BuyerColors.maroon,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          PopupMenuButton<String>(
+                            tooltip: 'Address options',
+                            icon: const Icon(Icons.more_vert),
+                            onSelected: (value) async {
+                              if (value == 'edit') {
+                                final updated = await showSavedAddressForm(
+                                  context,
+                                  existing: address,
+                                );
+                                if (!context.mounted) return;
+                                if (updated != null) {
+                                  await _saveAddress(context, updated);
+                                }
+                              } else if (value == 'delete') {
+                                await _confirmDelete(context, address);
+                              } else if (value == 'default') {
+                                await _saveAddress(
+                                  context,
+                                  address.copyWith(isDefault: true),
+                                );
+                              }
+                            },
+                            itemBuilder: (_) => [
+                              const PopupMenuItem(
+                                value: 'edit',
+                                child: Text('Edit'),
+                              ),
+                              if (!address.isDefault)
+                                const PopupMenuItem(
+                                  value: 'default',
+                                  child: Text('Make default'),
+                                ),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Text('Delete'),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      SizedBox(height: 16),
-                      Text(
-                        'No saved addresses',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF8B261D),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              address.recipientName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              address.formatted,
+                              style: const TextStyle(
+                                height: 1.45,
+                                color: BuyerColors.body,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              address.phone,
+                              style: const TextStyle(color: BuyerColors.body),
+                            ),
+                          ],
                         ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Add an address for quicker checkout.',
-                        style: TextStyle(color: AppColors.mutedText),
                       ),
                     ],
                   ),
                 ),
               );
-            }
-            return ListView.separated(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-              itemCount: addresses.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final address = addresses[index];
-                return Card(
-                  elevation: 1,
-                  color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    side: const BorderSide(
-                      color: Color(0xFF8B261D),
-                      width: 0.8,
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                    address.label,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF8B261D),
-                                    ),
-                                  ),
-                                  ),
-                                  if (address.isDefault) ...[
-                                    const SizedBox(width: 8),
-                                    const Chip(
-                                      backgroundColor: Color(0xFFF2DEDD),
-                                      label: Text(
-                                        'Default',
-                                        style: TextStyle(
-                                          color: Color(0xFF8B261D),
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            PopupMenuButton<String>(
-                              icon: const Icon(
-                                Icons.more_vert,
-                                color: Color(0xFF8B261D),
-                              ),
-                              onSelected: (value) async {
-                                if (value == 'edit') {
-                                  final updated = await showSavedAddressForm(
-                                    context,
-                                    existing: address,
-                                  );
-                                  if (!context.mounted) return;
-                                  if (updated != null) {
-                                    await _saveAddress(context, updated);
-                                  }
-                                } else if (value == 'delete') {
-                                  await _confirmDelete(context, address);
-                                } else if (value == 'default') {
-                                  await _saveAddress(
-                                    context,
-                                    address.copyWith(isDefault: true),
-                                  );
-                                }
-                              },
-                              itemBuilder: (_) => [
-                                const PopupMenuItem(
-                                  value: 'edit',
-                                  child: Text('Edit'),
-                                ),
-                                if (!address.isDefault)
-                                  const PopupMenuItem(
-                                    value: 'default',
-                                    child: Text('Make default'),
-                                  ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Text('Delete'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        Text(
-                          address.recipientName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF8B261D),
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          address.formatted,
-                          style: const TextStyle(
-                            height: 1.4,
-                            color: AppColors.mutedText,
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          address.phone,
-                          style: const TextStyle(color: AppColors.mutedText),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-        ),
-        floatingActionButton: FloatingActionButton.extended(
-          heroTag: null,
-          backgroundColor: const Color(0xFF8B261D),
-          foregroundColor: Colors.white,
-          onPressed: () async {
-            final address = await showSavedAddressForm(context);
-            if (!context.mounted) return;
-            if (address != null) {
-              await _saveAddress(context, address);
-            }
-          },
-          icon: const Icon(Icons.add),
-          label: const Text('Add address'),
-        ),
+            },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: null,
+        onPressed: () async {
+          final address = await showSavedAddressForm(context);
+          if (!context.mounted) return;
+          if (address != null) {
+            await _saveAddress(context, address);
+          }
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Add address'),
       ),
     );
   }
@@ -253,11 +231,7 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
         await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            backgroundColor: const Color(0xFFFAF6EE),
-            title: const Text(
-              'Delete address?',
-              style: TextStyle(color: Color(0xFF8B261D)),
-            ),
+            title: const Text('Delete address?'),
             content: Text('Remove your ${address.label} address?'),
             actions: [
               TextButton(
@@ -266,9 +240,6 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF8B261D),
-                ),
                 child: const Text('Delete'),
               ),
             ],
@@ -281,7 +252,11 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
     } catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not delete address: ${friendlyErrorMessage(error)}')),
+        SnackBar(
+          content: Text(
+            'Could not delete address: ${friendlyErrorMessage(error)}',
+          ),
+        ),
       );
     }
   }
@@ -291,10 +266,12 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
       await repository.saveAddress(userId, address);
     } catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        SnackBar(content: Text('Could not save address: ${friendlyErrorMessage(error)}')),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not save address: ${friendlyErrorMessage(error)}',
+          ),
+        ),
       );
     }
   }
@@ -343,7 +320,14 @@ class _AddressFormState extends State<_AddressForm> {
 
   @override
   void dispose() {
-    for (final controller in [_label, _name, _phone, _line, _city, _postalCode]) {
+    for (final controller in [
+      _label,
+      _name,
+      _phone,
+      _line,
+      _city,
+      _postalCode,
+    ]) {
       controller.dispose();
     }
     super.dispose();
@@ -354,7 +338,7 @@ class _AddressFormState extends State<_AddressForm> {
     return Padding(
       padding: EdgeInsets.fromLTRB(
         20,
-        12,
+        0,
         20,
         MediaQuery.viewInsetsOf(context).bottom + 20,
       ),
@@ -363,15 +347,11 @@ class _AddressFormState extends State<_AddressForm> {
         child: ListView(
           shrinkWrap: true,
           children: [
-            Text(
+            BuyerHeading(
               widget.address == null ? 'Add address' : 'Edit address',
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF8B261D),
-              ),
+              size: 21,
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
             _field(
               _label,
               'Label (Home, Work)',
@@ -399,7 +379,9 @@ class _AddressFormState extends State<_AddressForm> {
               validator: (v) {
                 final digits = v?.replaceAll(RegExp(r'\D'), '') ?? '';
                 if (digits.isEmpty) return 'Required';
-                if (digits.length != 10) return 'Must be a 10-digit mobile number';
+                if (digits.length != 10) {
+                  return 'Must be a 10-digit mobile number';
+                }
                 return null;
               },
             ),
@@ -407,11 +389,14 @@ class _AddressFormState extends State<_AddressForm> {
               _line,
               'Address line',
               inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\s,./#-]')),
+                FilteringTextInputFormatter.allow(
+                  RegExp(r'[a-zA-Z0-9\s,./#-]'),
+                ),
                 LengthLimitingTextInputFormatter(150),
               ],
             ),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: _field(
@@ -430,10 +415,7 @@ class _AddressFormState extends State<_AddressForm> {
                     child: DropdownButtonFormField<String>(
                       initialValue: _state,
                       isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'State',
-                        labelStyle: TextStyle(color: Color(0xFF8B261D)),
-                      ),
+                      decoration: const InputDecoration(labelText: 'State'),
                       items: kIndianStatesAndUnionTerritories
                           .map(
                             (name) => DropdownMenuItem(
@@ -469,23 +451,13 @@ class _AddressFormState extends State<_AddressForm> {
               },
             ),
             SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              activeThumbColor: const Color(0xFF8B261D),
-              title: const Text(
-                'Make this my default address',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
+              contentPadding: const EdgeInsets.only(left: 4),
+              title: const Text('Make this my default address'),
               value: _isDefault,
               onChanged: (value) => setState(() => _isDefault = value),
             ),
-            const SizedBox(height: 10),
-            FilledButton(
-              onPressed: _submit,
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF8B261D),
-              ),
-              child: const Text('Save address'),
-            ),
+            const SizedBox(height: 8),
+            FilledButton(onPressed: _submit, child: const Text('Save address')),
           ],
         ),
       ),
@@ -499,19 +471,17 @@ class _AddressFormState extends State<_AddressForm> {
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          inputFormatters: inputFormatters,
-          decoration: InputDecoration(
-            labelText: label,
-            labelStyle: const TextStyle(color: Color(0xFF8B261D)),
-          ),
-          validator: validator ??
-              (value) => value == null || value.trim().isEmpty ? 'Required' : null,
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: 12),
+    child: TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      decoration: InputDecoration(labelText: label),
+      validator:
+          validator ??
+          (value) => value == null || value.trim().isEmpty ? 'Required' : null,
+    ),
+  );
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;

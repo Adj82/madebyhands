@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
 import 'package:intl/intl.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/buyer_product_notification.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_heading.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_empty_state.dart';
 
 class BuyerNotificationsPage extends StatefulWidget {
@@ -47,27 +48,15 @@ class _BuyerNotificationsPageState extends State<BuyerNotificationsPage> {
     );
     return BuyerBackground(
       child: Scaffold(
-        backgroundColor: Colors.transparent,
         appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          title: const Text(
-            'Notifications',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF8B261D),
-            ),
-          ),
-          iconTheme: const IconThemeData(color: Color(0xFF8B261D)),
+          title: const Text('Notifications'),
           actions: [
             if (hasUnread)
               TextButton(
                 onPressed: _markAllRead,
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF8B261D),
-                ),
                 child: const Text('Mark all read'),
               ),
+            const SizedBox(width: 8),
           ],
         ),
         body: widget.notifications.isEmpty
@@ -78,37 +67,35 @@ class _BuyerNotificationsPageState extends State<BuyerNotificationsPage> {
                     'When creators publish in categories you have wishlisted or purchased from, they will appear here.',
               )
             : ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
                 itemCount: widget.notifications.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final notification = widget.notifications[index];
-                  final isRead =
-                      _readNotificationIds.contains(notification.id);
-                  return Material(
-                    color: isRead
-                        ? const Color(0xFFFAF6EE).withValues(alpha: 0.9)
-                        : const Color(0xFFF2DEDD).withValues(alpha: 0.95),
-                    borderRadius: BorderRadius.circular(18),
+                  final isRead = _readNotificationIds.contains(notification.id);
+                  return Card(
+                    color: isRead ? null : BuyerColors.blush,
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(18),
                       onTap: () => _openNotification(notification),
                       child: Padding(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(14),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             CircleAvatar(
-                              backgroundColor: const Color(0xFF8B261D)
-                                  .withValues(alpha: 0.14),
-                              foregroundColor: const Color(0xFF8B261D),
+                              radius: 19,
+                              backgroundColor: isRead
+                                  ? BuyerColors.blush
+                                  : BuyerColors.card,
+                              foregroundColor: BuyerColors.maroon,
                               child: Icon(
+                                size: 20,
                                 notification.type == BuyerNotificationType.order
                                     ? Icons.local_shipping_outlined
                                     : Icons.new_releases_outlined,
                               ),
                             ),
-                            const SizedBox(width: 14),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -116,20 +103,18 @@ class _BuyerNotificationsPageState extends State<BuyerNotificationsPage> {
                                   Row(
                                     children: [
                                       Expanded(
-                                        child: Text(
+                                        child: BuyerHeading(
                                           notification.title,
-                                          style: TextStyle(
-                                            fontWeight: isRead
-                                                ? FontWeight.w700
-                                                : FontWeight.w900,
-                                            color: const Color(0xFF8B261D),
-                                          ),
+                                          size: 15,
+                                          color: isRead
+                                              ? BuyerColors.ink
+                                              : BuyerColors.maroonDeep,
                                         ),
                                       ),
                                       if (!isRead)
                                         const CircleAvatar(
                                           radius: 4,
-                                          backgroundColor: Color(0xFF8B261D),
+                                          backgroundColor: BuyerColors.maroon,
                                         ),
                                     ],
                                   ),
@@ -137,8 +122,9 @@ class _BuyerNotificationsPageState extends State<BuyerNotificationsPage> {
                                   Text(
                                     notification.message,
                                     style: const TextStyle(
-                                      color: AppColors.mutedText,
-                                      height: 1.35,
+                                      fontSize: 12.5,
+                                      color: BuyerColors.body,
+                                      height: 1.4,
                                     ),
                                   ),
                                   const SizedBox(height: 8),
@@ -147,18 +133,15 @@ class _BuyerNotificationsPageState extends State<BuyerNotificationsPage> {
                                       'dd MMM yyyy, hh:mm a',
                                     ).format(notification.publishedAt),
                                     style: const TextStyle(
-                                      color: AppColors.mutedText,
-                                      fontSize: 12,
+                                      color: BuyerColors.muted,
+                                      fontSize: 11.5,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            const Icon(
-                              Icons.chevron_right,
-                              color: Color(0xFF8B261D),
-                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.chevron_right, size: 20),
                           ],
                         ),
                       ),

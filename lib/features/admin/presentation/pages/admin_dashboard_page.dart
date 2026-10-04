@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_cubit.dart';
+import 'package:madebyhands/features/admin/presentation/views/admin_logs_view.dart';
 import 'package:madebyhands/features/admin/presentation/views/admin_settings_view.dart';
 import 'package:madebyhands/features/admin/presentation/views/category_management_view.dart';
 import 'package:madebyhands/features/admin/presentation/views/finance_view.dart';
@@ -98,6 +99,16 @@ const _sections = <_AdminSection>[
     icon: Icons.settings_outlined,
     selectedIcon: Icons.settings,
     view: AdminSettingsView(),
+  ),
+  // Appended after Settings so the indices the notification bell navigates
+  // to (1, 2, 4, 6) stay valid.
+  _AdminSection(
+    title: 'Activity Logs',
+    menuLabel: 'Activity Logs',
+    icon: Icons.history,
+    selectedIcon: Icons.history,
+    view: AdminLogsView(),
+    superAdminOnly: true,
   ),
 ];
 

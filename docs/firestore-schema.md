@@ -145,6 +145,26 @@ admins only; read by checkout and the payment API (defaults 50, 5, and 999
 respectively). All three are editable from Admin → Settings → Platform
 economics.
 
+## Admin activity log — `admin_logs/{id}`
+
+Append-only record of what admins and managers changed. Written from the admin
+panel by the acting admin; only super admins can read it; entries can never be
+edited or deleted (see `firestore.rules`).
+
+- `actorUid`, `actorName`, `actorEmail`, `actorRole` — who did it
+- `action` — stable key such as `creator.verified`, `creator.rejected`,
+  `creator.revoked`, `product.approved`, `product.rejected`, `category.added`,
+  `category.deleted`, `category.reset`, `user.suspended`, `user.reinstated`,
+  `settings.fees_updated`, `order.rejected`, `order.refund_retried`,
+  `payout.released`, `access.granted`, `access.role_changed`
+- `category` — `creator` | `product` | `order` | `payout` | `category` | `user` |
+  `access` | `settings` (drives the filter chips)
+- `summary` — plain-language sentence shown in the log
+- `targetId` — id of the affected document, when there is one
+- `createdAt` — server timestamp
+
+Logging is best-effort: a failed log write never blocks the admin action.
+
 ## Deployment note
 
 `firestore.rules` is load-bearing. Deploy it together with the API:

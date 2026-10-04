@@ -10,10 +10,15 @@ class SupportCenterPage extends StatefulWidget {
   final UserEntity user;
   final SupportRepository repository;
 
+  /// Wraps the conversation page this screen pushes, so a panel with its own
+  /// look (the buyer's parchment theme) carries it onto that route too.
+  final Widget Function(Widget page)? pageWrapper;
+
   const SupportCenterPage({
     super.key,
     required this.user,
     required this.repository,
+    this.pageWrapper,
   });
 
   @override
@@ -71,12 +76,15 @@ class _SupportCenterPageState extends State<SupportCenterPage> {
               ticket: tickets[index],
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => SupportConversationPage(
-                    ticket: tickets[index],
-                    repository: widget.repository,
-                    senderId: widget.user.uid,
-                    senderRole: widget.user.role,
-                  ),
+                  builder: (_) {
+                    final page = SupportConversationPage(
+                      ticket: tickets[index],
+                      repository: widget.repository,
+                      senderId: widget.user.uid,
+                      senderRole: widget.user.role,
+                    );
+                    return widget.pageWrapper?.call(page) ?? page;
+                  },
                 ),
               ),
             ),
@@ -198,7 +206,9 @@ class SupportTicketTile extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
-          showRequester ? '$requester\n${ticket.lastMessage}' : ticket.lastMessage,
+          showRequester
+              ? '$requester\n${ticket.lastMessage}'
+              : ticket.lastMessage,
           maxLines: showRequester ? 2 : 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
@@ -264,7 +274,9 @@ class _SupportConversationPageState extends State<SupportConversationPage> {
       setState(() => _isOpen = false);
       messenger.showSnackBar(const SnackBar(content: Text('Ticket resolved.')));
     } catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(friendlyErrorMessage(error))),
+      );
     }
   }
 
@@ -282,7 +294,9 @@ class _SupportConversationPageState extends State<SupportConversationPage> {
       );
       _message.clear();
     } catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(friendlyErrorMessage(error))),
+      );
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -328,6 +342,7 @@ class _SupportConversationPageState extends State<SupportConversationPage> {
                   itemBuilder: (context, index) {
                     final item = messages[messages.length - 1 - index];
                     final mine = _isMine(item);
+                    final colors = Theme.of(context).colorScheme;
                     return Align(
                       alignment: mine
                           ? Alignment.centerRight
@@ -338,8 +353,11 @@ class _SupportConversationPageState extends State<SupportConversationPage> {
                         ),
                         child: Card(
                           color: mine
-                              ? AppColors.primary.withValues(alpha: 0.12)
-                              : AppColors.surface,
+                              ? Color.alphaBlend(
+                                  colors.primary.withValues(alpha: 0.12),
+                                  colors.surface,
+                                )
+                              : colors.surface,
                           child: Padding(
                             padding: const EdgeInsets.all(12),
                             child: Column(
@@ -350,17 +368,18 @@ class _SupportConversationPageState extends State<SupportConversationPage> {
                                     item.senderRole == 'admin'
                                         ? 'MadeByHands support'
                                         : widget.ticket.userName,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
-                                      color: AppColors.primary,
+                                      color: colors.primary,
                                     ),
                                   ),
                                 Text(item.message),
                                 const SizedBox(height: 4),
                                 Text(
-                                  DateFormat('dd MMM, hh:mm a')
-                                      .format(item.createdAt),
+                                  DateFormat(
+                                    'dd MMM, hh:mm a',
+                                  ).format(item.createdAt),
                                   style: const TextStyle(
                                     fontSize: 10,
                                     color: AppColors.mutedText,
@@ -400,6 +419,14 @@ class _SupportConversationPageState extends State<SupportConversationPage> {
                     IconButton.filled(
                       tooltip: 'Send',
                       onPressed: _sending ? null : _send,
+                      // Explicit, because an ambient IconTheme colour (the
+                      // buyer theme sets one) otherwise replaces the filled
+                      // button's default foreground.
+                      style: IconButton.styleFrom(
+                        foregroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onPrimary,
+                      ),
                       icon: const Icon(Icons.send),
                     ),
                   ],

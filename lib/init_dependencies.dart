@@ -8,6 +8,8 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:madebyhands/features/admin/data/datasources/admin_remote_data_source.dart';
 import 'package:madebyhands/features/admin/data/repositories/admin_repository_impl.dart';
+import 'package:madebyhands/features/admin/data/repositories/firestore_admin_log_repository.dart';
+import 'package:madebyhands/features/admin/domain/repositories/admin_log_repository.dart';
 import 'package:madebyhands/features/admin/domain/repositories/admin_repository.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_cubit.dart';
@@ -139,7 +141,22 @@ void _initAdmin() {
   // Cubit/Bloc
   serviceLocator.registerFactory(() => AdminCubit());
 
+  // The activity log records who did what, so it reads the signed-in user at
+  // the moment of each action rather than capturing one at start-up.
+  serviceLocator.registerLazySingleton<AdminLogRepository>(
+    () => FirestoreAdminLogRepository(
+      firestore: serviceLocator(),
+      currentUser: () {
+        final state = serviceLocator<AuthBloc>().state;
+        return state is AuthSuccess ? state.user : null;
+      },
+    ),
+  );
+
   serviceLocator.registerLazySingleton(
-    () => AdminBloc(adminRepository: serviceLocator()),
+    () => AdminBloc(
+      adminRepository: serviceLocator(),
+      logRepository: serviceLocator(),
+    ),
   );
 }

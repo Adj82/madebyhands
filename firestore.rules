@@ -280,6 +280,21 @@ service cloud.firestore {
 
     // ------------------------------------------------------ account deletions
 
+    // Admin activity log: one append-only entry per change an admin or manager
+    // makes in the panel. Written by the acting admin themselves (never on
+    // someone else's behalf), readable only by super admins, and immutable.
+    match /admin_logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow create: if isAdminOrManager() &&
+        request.resource.data.actorUid == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.keys().hasOnly([
+          'actorUid', 'actorName', 'actorEmail', 'actorRole',
+          'action', 'category', 'summary', 'targetId', 'createdAt'
+        ]);
+      allow update, delete: if false;
+    }
+
     // A one-way log of why someone deleted their account, written by the
     // departing user themselves just before their account is removed.
     // Write-only from the client: nobody can read, edit, or delete these

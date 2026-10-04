@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:madebyhands/core/error/failures.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/buyer_order.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/order_detail_page.dart';
+import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_empty_state.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_heading.dart';
 import 'package:madebyhands/features/orders/domain/order_status.dart';
 
 class OrderHistoryPage extends StatefulWidget {
@@ -32,60 +34,39 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
     final userId = widget.userId;
     return BuyerBackground(
       child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          title: const Text(
-            'My orders',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF8B261D),
-            ),
-          ),
-          iconTheme: const IconThemeData(color: Color(0xFF8B261D)),
-        ),
+        appBar: AppBar(title: const Text('My orders')),
         body: StreamBuilder<List<BuyerOrder>>(
           stream: _orders,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
-              return _OrderMessage(
+              return BuyerEmptyState(
                 icon: Icons.cloud_off_outlined,
                 title: 'Could not load orders',
                 message: friendlyErrorMessage(snapshot.error!),
               );
             }
             if (!snapshot.hasData) {
-              return const Center(
-                child: CircularProgressIndicator(color: Color(0xFF8B261D)),
-              );
+              return const Center(child: CircularProgressIndicator());
             }
             final orders = snapshot.data!;
             if (orders.isEmpty) {
-              return const _OrderMessage(
+              return const BuyerEmptyState(
                 icon: Icons.receipt_long_outlined,
                 title: 'No orders yet',
                 message: 'Your completed purchases will appear here.',
               );
             }
             return ListView.separated(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
               itemCount: orders.length,
               separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final order = orders[index];
+                final showRefund =
+                    order.refundStatus != null ||
+                    OrderStatus.isRejectedOrCancelled(order.status);
                 return Card(
-                  elevation: 1,
-                  color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    side: const BorderSide(
-                      color: Color(0xFF8B261D),
-                      width: 0.8,
-                    ),
-                  ),
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => OrderDetailPage(
@@ -102,34 +83,37 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                       ),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
                               Expanded(
-                                child: Text(
+                                child: BuyerHeading(
                                   'Order #${order.id.length > 8 ? order.id.substring(order.id.length - 8).toUpperCase() : order.id.toUpperCase()}',
+                                  size: 16,
+                                  color: BuyerColors.ink,
+                                  weight: FontWeight.w700,
                                   maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF8B261D),
-                                  ),
                                 ),
                               ),
+                              const SizedBox(width: 8),
                               _StatusChip(status: order.status),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           Text(
-                            _date(order.createdAt),
-                            style: const TextStyle(color: AppColors.mutedText),
+                            order.updatedAt == null
+                                ? 'Placed ${_date(order.createdAt)}'
+                                : 'Placed ${_date(order.createdAt)}  ·  Updated ${_dateTime(order.updatedAt!)}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: BuyerColors.muted,
+                            ),
                           ),
-                          if (order.refundStatus != null ||
-                              OrderStatus.isRejectedOrCancelled(order.status)) ...[
-                            const SizedBox(height: 3),
+                          if (showRefund) ...[
+                            const SizedBox(height: 4),
                             Text(
                               refundStatusLabel(order.refundStatus ?? ''),
                               style: TextStyle(
@@ -141,17 +125,7 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                               ),
                             ),
                           ],
-                          if (order.updatedAt != null) ...[
-                            const SizedBox(height: 3),
-                            Text(
-                              'Updated ${_dateTime(order.updatedAt!)}',
-                              style: const TextStyle(
-                                color: AppColors.mutedText,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                          const Divider(height: 26),
+                          const Divider(height: 22),
                           Row(
                             children: [
                               Expanded(
@@ -159,22 +133,19 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                                   '${order.items.length} ${order.items.length == 1 ? 'item' : 'items'}',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w600,
+                                    color: BuyerColors.body,
                                   ),
                                 ),
                               ),
                               Text(
                                 '₹${order.total}',
                                 style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF8B261D),
+                                  fontSize: 16.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: BuyerColors.maroon,
                                 ),
                               ),
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.chevron_right,
-                                color: Color(0xFF8B261D),
-                              ),
+                              const Icon(Icons.chevron_right, size: 22),
                             ],
                           ),
                         ],
@@ -204,69 +175,29 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Buyers only ever see Confirmed / Delivered / Rejected / Cancelled —
-    // the full creator/admin fulfilment pipeline stays internal.
+    // Buyers see Placed / Confirmed / Dispatched / Delivered (or Rejected /
+    // Cancelled) — the full creator/admin fulfilment pipeline stays internal.
     final bucket = OrderStatus.buyerStatus(status);
     final color = switch (bucket) {
       OrderStatus.delivered => Colors.green.shade800,
       OrderStatus.rejected || OrderStatus.cancelled => Colors.red.shade800,
-      _ => const Color(0xFF8B261D),
+      _ => BuyerColors.maroon,
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
       child: Text(
         OrderStatus.buyerLabel(status),
         style: TextStyle(
           color: color,
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
+          fontSize: 11.5,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
   }
-}
-
-class _OrderMessage extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String message;
-
-  const _OrderMessage({
-    required this.icon,
-    required this.title,
-    required this.message,
-  });
-
-  @override
-  Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 64, color: const Color(0xFF8B261D)),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF8B261D),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.mutedText),
-              ),
-            ],
-          ),
-        ),
-      );
 }

@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/public_creator.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/public_creator_storefront_page.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_empty_state.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_heading.dart';
 
 class ExploreStorefrontsPage extends StatefulWidget {
   final String userId;
@@ -45,22 +46,10 @@ class _ExploreStorefrontsPageState extends State<ExploreStorefrontsPage> {
   Widget build(BuildContext context) {
     return BuyerBackground(
       child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          title: const Text(
-            'Creator Storefronts',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF8B261D),
-            ),
-          ),
-          iconTheme: const IconThemeData(color: Color(0xFF8B261D)),
-          centerTitle: true,
-        ),
+        appBar: AppBar(title: const Text('Creator Storefronts')),
         body: BlocBuilder<BuyerBloc, BuyerState>(
-          buildWhen: (previous, current) => previous.creators != current.creators,
+          buildWhen: (previous, current) =>
+              previous.creators != current.creators,
           builder: (context, state) {
             final query = _searchQuery.trim().toLowerCase();
 
@@ -79,17 +68,13 @@ class _ExploreStorefrontsPageState extends State<ExploreStorefrontsPage> {
             return Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
                   child: TextField(
                     onChanged: (value) => setState(() => _searchQuery = value),
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(
-                        Icons.search,
-                        color: Color(0xFF8B261D),
-                      ),
+                    textInputAction: TextInputAction.search,
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search, size: 20),
                       hintText: 'Search by creator, studio or location...',
-                      filled: true,
-                      fillColor: const Color(0xFFFAF6EE).withValues(alpha: 0.9),
                     ),
                   ),
                 ),
@@ -98,17 +83,18 @@ class _ExploreStorefrontsPageState extends State<ExploreStorefrontsPage> {
                       ? const BuyerEmptyState(
                           icon: Icons.storefront_outlined,
                           title: 'No storefronts found',
-                          message: 'Try searching for another creator or location.',
+                          message:
+                              'Try searching for another creator or location.',
                         )
                       : RefreshIndicator(
                           onRefresh: () async {
                             context.read<BuyerBloc>().add(BuyerWatchCreators());
                           },
                           child: ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
                             itemCount: eligibleCreators.length,
                             separatorBuilder: (_, _) =>
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 12),
                             itemBuilder: (context, index) {
                               final creator = eligibleCreators[index];
                               return _StorefrontCard(
@@ -137,146 +123,136 @@ class _StorefrontCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 1,
-      color: const Color(0xFFFAF6EE).withValues(alpha: 0.92),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: Color(0xFF8B261D), width: 0.8),
-      ),
-      child: ListTile(
+      child: InkWell(
         onTap: onTap,
-        contentPadding: const EdgeInsets.all(16),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: const Color(0xFFF2DEDD),
-                  backgroundImage: creator.profileImage.isNotEmpty
-                      ? NetworkImage(creator.profileImage)
-                      : null,
-                  child: creator.profileImage.isEmpty
-                      ? const Icon(
-                          Icons.storefront,
-                          size: 26,
-                          color: Color(0xFF8B261D),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              creator.displayName,
-                              style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF8B261D),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (creator.isVerified) ...[
-                            const SizedBox(width: 5),
-                            const Icon(
-                              Icons.verified,
-                              color: Color(0xFF8B261D),
-                              size: 18,
-                            ),
-                          ],
-                        ],
-                      ),
-                      if (creator.name.isNotEmpty &&
-                          creator.name != creator.displayName) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          'By ${creator.name}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.mutedText,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          if (creator.location.isNotEmpty)
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: BuyerColors.blush,
+                    backgroundImage: creator.profileImage.isNotEmpty
+                        ? NetworkImage(creator.profileImage)
+                        : null,
+                    child: creator.profileImage.isEmpty
+                        ? const Icon(Icons.storefront, size: 24)
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
                             Flexible(
-                              child: Text(
-                                creator.location,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.mutedText,
-                                ),
+                              child: BuyerHeading(
+                                creator.displayName,
+                                size: 16,
+                                color: BuyerColors.ink,
+                                weight: FontWeight.w700,
                                 maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            if (creator.isVerified) ...[
+                              const SizedBox(width: 5),
+                              const Icon(Icons.verified, size: 16),
+                            ],
+                          ],
+                        ),
+                        if (creator.name.isNotEmpty &&
+                            creator.name != creator.displayName) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'By ${creator.name}',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: BuyerColors.body,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ],
-                      ),
-                    ],
+                        if (creator.location.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              const Icon(Icons.location_on, size: 13),
+                              const SizedBox(width: 3),
+                              Flexible(
+                                child: Text(
+                                  creator.location,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: BuyerColors.muted,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
+              if (creator.bio.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  creator.bio,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    height: 1.4,
+                    color: BuyerColors.body,
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: Color(0xFF8B261D)),
               ],
-            ),
-            if (creator.bio.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                creator.bio,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 13,
-                  height: 1.35,
-                  color: AppColors.text,
-                ),
-              ),
-            ],
-            if (creator.portfolio.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 64,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: creator.portfolio.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    return ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        creator.portfolio[index],
-                        width: 64,
-                        height: 64,
-                        cacheWidth: 192,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
+              if (creator.portfolio.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 64,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: creator.portfolio.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          creator.portfolio[index],
                           width: 64,
                           height: 64,
-                          color: AppColors.outline,
-                          child: const Icon(
-                            Icons.image_not_supported_outlined,
-                            size: 18,
-                            color: AppColors.mutedText,
+                          cacheWidth: 192,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Container(
+                            width: 64,
+                            height: 64,
+                            color: BuyerColors.sand,
+                            child: const Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 18,
+                              color: BuyerColors.muted,
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

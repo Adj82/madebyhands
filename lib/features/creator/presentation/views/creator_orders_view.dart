@@ -365,10 +365,114 @@ class _OrderDetailSheet extends StatelessWidget {
       _showDispatchDialog(context);
       return;
     }
+    if (nextStatus == OrderStatus.delivered) {
+      _showDeliveredDialog(context);
+      return;
+    }
     context.read<CreatorBloc>().add(
       CreatorUpdateOrderStatus(orderId: order.id, status: nextStatus),
     );
     Navigator.pop(context);
+  }
+
+  /// Marking an order delivered releases the creator's payout, so — like
+  /// dispatch — it needs an explicit confirmation that it is really true.
+  Future<void> _showDeliveredDialog(BuildContext context) async {
+    final bloc = context.read<CreatorBloc>();
+    final navigator = Navigator.of(context);
+    bool acknowledged = false;
+    bool showAcknowledgeError = false;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          scrollable: true,
+          title: const Text('Confirm delivery'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'The buyer is told their order has arrived, and your payout '
+                'becomes ready for release.',
+                style: TextStyle(fontSize: 12, color: AppColors.mutedText),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.red, size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Only mark this order as delivered if it has actually '
+                        'reached the buyer. Marking an order delivered before the '
+                        'courier has handed it over, or when it was not delivered '
+                        'in good condition, may result in your payout being '
+                        'withheld.',
+                        style: TextStyle(fontSize: 12.5, color: Colors.red, height: 1.3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              CheckboxListTile(
+                value: acknowledged,
+                onChanged: (value) => setDialogState(() {
+                  acknowledged = value ?? false;
+                  if (acknowledged) showAcknowledgeError = false;
+                }),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text(
+                  'I confirm this order has been delivered to the buyer and '
+                  'the product reached them genuine and in good condition.',
+                  style: TextStyle(fontSize: 12.5),
+                ),
+              ),
+              if (showAcknowledgeError)
+                const Padding(
+                  padding: EdgeInsets.only(left: 12),
+                  child: Text(
+                    'Please confirm the statement above to continue.',
+                    style: TextStyle(fontSize: 12, color: Colors.red),
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (!acknowledged) {
+                  setDialogState(() => showAcknowledgeError = true);
+                  return;
+                }
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text('Mark delivered'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+    bloc.add(
+      CreatorUpdateOrderStatus(orderId: order.id, status: OrderStatus.delivered),
+    );
+    navigator.pop();
   }
 
   Future<void> _showDispatchDialog(BuildContext context) async {

@@ -1,5 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:madebyhands/features/admin/domain/entities/admin_log_entry.dart';
+import 'package:madebyhands/features/admin/domain/repositories/admin_log_repository.dart';
 import 'package:madebyhands/features/admin/domain/repositories/admin_repository.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 
@@ -11,10 +13,14 @@ part 'admin_state.dart';
 /// creator onboarding and listing forms also read).
 class AdminBloc extends Bloc<AdminEvent, AdminState> {
   final AdminRepository _adminRepository;
+  final AdminLogRepository _logs;
 
-  AdminBloc({required AdminRepository adminRepository})
-    : _adminRepository = adminRepository,
-      super(const AdminState()) {
+  AdminBloc({
+    required AdminRepository adminRepository,
+    required AdminLogRepository logRepository,
+  }) : _adminRepository = adminRepository,
+       _logs = logRepository,
+       super(const AdminState()) {
     on<AdminLoadDataRequested>(_onLoadDataRequested);
     on<AdminCategoriesRequested>(_onCategoriesRequested);
     on<AdminApproveCreatorRequested>(_onApproveCreatorRequested);
@@ -27,6 +33,22 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     on<AdminProductReviewRequested>(_onProductReviewRequested);
   }
 
+  /// Name to show in the activity log for a creator, falling back to the id.
+  String _creatorLabel(String uid) {
+    for (final profile in state.creatorProfiles) {
+      if (profile.uid != uid) continue;
+      final name = profile.name.trim();
+      final business = profile.businessName.trim();
+      if (name.isNotEmpty && business.isNotEmpty) return '$name ($business)';
+      if (name.isNotEmpty) return name;
+      if (business.isNotEmpty) return business;
+    }
+    return uid;
+  }
+
+  static String _money(double value) =>
+      value == value.roundToDouble() ? value.toStringAsFixed(0) : '$value';
+
   Future<void> _onProductReviewRequested(
     AdminProductReviewRequested event,
     Emitter<AdminState> emit,
@@ -38,13 +60,29 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
       reviewerEmail: event.reviewerEmail,
       rejectionReason: event.rejectionReason,
     );
-    res.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) => emit(
-        state.copyWith(
-          notice: event.approve ? 'Product approved.' : 'Product rejected.',
-        ),
+    final failure = res.fold<String?>(
+      (failure) => failure.message,
+      (_) => null,
+    );
+    if (failure != null) {
+      emit(state.copyWith(errorMessage: failure));
+      return;
+    }
+    emit(
+      state.copyWith(
+        notice: event.approve ? 'Product approved.' : 'Product rejected.',
       ),
+    );
+    final product = event.productName.trim().isEmpty
+        ? event.productId
+        : '"${event.productName.trim()}"';
+    await _logs.log(
+      category: AdminLogCategory.product,
+      action: event.approve ? 'product.approved' : 'product.rejected',
+      summary: event.approve
+          ? 'Approved product $product.'
+          : 'Rejected product $product. Reason: ${(event.rejectionReason ?? '').trim()}',
+      targetId: event.productId,
     );
   }
 
@@ -94,10 +132,22 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     AdminApproveCreatorRequested event,
     Emitter<AdminState> emit,
   ) async {
+    final label = _creatorLabel(event.uid);
     final res = await _adminRepository.approveCreator(event.uid);
-    await res.fold(
-      (failure) async => emit(state.copyWith(errorMessage: failure.message)),
-      (_) => _reloadProfiles(emit, notice: 'Creator verified.'),
+    final failure = res.fold<String?>(
+      (failure) => failure.message,
+      (_) => null,
+    );
+    if (failure != null) {
+      emit(state.copyWith(errorMessage: failure));
+      return;
+    }
+    await _reloadProfiles(emit, notice: 'Creator verified.');
+    await _logs.log(
+      category: AdminLogCategory.creator,
+      action: 'creator.verified',
+      summary: 'Verified creator $label.',
+      targetId: event.uid,
     );
   }
 
@@ -105,18 +155,39 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     AdminRejectCreatorRequested event,
     Emitter<AdminState> emit,
   ) async {
+    final label = _creatorLabel(event.uid);
+    final wasVerified = state.creatorProfiles.any(
+      (profile) => profile.uid == event.uid && profile.isVerified,
+    );
     final res = await _adminRepository.rejectCreator(event.uid, event.reason);
-    await res.fold(
-      (failure) async => emit(state.copyWith(errorMessage: failure.message)),
-      (_) => _reloadProfiles(emit, notice: 'Verification rejected.'),
+    final failure = res.fold<String?>(
+      (failure) => failure.message,
+      (_) => null,
+    );
+    if (failure != null) {
+      emit(state.copyWith(errorMessage: failure));
+      return;
+    }
+    await _reloadProfiles(emit, notice: 'Verification rejected.');
+    await _logs.log(
+      category: AdminLogCategory.creator,
+      action: wasVerified ? 'creator.revoked' : 'creator.rejected',
+      summary: wasVerified
+          ? 'Revoked verification of creator $label. Reason: ${event.reason}'
+          : 'Rejected verification of creator $label. Reason: ${event.reason}',
+      targetId: event.uid,
     );
   }
 
-  Future<void> _reloadProfiles(Emitter<AdminState> emit, {String? notice}) async {
+  Future<void> _reloadProfiles(
+    Emitter<AdminState> emit, {
+    String? notice,
+  }) async {
     final res = await _adminRepository.getCreatorProfiles();
     res.fold(
       (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (profiles) => emit(state.copyWith(creatorProfiles: profiles, notice: notice)),
+      (profiles) =>
+          emit(state.copyWith(creatorProfiles: profiles, notice: notice)),
     );
   }
 
@@ -131,11 +202,19 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
       return;
     }
     final res = await _adminRepository.addCategory(name);
-    res.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) => emit(
-        state.copyWith(categories: [...state.categories, name]..sort()),
-      ),
+    final failure = res.fold<String?>(
+      (failure) => failure.message,
+      (_) => null,
+    );
+    if (failure != null) {
+      emit(state.copyWith(errorMessage: failure));
+      return;
+    }
+    emit(state.copyWith(categories: [...state.categories, name]..sort()));
+    await _logs.log(
+      category: AdminLogCategory.category,
+      action: 'category.added',
+      summary: 'Added category "$name".',
     );
   }
 
@@ -144,13 +223,23 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     Emitter<AdminState> emit,
   ) async {
     final res = await _adminRepository.deleteCategory(event.name);
-    res.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) => emit(
-        state.copyWith(
-          categories: state.categories.where((c) => c != event.name).toList(),
-        ),
+    final failure = res.fold<String?>(
+      (failure) => failure.message,
+      (_) => null,
+    );
+    if (failure != null) {
+      emit(state.copyWith(errorMessage: failure));
+      return;
+    }
+    emit(
+      state.copyWith(
+        categories: state.categories.where((c) => c != event.name).toList(),
       ),
+    );
+    await _logs.log(
+      category: AdminLogCategory.category,
+      action: 'category.deleted',
+      summary: 'Deleted category "${event.name}".',
     );
   }
 
@@ -159,14 +248,26 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     Emitter<AdminState> emit,
   ) async {
     final res = await _adminRepository.resetCategoriesToDefaults();
-    res.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (categories) => emit(
+    final categories = res.fold<List<String>?>((_) => null, (value) => value);
+    if (categories == null) {
+      emit(
         state.copyWith(
-          categories: categories,
-          notice: 'Categories reset to defaults.',
+          errorMessage: res.fold((failure) => failure.message, (_) => null),
         ),
+      );
+      return;
+    }
+    emit(
+      state.copyWith(
+        categories: categories,
+        notice: 'Categories reset to defaults.',
       ),
+    );
+    await _logs.log(
+      category: AdminLogCategory.category,
+      action: 'category.reset',
+      summary:
+          'Reset categories to the ${categories.length} default categories.',
     );
   }
 
@@ -174,14 +275,33 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     AdminSuspendUserRequested event,
     Emitter<AdminState> emit,
   ) async {
-    final res = await _adminRepository.suspendUser(event.uid, event.isSuspended);
-    res.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) => emit(
-        state.copyWith(
-          notice: event.isSuspended ? 'User suspended.' : 'User reinstated.',
-        ),
+    final res = await _adminRepository.suspendUser(
+      event.uid,
+      event.isSuspended,
+    );
+    final failure = res.fold<String?>(
+      (failure) => failure.message,
+      (_) => null,
+    );
+    if (failure != null) {
+      emit(state.copyWith(errorMessage: failure));
+      return;
+    }
+    emit(
+      state.copyWith(
+        notice: event.isSuspended ? 'User suspended.' : 'User reinstated.',
       ),
+    );
+    final who = event.userLabel.trim().isEmpty
+        ? event.uid
+        : event.userLabel.trim();
+    await _logs.log(
+      category: AdminLogCategory.user,
+      action: event.isSuspended ? 'user.suspended' : 'user.reinstated',
+      summary: event.isSuspended
+          ? 'Suspended user $who.'
+          : 'Reinstated user $who.',
+      targetId: event.uid,
     );
   }
 
@@ -189,21 +309,41 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     AdminUpdateSettingsRequested event,
     Emitter<AdminState> emit,
   ) async {
+    final before = state;
     final res = await _adminRepository.updatePlatformSettings(
       event.flatFee,
       event.percentFee,
       event.commissionThreshold,
     );
-    res.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) => emit(
-        state.copyWith(
-          flatFee: event.flatFee,
-          percentFee: event.percentFee,
-          commissionThreshold: event.commissionThreshold,
-          notice: 'Platform fees updated.',
-        ),
+    final failure = res.fold<String?>(
+      (failure) => failure.message,
+      (_) => null,
+    );
+    if (failure != null) {
+      emit(state.copyWith(errorMessage: failure));
+      return;
+    }
+    emit(
+      state.copyWith(
+        flatFee: event.flatFee,
+        percentFee: event.percentFee,
+        commissionThreshold: event.commissionThreshold,
+        notice: 'Platform fees updated.',
       ),
+    );
+    final changes = <String>[
+      if (before.flatFee != event.flatFee)
+        'flat fee ₹${_money(before.flatFee)} → ₹${_money(event.flatFee)}',
+      if (before.percentFee != event.percentFee)
+        'commission ${_money(before.percentFee)}% → ${_money(event.percentFee)}%',
+      if (before.commissionThreshold != event.commissionThreshold)
+        'commission threshold ₹${_money(before.commissionThreshold)} → ₹${_money(event.commissionThreshold)}',
+    ];
+    if (changes.isEmpty) return;
+    await _logs.log(
+      category: AdminLogCategory.settings,
+      action: 'settings.fees_updated',
+      summary: 'Changed platform fees: ${changes.join(', ')}.',
     );
   }
 }

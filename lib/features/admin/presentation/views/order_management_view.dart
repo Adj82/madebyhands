@@ -6,6 +6,8 @@ import 'package:madebyhands/core/constants/couriers.dart';
 import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/core/services/payment_api.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/admin/domain/entities/admin_log_entry.dart';
+import 'package:madebyhands/features/admin/domain/repositories/admin_log_repository.dart';
 import 'package:madebyhands/features/orders/domain/order_status.dart';
 import 'package:madebyhands/init_dependencies.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -276,6 +278,17 @@ class _OrderTileState extends State<_OrderTile> {
       final result = await serviceLocator<OrderActionsApi>().rejectOrder(
         orderId: order.id,
         reason: reason,
+      );
+      final outcome = result.refunded
+          ? 'Buyer refunded.'
+          : 'Refund not completed yet.';
+      await serviceLocator<AdminLogRepository>().log(
+        category: AdminLogCategory.order,
+        action: isRetry ? 'order.refund_retried' : 'order.rejected',
+        summary: isRetry
+            ? 'Retried the refund for order #${order.shortId} (${order.creatorName}). $outcome'
+            : 'Rejected order #${order.shortId} (${order.creatorName}). Reason: $reason. $outcome',
+        targetId: order.id,
       );
       messenger.showSnackBar(
         SnackBar(

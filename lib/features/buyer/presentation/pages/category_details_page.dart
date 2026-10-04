@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:madebyhands/core/constants/product_categories.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
+import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
 
 /// Buyer-facing category storefront backed only by the live product stream.
@@ -198,45 +199,58 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF31251F),
-      body: BlocBuilder<BuyerBloc, BuyerState>(
-        builder: (context, state) {
-          final normalizedQuery = _query.trim().toLowerCase();
-          final categoryProducts = state.products
-              .where(
-                (product) => productMatchesCategory(
-                  product.allCategories,
-                  widget.categoryTitle,
-                ),
-              )
-              .where(_matchesSubcategory)
-              .where(
-                (product) =>
-                    normalizedQuery.isEmpty ||
-                    product.name.toLowerCase().contains(normalizedQuery) ||
-                    product.description.toLowerCase().contains(
-                      normalizedQuery,
-                    ) ||
-                    product.artisan.toLowerCase().contains(normalizedQuery),
-              )
-              .toList();
+    // The buyer theme gives the spinner, buttons and search field the same
+    // maroon accents as the rest of the buyer screens.
+    return Theme(
+      data: BuyerTheme.data,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF31251F),
+        body: BlocBuilder<BuyerBloc, BuyerState>(
+          builder: (context, state) {
+            final normalizedQuery = _query.trim().toLowerCase();
+            final categoryProducts = state.products
+                .where(
+                  (product) => productMatchesCategory(
+                    product.allCategories,
+                    widget.categoryTitle,
+                  ),
+                )
+                .where(_matchesSubcategory)
+                .where(
+                  (product) =>
+                      normalizedQuery.isEmpty ||
+                      product.name.toLowerCase().contains(normalizedQuery) ||
+                      product.description.toLowerCase().contains(
+                        normalizedQuery,
+                      ) ||
+                      product.artisan.toLowerCase().contains(normalizedQuery),
+                )
+                .toList();
 
-          return CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(child: _buildHero(context, state)),
-              SliverToBoxAdapter(
-                child: _buildProductContent(
-                  context,
-                  state,
-                  categoryProducts,
-                  normalizedQuery,
+            // One sliver (not two) so the panel's overlap strip below can
+            // paint over the hero's last pixels instead of being clipped at
+            // the sliver boundary.
+            return CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildHero(context, state),
+                      _buildProductContent(
+                        context,
+                        state,
+                        categoryProducts,
+                        normalizedQuery,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -280,8 +294,10 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
               child: CircularProgressIndicator(),
             )
           else if (products.isEmpty)
-            SizedBox(
-              height: 260,
+            // A minimum, not a fixed height: long category names and larger
+            // system font sizes need more room than 260.
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 260),
               child: _EmptyCategory(
                 category: widget.categoryTitle,
                 hasSearch: normalizedQuery.isNotEmpty || _subcategory != 'All',
@@ -350,88 +366,111 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
           ),
         ),
       ),
+      // This hero sits in a scroll view, so its height is unbounded: flex
+      // children (Spacer/Expanded) are not allowed here. spaceBetween pushes
+      // the tabs to the bottom of the 350 minimum instead, and the hero simply
+      // grows when the title wraps or the search field is open.
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              IconButton.filledTonal(
-                tooltip: 'Back',
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.arrow_back_rounded),
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.white.withValues(alpha: 0.9),
-                  foregroundColor: const Color(0xFF8B261D),
+              Row(
+                children: [
+                  IconButton.filledTonal(
+                    tooltip: 'Back',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.9),
+                      foregroundColor: const Color(0xFF8B261D),
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton.filledTonal(
+                    tooltip: _showSearch
+                        ? 'Close search'
+                        : 'Search this category',
+                    onPressed: () => setState(() => _showSearch = !_showSearch),
+                    icon: Icon(_showSearch ? Icons.close : Icons.search),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.9),
+                      foregroundColor: const Color(0xFF8B261D),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filledTonal(
+                    tooltip: 'Open cart',
+                    onPressed: widget.onOpenCart,
+                    icon: Badge(
+                      isLabelVisible: cartCount > 0,
+                      label: Text('$cartCount'),
+                      child: const Icon(Icons.shopping_bag_outlined),
+                    ),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.9),
+                      foregroundColor: const Color(0xFF8B261D),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 34),
+              Text(
+                widget.categoryTitle,
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  height: 1.15,
                 ),
               ),
-              const Spacer(),
-              IconButton.filledTonal(
-                tooltip: _showSearch ? 'Close search' : 'Search this category',
-                onPressed: () => setState(() => _showSearch = !_showSearch),
-                icon: Icon(_showSearch ? Icons.close : Icons.search),
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.white.withValues(alpha: 0.9),
-                  foregroundColor: const Color(0xFF8B261D),
+              const SizedBox(height: 8),
+              Text(
+                _description,
+                style: GoogleFonts.montserrat(
+                  fontSize: 13,
+                  color: Colors.white.withValues(alpha: 0.92),
+                  height: 1.4,
                 ),
               ),
-              const SizedBox(width: 8),
-              IconButton.filledTonal(
-                tooltip: 'Open cart',
-                onPressed: widget.onOpenCart,
-                icon: Badge(
-                  isLabelVisible: cartCount > 0,
-                  label: Text('$cartCount'),
-                  child: const Icon(Icons.shopping_bag_outlined),
+              if (_showSearch) ...[
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _searchController,
+                  autofocus: true,
+                  onChanged: (value) => setState(() => _query = value),
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Search in ${widget.categoryTitle}',
+                    hintStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                    ),
+                    prefixIcon: const Icon(Icons.search, color: Colors.white),
+                    filled: true,
+                    fillColor: Colors.black.withValues(alpha: 0.25),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide.none,
+                    ),
+                    // Borderless in every state: the buyer theme would
+                    // otherwise outline this field over the hero image.
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
                 ),
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.white.withValues(alpha: 0.9),
-                  foregroundColor: const Color(0xFF8B261D),
-                ),
-              ),
+              ],
+              const SizedBox(height: 18),
             ],
           ),
-          const SizedBox(height: 34),
-          Text(
-            widget.categoryTitle,
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              height: 1.15,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _description,
-            style: GoogleFonts.montserrat(
-              fontSize: 13,
-              color: Colors.white.withValues(alpha: 0.92),
-              height: 1.4,
-            ),
-          ),
-          if (_showSearch) ...[
-            const SizedBox(height: 16),
-            TextField(
-              controller: _searchController,
-              autofocus: true,
-              onChanged: (value) => setState(() => _query = value),
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Search in ${widget.categoryTitle}',
-                hintStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7),
-                ),
-                prefixIcon: const Icon(Icons.search, color: Colors.white),
-                filled: true,
-                fillColor: Colors.black.withValues(alpha: 0.25),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ],
-          const Spacer(),
           SizedBox(
             height: 48,
             child: ListView.separated(
@@ -536,6 +575,20 @@ class _SelectedTabPainter extends CustomPainter {
       ..quadraticBezierTo(width, height, width + flareRadius, height)
       ..close();
     canvas.drawPath(path, paint);
+    // On screens whose height lands between physical pixels, the tab's bottom
+    // edge and the panel's top edge both antialias against the dark page
+    // background and leave a thin line. Painting the tab 1px past its bottom
+    // (the panel is the same colour) closes that gap. Needs the hero and panel
+    // in one sliver so the overflow is not clipped.
+    canvas.drawRect(
+      Rect.fromLTRB(
+        -flareRadius / 2,
+        height - 1,
+        width + flareRadius / 2,
+        height + 1,
+      ),
+      paint,
+    );
   }
 
   @override

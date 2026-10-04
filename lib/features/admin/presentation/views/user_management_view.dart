@@ -329,7 +329,13 @@ class _UserTile extends StatelessWidget {
       ),
     );
     if (confirmed == true) {
-      adminBloc.add(AdminSuspendUserRequested(user.uid, suspend));
+      adminBloc.add(
+        AdminSuspendUserRequested(
+          user.uid,
+          suspend,
+          userLabel: user.name.trim().isEmpty ? user.email : '${user.name} (${user.email})',
+        ),
+      );
     }
   }
 

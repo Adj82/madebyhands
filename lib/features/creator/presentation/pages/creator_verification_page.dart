@@ -81,10 +81,9 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
 
   void _submit() {
     FocusScope.of(context).unfocus();
-    // The ID document is optional — matching the PAN number field on the
-    // bank account page, which isn't mandatory either.
     final hasPhoto = _latestPhotoFile != null || _existingPhotoUrl.isNotEmpty;
-    setState(() => _documentsMissing = !hasPhoto);
+    final hasIdCard = _idCardFile != null || _existingIdCardUrl.isNotEmpty;
+    setState(() => _documentsMissing = !hasPhoto || !hasIdCard);
     if (!_formKey.currentState!.validate() || _documentsMissing) return;
     context.read<CreatorBloc>().add(
       CreatorSubmitVerification(
@@ -248,7 +247,7 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
                     ),
                     const SizedBox(height: 15),
                     _FilePickerTile(
-                      title: 'PAN card / government ID (Optional)',
+                      title: 'PAN card / government ID *',
                       subtitle: 'Photo of an official ID',
                       hasNewFile: _idCardFile != null,
                       hasExisting: _existingIdCardUrl.isNotEmpty,
@@ -261,7 +260,7 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
                       const Padding(
                         padding: EdgeInsets.only(top: 10),
                         child: Text(
-                          'Please add a recent photo of you.',
+                          'Please add both a recent photo of you and a photo of your PAN card / government ID.',
                           style: TextStyle(color: Colors.red, fontSize: 12),
                         ),
                       ),

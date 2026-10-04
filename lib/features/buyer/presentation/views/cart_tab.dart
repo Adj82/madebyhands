@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
+import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_empty_state.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_heading.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_thumbnail.dart';
 
 class CartTab extends StatelessWidget {
@@ -31,6 +32,10 @@ class CartTab extends StatelessWidget {
           final productsInCart = state.products
               .where((product) => state.cartQuantities.containsKey(product.id))
               .toList();
+          final itemCount = productsInCart.fold<int>(
+            0,
+            (total, product) => total + state.cartQuantities[product.id]!,
+          );
 
           final subtotal = productsInCart.fold<int>(0, (total, product) {
             final selection =
@@ -42,16 +47,15 @@ class CartTab extends StatelessWidget {
           });
 
           return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-                child: Text(
-                  'Your cart',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF8B261D),
-                      ),
+                child: BuyerPageHeader(
+                  title: 'Your cart',
+                  subtitle: productsInCart.isEmpty
+                      ? 'Handmade pieces you are ready to buy.'
+                      : '$itemCount ${itemCount == 1 ? 'item' : 'items'} ready for checkout',
                 ),
               ),
               Expanded(
@@ -59,12 +63,13 @@ class CartTab extends StatelessWidget {
                     ? BuyerEmptyState(
                         icon: Icons.shopping_bag_outlined,
                         title: 'Your cart is empty',
-                        message: 'Add a handmade piece and it will appear here.',
+                        message:
+                            'Add a handmade piece and it will appear here.',
                         actionLabel: 'Start shopping',
                         onAction: onBrowse,
                       )
                     : ListView.separated(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                         itemCount: productsInCart.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
@@ -73,175 +78,223 @@ class CartTab extends StatelessWidget {
                           final customization =
                               state.cartCustomizations[product.id] ??
                               const ProductCustomizationSelection();
-                          final unitPrice = customization.unitPriceFor(product);
-                          return Card(
-                            elevation: 1,
-                            color: const Color(0xFFFAF6EE).withValues(alpha: 0.92),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              side: const BorderSide(
-                                color: Color(0xFF8B261D),
-                                width: 0.8,
-                              ),
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: InkWell(
-                              onTap: onProductTap == null
-                                  ? null
-                                  : () => onProductTap!(product),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Row(
-                                  children: [
-                                    ProductThumbnail(product: product, size: 76),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            product.name,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              color: Color(0xFF8B261D),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 5),
-                                          Text(
-                                            '₹$unitPrice',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w800,
-                                              color: Color(0xFF2C1810),
-                                            ),
-                                          ),
-                                          if (!customization.isEmpty) ...[
-                                            const SizedBox(height: 5),
-                                            Text(
-                                              customization.values.entries
-                                                  .map(
-                                                    (entry) =>
-                                                        '${entry.key}: ${entry.value.join(', ')}',
-                                                  )
-                                                  .join(' · '),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                color: AppColors.mutedText,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          tooltip: quantity == 1 ? 'Remove from cart' : 'Decrease quantity',
-                                          onPressed: () => context
-                                              .read<BuyerBloc>()
-                                              .add(
-                                                BuyerUpdateCartQuantity(
-                                                  product,
-                                                  quantity - 1,
-                                                ),
-                                              ),
-                                          icon: const Icon(
-                                            Icons.remove_circle_outline,
-                                            color: Color(0xFF8B261D),
-                                          ),
-                                        ),
-                                        Text(
-                                          '$quantity',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            color: Color(0xFF8B261D),
-                                          ),
-                                        ),
-                                        IconButton(
-                                          tooltip: 'Increase quantity',
-                                          onPressed: quantity >= product.stock
-                                              ? null
-                                              : () => context.read<BuyerBloc>().add(
-                                                  BuyerUpdateCartQuantity(
-                                                    product,
-                                                    quantity + 1,
-                                                  ),
-                                                ),
-                                          icon: const Icon(
-                                            Icons.add_circle_outline,
-                                            color: Color(0xFF8B261D),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                          return _CartItemCard(
+                            product: product,
+                            quantity: quantity,
+                            customization: customization,
+                            onTap: onProductTap == null
+                                ? null
+                                : () => onProductTap!(product),
                           );
                         },
                       ),
               ),
               if (productsInCart.isNotEmpty)
                 Container(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
                   decoration: const BoxDecoration(
-                    color: Color(0xFFFAF6EE),
-                    border: Border(top: BorderSide(color: AppColors.outline)),
+                    color: BuyerColors.card,
+                    border: Border(top: BorderSide(color: BuyerColors.line)),
                   ),
-                  child: SafeArea(
-                    top: false,
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                'Subtotal',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: AppColors.mutedText,
-                                ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Subtotal',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: BuyerColors.body,
                               ),
                             ),
-                            Text(
-                              '₹$subtotal',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF8B261D),
-                              ),
+                          ),
+                          Text(
+                            '₹$subtotal',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: BuyerColors.maroon,
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        const Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'A platform fee per creator is added at checkout.',
-                            style: TextStyle(fontSize: 12, color: AppColors.mutedText),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'A platform fee per creator is added at checkout.',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: BuyerColors.muted,
                         ),
-                        const SizedBox(height: 12),
-                        FilledButton(
-                          onPressed: onCheckout,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF8B261D),
-                          ),
-                          child: const Text('Review and place order'),
-                        ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton(
+                        onPressed: onCheckout,
+                        child: const Text('Review and place order'),
+                      ),
+                    ],
                   ),
                 ),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _CartItemCard extends StatelessWidget {
+  final Product product;
+  final int quantity;
+  final ProductCustomizationSelection customization;
+  final VoidCallback? onTap;
+
+  const _CartItemCard({
+    required this.product,
+    required this.quantity,
+    required this.customization,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final unitPrice = customization.unitPriceFor(product);
+    void setQuantity(int value) =>
+        context.read<BuyerBloc>().add(BuyerUpdateCartQuantity(product, value));
+
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ProductThumbnail(product: product, size: 78, radius: 12),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    BuyerHeading(
+                      product.name,
+                      size: 14.5,
+                      color: BuyerColors.ink,
+                      weight: FontWeight.w700,
+                      maxLines: 2,
+                    ),
+                    if (!customization.isEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        customization.values.entries
+                            .map(
+                              (entry) =>
+                                  '${entry.key}: ${entry.value.join(', ')}',
+                            )
+                            .join(' · '),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: BuyerColors.muted,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '₹$unitPrice',
+                            style: const TextStyle(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w800,
+                              color: BuyerColors.maroon,
+                            ),
+                          ),
+                        ),
+                        _QuantityStepper(
+                          quantity: quantity,
+                          onDecrease: () => setQuantity(quantity - 1),
+                          onIncrease: quantity >= product.stock
+                              ? null
+                              : () => setQuantity(quantity + 1),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The pill-shaped − / count / + control.
+class _QuantityStepper extends StatelessWidget {
+  final int quantity;
+  final VoidCallback onDecrease;
+  final VoidCallback? onIncrease;
+
+  const _QuantityStepper({
+    required this.quantity,
+    required this.onDecrease,
+    required this.onIncrease,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Widget button({
+      required String tooltip,
+      required IconData icon,
+      required VoidCallback? onPressed,
+    }) => IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: Icon(icon, size: 16),
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+      disabledColor: BuyerColors.goldSoft,
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: BuyerColors.paper,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: BuyerColors.gold, width: 1.1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          button(
+            tooltip: quantity == 1 ? 'Remove from cart' : 'Decrease quantity',
+            icon: quantity == 1 ? Icons.delete_outline : Icons.remove,
+            onPressed: onDecrease,
+          ),
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 22),
+            child: Text(
+              '$quantity',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: BuyerColors.maroon,
+              ),
+            ),
+          ),
+          button(
+            tooltip: 'Increase quantity',
+            icon: Icons.add,
+            onPressed: onIncrease,
+          ),
+        ],
       ),
     );
   }

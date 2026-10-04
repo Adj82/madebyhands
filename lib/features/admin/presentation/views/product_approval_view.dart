@@ -226,6 +226,7 @@ void approveProduct(BuildContext context, CreatorProduct product) {
       approve: true,
       reviewerName: admin?.name ?? 'Admin',
       reviewerEmail: admin?.email ?? '',
+      productName: product.name,
     ),
   );
 }
@@ -282,6 +283,7 @@ Future<bool> rejectProductWithReason(BuildContext context, CreatorProduct produc
       reviewerName: admin?.name ?? 'Admin',
       reviewerEmail: admin?.email ?? '',
       rejectionReason: reason,
+      productName: product.name,
     ),
   );
   return true;

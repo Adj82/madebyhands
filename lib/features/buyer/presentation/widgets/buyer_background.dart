@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
 
+/// The backdrop shared by every buyer screen. It also applies [BuyerTheme],
+/// so anything built underneath — including dialogs and bottom sheets opened
+/// from it — picks up the buyer fonts, buttons, fields and cards.
 class BuyerBackground extends StatelessWidget {
   final Widget child;
 
@@ -7,6 +11,9 @@ class BuyerBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(color: const Color(0xFFFFF4F2), child: child);
+    return Theme(
+      data: BuyerTheme.data,
+      child: ColoredBox(color: BuyerColors.paper, child: child),
+    );
   }
 }
