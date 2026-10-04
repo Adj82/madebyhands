@@ -1,6 +1,6 @@
 // Generates downloadable PDF invoices for a placed order — a buyer copy
 // (what the buyer paid, no fee breakdown) and a seller copy (the platform's
-// flat fee + commission breakdown and the resulting payout). Both are built
+// commission breakdown and the resulting payout). Both are built
 // purely from the fee figures already snapshotted onto the order document at
 // checkout time (see `server/fees.js` / `api/finalize-payment.js`), so an
 // invoice always reflects the admin-set fees that were actually in force
@@ -70,8 +70,11 @@ class InvoiceData {
     this.buyerTotalPaid = 0,
   });
 
-  int get totalFees => flatFee + commissionAmount;
-  int get creatorPayout => subtotal - commissionAmount;
+  /// Only the percentage commission comes off the creator's subtotal. The
+  /// flat platform fee is charged to the buyer on top of the items, so it is
+  /// shown for information but never deducted (see `computeOrderFees`).
+  int get totalDeductions => commissionAmount;
+  int get creatorPayout => subtotal - totalDeductions;
 
   factory InvoiceData.buyerCopy({
     required String orderId,
@@ -326,22 +329,11 @@ class InvoicePdfService {
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
         _totalRow('Subtotal', _money(data.subtotal)),
-        _totalRow('Seller Platform Fee', _money(data.flatFee)),
         _totalRow(
           data.commissionAmount > 0
-              ? 'Transaction Fee (${data.commissionRate.toStringAsFixed(0)}% on orders above Rs. 999)'
+              ? 'Transaction Fee (${_rate(data.commissionRate)}%)'
               : 'Transaction Fee (not applicable)',
-          _money(data.commissionAmount),
-        ),
-        pw.SizedBox(height: 6),
-        pw.Container(
-          color: PdfColors.grey200,
-          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          child: _totalRow(
-            'TOTAL FEES',
-            _money(data.totalFees),
-            bold: true,
-          ),
+          '- ${_money(data.commissionAmount)}',
         ),
         pw.SizedBox(height: 6),
         pw.Container(
@@ -354,9 +346,21 @@ class InvoicePdfService {
             color: brand,
           ),
         ),
+        if (data.flatFee > 0) ...[
+          pw.SizedBox(height: 8),
+          pw.Text(
+            'The platform fee of ${_money(data.flatFee)} was paid by the buyer '
+            'and is not deducted from your payout.',
+            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+          ),
+        ],
       ],
     );
   }
+
+  static String _rate(double rate) => rate == rate.roundToDouble()
+      ? rate.toStringAsFixed(0)
+      : rate.toStringAsFixed(1);
 
   static pw.Widget _buyerTotals(InvoiceData data, PdfColor brand) {
     return pw.Container(

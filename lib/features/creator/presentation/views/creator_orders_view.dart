@@ -316,7 +316,46 @@ class OrderStatusBadge extends StatelessWidget {
   }
 }
 
-/// Builds the seller-copy invoice PDF for [order] — fee breakdown and the
+/// Builds the buyer-copy invoice PDF for [order] — what the customer paid,
+/// with no fee breakdown — so the creator can print it and put it in the
+/// parcel when dispatching.
+Future<void> _downloadBuyerInvoice(BuildContext context, CreatorOrder order) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    final data = InvoiceData.buyerCopy(
+      orderId: order.id,
+      invoiceDate: order.createdAt,
+      billToName: order.buyerName,
+      billToAddressLines: order.deliveryAddress
+          .split(',')
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty)
+          .toList(),
+      items: order.items
+          .map(
+            (item) => InvoiceLineItem(
+              name: item.name,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+            ),
+          )
+          .toList(),
+      subtotal: order.totalAmount,
+      // The buyer pays the items plus the flat platform fee for this creator.
+      buyerTotalPaid: order.totalAmount + order.flatFee,
+    );
+    await InvoicePdfService.downloadOrShare(data);
+  } catch (error) {
+    logInvoiceError(error);
+    if (context.mounted) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not generate the invoice. Please try again.')),
+      );
+    }
+  }
+}
+
+/// Builds the creator-copy invoice PDF for [order] — commission and the
 /// resulting payout — and hands it to the platform's share/download sheet.
 Future<void> _downloadSellerInvoice(BuildContext context, CreatorOrder order) async {
   final messenger = ScaffoldMessenger.of(context);
@@ -729,9 +768,19 @@ class _OrderDetailSheet extends StatelessWidget {
                   _amountRow('Your earnings', order.creatorNetAmount, emphasize: true),
                   const SizedBox(height: 16),
                   OutlinedButton.icon(
+                    onPressed: () => _downloadBuyerInvoice(context, order),
+                    icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                    label: const Text('Buyer invoice (for the parcel)'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
                     onPressed: () => _downloadSellerInvoice(context, order),
                     icon: const Icon(Icons.download_outlined, size: 18),
-                    label: const Text('Download invoice'),
+                    label: const Text('Your invoice (creator copy)'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
                       side: const BorderSide(color: AppColors.primary),
