@@ -127,10 +127,11 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                             _date(order.createdAt),
                             style: const TextStyle(color: AppColors.mutedText),
                           ),
-                          if (order.refundStatus != null) ...[
+                          if (order.refundStatus != null ||
+                              OrderStatus.isRejectedOrCancelled(order.status)) ...[
                             const SizedBox(height: 3),
                             Text(
-                              refundStatusLabel(order.refundStatus!),
+                              refundStatusLabel(order.refundStatus ?? ''),
                               style: TextStyle(
                                 color: order.refundStatus == 'refunded'
                                     ? Colors.green.shade800

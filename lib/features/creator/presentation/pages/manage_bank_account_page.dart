@@ -361,7 +361,7 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
                   ),
                   const SizedBox(height: 16),
 
-                  _buildFieldTitle('PAN Number *'),
+                  _buildFieldTitle('PAN Number (Optional)'),
                   TextFormField(
                     controller: _panNumberController,
                     textCapitalization: TextCapitalization.characters,
@@ -371,9 +371,7 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
                     ),
                     validator: (v) {
                       final trimmed = v?.trim().toUpperCase() ?? '';
-                      if (trimmed.isEmpty) {
-                        return 'PAN number is required.';
-                      }
+                      if (trimmed.isEmpty) return null;
                       if (!_panRegex.hasMatch(trimmed)) {
                         return 'Enter a valid 10-character PAN number.';
                       }

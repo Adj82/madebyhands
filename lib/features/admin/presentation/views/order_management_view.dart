@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:madebyhands/core/constants/couriers.dart';
 import 'package:madebyhands/core/error/failures.dart';
 import 'package:madebyhands/core/services/payment_api.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
@@ -212,6 +213,19 @@ class _AdminOrder {
       .whereType<Map>()
       .map((item) => Map<String, dynamic>.from(item))
       .toList();
+
+  String? get carrierName => data['carrierName'] as String?;
+  String? get consignmentNumber => data['consignmentNumber'] as String?;
+
+  /// An explicit `trackingUrl` field if one was stored, otherwise a tracking
+  /// page derived from the carrier + consignment number (see
+  /// [courierTrackingUri]), or null if neither is available yet.
+  Uri? get trackingUri {
+    final explicit = data['trackingUrl'] as String?;
+    final parsed = (explicit?.trim().isNotEmpty ?? false) ? Uri.tryParse(explicit!.trim()) : null;
+    if (parsed != null && parsed.hasScheme) return parsed;
+    return courierTrackingUri(carrierName, consignmentNumber);
+  }
 }
 
 class _OrderList extends StatelessWidget {
@@ -307,6 +321,16 @@ class _OrderTileState extends State<_OrderTile> {
         ],
       ),
     );
+  }
+
+  Future<void> _openTrackingLink(BuildContext context, Uri uri) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not open the tracking page.')),
+      );
+    }
   }
 
   /// Looks up [uid]'s current phone/email from their `users` profile (the
@@ -517,10 +541,39 @@ class _OrderTileState extends State<_OrderTile> {
           _infoLine('Payment', order.paymentStatus.toUpperCase()),
           _infoLine('Payout', order.payoutStatus.toUpperCase()),
           if (refund != null) _infoLine('Refund', refund.toUpperCase(), isError: refund == 'failed'),
-          if ((order.data['carrierName'] as String?)?.isNotEmpty == true)
-            _infoLine('Carrier', order.data['carrierName'] as String),
-          if ((order.data['consignmentNumber'] as String?)?.isNotEmpty == true)
-            _infoLine('Consignment #', order.data['consignmentNumber'] as String),
+          if ((order.carrierName ?? '').isNotEmpty) _infoLine('Carrier', order.carrierName!),
+          if ((order.consignmentNumber ?? '').isNotEmpty)
+            _infoLine('Consignment #', order.consignmentNumber!),
+          if (order.trackingUri != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(
+                    width: 115,
+                    child: Text(
+                      'Tracking link',
+                      style: TextStyle(fontSize: 13, color: AppColors.mutedText),
+                    ),
+                  ),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => _openTrackingLink(context, order.trackingUri!),
+                      child: Text(
+                        order.trackingUri.toString(),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           if ((order.data['rejectionReason'] as String?)?.isNotEmpty == true)
             _infoLine('Rejection reason', order.data['rejectionReason'] as String, isError: true),
           const SizedBox(height: 14),

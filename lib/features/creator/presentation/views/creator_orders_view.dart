@@ -383,73 +383,131 @@ class _OrderDetailSheet extends StatelessWidget {
       LengthLimitingTextInputFormatter(30),
     ];
 
+    bool acknowledged = false;
+    bool showAcknowledgeError = false;
+
     final submitted = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        scrollable: true,
-        title: const Text('Dispatch details'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'The buyer gets these details and a tracking link.',
-                style: TextStyle(fontSize: 12, color: AppColors.mutedText),
-              ),
-              const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
-                isExpanded: true,
-                initialValue: courier,
-                decoration: const InputDecoration(labelText: 'Courier partner *'),
-                items: [
-                  for (final option in kCourierOptions)
-                    DropdownMenuItem(
-                      value: option,
-                      child: Text(option, overflow: TextOverflow.ellipsis),
-                    ),
-                ],
-                onChanged: (value) => courier = value,
-                validator: (value) => value == null ? 'Select a courier.' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: consignment,
-                inputFormatters: formatters,
-                decoration: const InputDecoration(
-                  labelText: 'Consignment number *',
-                  hintText: 'e.g. SP123456789IN',
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          scrollable: true,
+          title: const Text('Dispatch details'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'The buyer gets these details and a tracking link.',
+                  style: TextStyle(fontSize: 12, color: AppColors.mutedText),
                 ),
-                validator: (value) =>
-                    (value?.trim().isEmpty ?? true) ? 'Consignment number is required.' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: confirm,
-                inputFormatters: formatters,
-                decoration: const InputDecoration(labelText: 'Confirm consignment number *'),
-                validator: (value) => value?.trim() != consignment.text.trim()
-                    ? 'Consignment numbers do not match.'
-                    : null,
-              ),
-            ],
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  initialValue: courier,
+                  decoration: const InputDecoration(labelText: 'Courier partner *'),
+                  items: [
+                    for (final option in kCourierOptions)
+                      DropdownMenuItem(
+                        value: option,
+                        child: Text(option, overflow: TextOverflow.ellipsis),
+                      ),
+                  ],
+                  onChanged: (value) => courier = value,
+                  validator: (value) => value == null ? 'Select a courier.' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: consignment,
+                  inputFormatters: formatters,
+                  decoration: const InputDecoration(
+                    labelText: 'Consignment number *',
+                    hintText: 'e.g. SP123456789IN',
+                  ),
+                  validator: (value) =>
+                      (value?.trim().isEmpty ?? true) ? 'Consignment number is required.' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: confirm,
+                  inputFormatters: formatters,
+                  decoration: const InputDecoration(labelText: 'Confirm consignment number *'),
+                  validator: (value) => value?.trim() != consignment.text.trim()
+                      ? 'Consignment numbers do not match.'
+                      : null,
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                  ),
+                  child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.red, size: 20),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Make sure you have actually dispatched the order and the '
+                          'courier/consignment details above are real, and that the '
+                          'product shipped is genuine and in good condition. False or '
+                          'incorrect dispatch details may result in your payout being '
+                          'withheld.',
+                          style: TextStyle(fontSize: 12.5, color: Colors.red, height: 1.3),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                CheckboxListTile(
+                  value: acknowledged,
+                  onChanged: (value) => setDialogState(() {
+                    acknowledged = value ?? false;
+                    if (acknowledged) showAcknowledgeError = false;
+                  }),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text(
+                    'I confirm the order has genuinely been dispatched with these '
+                    'real details, and the product is genuine and in good condition.',
+                    style: TextStyle(fontSize: 12.5),
+                  ),
+                ),
+                if (showAcknowledgeError)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 12),
+                    child: Text(
+                      'Please confirm the statement above to continue.',
+                      style: TextStyle(fontSize: 12, color: Colors.red),
+                    ),
+                  ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final formValid = formKey.currentState!.validate();
+                if (!acknowledged) {
+                  setDialogState(() => showAcknowledgeError = true);
+                }
+                if (formValid && acknowledged) {
+                  Navigator.pop(dialogContext, true);
+                }
+              },
+              child: const Text('Mark in transit'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(dialogContext, true);
-              }
-            },
-            child: const Text('Mark in transit'),
-          ),
-        ],
       ),
     );
     if (submitted != true) return;

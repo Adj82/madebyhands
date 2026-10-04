@@ -39,16 +39,16 @@ class BuyerProductNotification {
        reason = null,
        type = BuyerNotificationType.order;
 
-  String get title => type == BuyerNotificationType.order
-      ? (OrderStatus.buyerStatus(orderStatus ?? '') == OrderStatus.rejected ||
-                OrderStatus.buyerStatus(orderStatus ?? '') ==
-                    OrderStatus.cancelled
-            ? 'Order rejected'
-            : OrderStatus.buyerStatus(orderStatus ?? '') ==
-                  OrderStatus.delivered
-            ? 'Order delivered'
-            : 'Order accepted')
-      : 'New in $category';
+  String get title {
+    if (type != BuyerNotificationType.order) return 'New in $category';
+    final bucket = OrderStatus.buyerStatus(orderStatus ?? '');
+    return switch (bucket) {
+      OrderStatus.rejected || OrderStatus.cancelled => 'Order rejected',
+      OrderStatus.delivered => 'Order delivered',
+      OrderStatus.dispatched => 'Order dispatched',
+      _ => 'Order accepted',
+    };
+  }
 
   String get message {
     if (type != BuyerNotificationType.order) {
@@ -72,6 +72,9 @@ class BuyerProductNotification {
     }
     if (bucket == OrderStatus.delivered) {
       return 'Order #$orderId has been delivered.';
+    }
+    if (bucket == OrderStatus.dispatched) {
+      return 'Order #$orderId has been dispatched. Track it with the details provided.';
     }
     return 'Order #$orderId has been accepted by the creator and is now being prepared.';
   }

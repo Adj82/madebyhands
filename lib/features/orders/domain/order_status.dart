@@ -14,6 +14,11 @@ abstract final class OrderStatus {
   static const rejected = 'rejected';
   static const cancelled = 'cancelled';
 
+  /// Buyer-facing bucket only — never a real stored order status. Covers
+  /// every granular creator step from `inTransit` onward, once a carrier and
+  /// consignment number exist.
+  static const dispatched = 'dispatched';
+
   static const shipmentFlow = <String>[
     placed,
     confirmed,
@@ -63,6 +68,7 @@ abstract final class OrderStatus {
     delivered => 'Delivered',
     rejected => 'Rejected',
     cancelled => 'Cancelled',
+    dispatched => 'Dispatched',
     _ => value.trim().isEmpty ? 'Status unavailable' : value,
   };
 
@@ -111,13 +117,17 @@ abstract final class OrderStatus {
   /// Buyer-facing status bucket. Creators and admins still track the full
   /// granular pipeline (placed → confirmed → processing → in_transit →
   /// shipped → out_for_delivery → delivered) to manage fulfilment, but
-  /// buyers only ever see two states: "Confirmed" while the order is
-  /// anywhere in that pipeline, and "Delivered" once it arrives. Rejected
-  /// and cancelled orders stay their own distinct, clearly-flagged state.
+  /// buyers see a simpler 4-step journey: "Placed" → "Confirmed" (accepted,
+  /// tracking not yet available) → "Dispatched" (carrier handed off, track
+  /// with the provided details) → "Delivered". Rejected and cancelled
+  /// orders stay their own distinct, clearly-flagged state.
   static String buyerStatus(String value) {
     final normalized = normalize(value);
     if (normalized == delivered) return delivered;
     if (isRejectedOrCancelled(normalized)) return normalized;
+    if (normalized == placed) return placed;
+    final step = shipmentStep(normalized);
+    if (step >= shipmentFlow.indexOf(inTransit)) return dispatched;
     return confirmed;
   }
 

@@ -81,9 +81,10 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
 
   void _submit() {
     FocusScope.of(context).unfocus();
+    // The ID document is optional — matching the PAN number field on the
+    // bank account page, which isn't mandatory either.
     final hasPhoto = _latestPhotoFile != null || _existingPhotoUrl.isNotEmpty;
-    final hasId = _idCardFile != null || _existingIdCardUrl.isNotEmpty;
-    setState(() => _documentsMissing = !hasPhoto || !hasId);
+    setState(() => _documentsMissing = !hasPhoto);
     if (!_formKey.currentState!.validate() || _documentsMissing) return;
     context.read<CreatorBloc>().add(
       CreatorSubmitVerification(
@@ -231,12 +232,12 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
                     ),
                     const SizedBox(height: 30),
                     const Text(
-                      'Documents *',
+                      'Documents',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 15),
                     _FilePickerTile(
-                      title: 'Recent photo of you',
+                      title: 'Recent photo of you *',
                       subtitle: 'Clear, well-lit portrait',
                       hasNewFile: _latestPhotoFile != null,
                       hasExisting: _existingPhotoUrl.isNotEmpty,
@@ -247,7 +248,7 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
                     ),
                     const SizedBox(height: 15),
                     _FilePickerTile(
-                      title: 'PAN card / government ID',
+                      title: 'PAN card / government ID (Optional)',
                       subtitle: 'Photo of an official ID',
                       hasNewFile: _idCardFile != null,
                       hasExisting: _existingIdCardUrl.isNotEmpty,
@@ -260,7 +261,7 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
                       const Padding(
                         padding: EdgeInsets.only(top: 10),
                         child: Text(
-                          'Please add both documents.',
+                          'Please add a recent photo of you.',
                           style: TextStyle(color: Colors.red, fontSize: 12),
                         ),
                       ),

@@ -8,6 +8,7 @@ import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
+import 'package:madebyhands/features/buyer/presentation/pages/order_history_page.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/saved_addresses_page.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_thumbnail.dart';
 import 'package:madebyhands/features/orders/domain/entities/marketplace_order.dart';
@@ -174,7 +175,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
       if (!mounted) return;
       setState(() => _busy = false);
       await _showSuccessDialog(payment.paymentId ?? '', orderIds.length);
-      if (mounted) Navigator.of(context).pop();
     } on PaymentConfirmationException catch (error) {
       if (error.refunded) _capturedPayment = null;
       if (!mounted) return;
@@ -188,6 +188,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Future<void> _showSuccessDialog(String paymentId, int orderCount) {
+    final navigator = Navigator.of(context);
+    final user = widget.user;
+    final repository = widget.buyerRepository;
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -202,8 +205,19 @@ class _CheckoutPageState extends State<CheckoutPage> {
         ),
         actions: [
           FilledButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Done'),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              navigator.pop();
+              navigator.push(
+                MaterialPageRoute(
+                  builder: (_) => OrderHistoryPage(
+                    userId: user.uid,
+                    repository: repository,
+                  ),
+                ),
+              );
+            },
+            child: const Text('Go to my orders'),
           ),
         ],
       ),
