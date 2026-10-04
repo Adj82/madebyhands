@@ -111,7 +111,7 @@ The rules are load-bearing, not advisory — deploy them alongside API changes.
 - `admin_logs` is the admin activity log: append-only, created only by the acting admin/manager (`actorUid == auth.uid`), readable only by super admins. New admin actions that change data should call `AdminLogRepository.log` (AdminBloc does for its events; views that write directly do it themselves). Logging is best-effort and must never block the action.
 - `creator_verifications` (documents) and `creator_bank_accounts` (payout details) are private to the owner and admins / super admins.
 - Product ownership is checked against **either** `creatorUid` **or** `creatorId`; both spellings exist in the data, and `server/checkout.js` falls back the same way.
-- Storage rules are not in this repo. Uploads go to `creator_profiles/{uid}/…` and `products/{uid}/…`.
+- Storage rules are in `storage.rules` (`firebase deploy --only storage`). Uploads go to `creator_profiles/{uid}/…` and `products/{uid}/…`. The web build loads these images with `Image.network`, which needs CORS on the bucket: apply `storage-cors.json` once with `gcloud storage buckets update gs://madebyhands-77f87.firebasestorage.app --cors-file=storage-cors.json` (or `gsutil cors set storage-cors.json gs://madebyhands-77f87.firebasestorage.app`). Without it every Storage image is blank on web (Android/iOS are unaffected).
 
 ## Environment variables
 
