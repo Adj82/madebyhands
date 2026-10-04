@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:madebyhands/core/constants/image_upload.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
@@ -70,8 +71,9 @@ class _CreatorVerificationPageState extends State<CreatorVerificationPage> {
     try {
       final picked = await ImagePicker().pickImage(
         source: ImageSource.gallery,
-        imageQuality: 70,
-        maxWidth: 2000,
+        imageQuality: kImageQuality,
+        maxWidth: kDocumentImageMaxSide,
+        maxHeight: kDocumentImageMaxSide,
       );
       return picked == null ? null : File(picked.path);
     } catch (_) {

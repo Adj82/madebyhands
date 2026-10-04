@@ -92,7 +92,12 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
   final FirebaseFirestore firestore;
   final FirebaseStorage firebaseStorage;
 
-  static final _imageMetadata = SettableMetadata(contentType: 'image/jpeg');
+  // Every upload has a unique, timestamped path and is never overwritten, so
+  // clients and CDNs can cache it for a year.
+  static final _imageMetadata = SettableMetadata(
+    contentType: 'image/jpeg',
+    cacheControl: 'public, max-age=31536000',
+  );
 
   CreatorRemoteDataSourceImpl({
     required this.firestore,

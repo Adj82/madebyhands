@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:madebyhands/core/constants/product_categories.dart';
+import 'package:madebyhands/core/constants/image_upload.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
@@ -224,7 +225,11 @@ class _AddProductPageState extends State<AddProductPage> {
       return;
     }
     final picker = ImagePicker();
-    final pickedFiles = await picker.pickMultiImage(imageQuality: 70);
+    final pickedFiles = await picker.pickMultiImage(
+      imageQuality: kImageQuality,
+      maxWidth: kProductImageMaxSide,
+      maxHeight: kProductImageMaxSide,
+    );
     if (pickedFiles.isEmpty) return;
     final accepted = pickedFiles.take(remaining).toList();
     setState(() {
@@ -1228,7 +1233,11 @@ class _CustomizationBlock extends StatefulWidget {
 class _CustomizationBlockState extends State<_CustomizationBlock> {
   Future<void> _pickImages() async {
     final picker = ImagePicker();
-    final pickedFiles = await picker.pickMultiImage(imageQuality: 70);
+    final pickedFiles = await picker.pickMultiImage(
+      imageQuality: kImageQuality,
+      maxWidth: kProductImageMaxSide,
+      maxHeight: kProductImageMaxSide,
+    );
     if (pickedFiles.isNotEmpty) {
       setState(() {
         widget.controllers.imageFiles.addAll(

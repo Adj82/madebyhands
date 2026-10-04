@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:madebyhands/core/constants/image_upload.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
@@ -62,7 +63,12 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
 
   Future<void> _pickProfileImage() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: kImageQuality,
+      maxWidth: kProfileImageMaxSide,
+      maxHeight: kProfileImageMaxSide,
+    );
     if (pickedFile != null) {
       setState(() => _profileImage = File(pickedFile.path));
     }
@@ -70,7 +76,12 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
 
   Future<void> _pickPortfolioImage() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: kImageQuality,
+      maxWidth: kProfileImageMaxSide,
+      maxHeight: kProfileImageMaxSide,
+    );
     if (pickedFile != null) {
       setState(() => _portfolioImages.add(File(pickedFile.path)));
     }
