@@ -7,6 +7,7 @@ import 'package:madebyhands/features/buyer/data/mock_buyer_repository.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/buyer_dashboard_page.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/arch_backdrop.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -116,5 +117,50 @@ void main() {
 
     final greeting = tester.getRect(find.text('Hello, Suhani'));
     expect(greeting.top, greaterThan(archTop + 60));
+  });
+
+  testWidgets('the other tabs sit below a scalloped pink header', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(412, 900);
+    tester.view.devicePixelRatio = 1;
+    tester.view.padding = const FakeViewPadding(top: 40);
+    addTearDown(tester.view.reset);
+
+    final buyer = UserEntity(
+      uid: 'buyer-1',
+      email: 'suhani@example.com',
+      name: 'Suhani',
+      role: 'buyer',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.lightThemeMode,
+        home: BlocProvider(
+          create: (_) => BuyerBloc(repository: MockBuyerRepository())
+            ..add(BuyerWatchProducts())
+            ..add(BuyerWatchFavorites(buyer.uid)),
+          child: BuyerDashboardPage(user: buyer, onLogout: () {}),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Shop, Wishlist, Cart and Account each get the frame; Home has the arch.
+    expect(find.byType(BuyerTabFrame, skipOffstage: false), findsNWidgets(4));
+
+    await tester.tap(find.text('Shop').last);
+    await tester.pumpAndSettle();
+
+    final header = tester.getRect(find.byType(ScallopedHeader));
+    expect(header.top, 0);
+    expect(header.bottom, 40 + ScallopedHeader.depth);
+    final heading = tester.getRect(find.text('Explore handmade'));
+    expect(
+      heading.top,
+      greaterThanOrEqualTo(40 + ScallopedHeader.contentInset),
+    );
+    expect(tester.takeException(), isNull);
   });
 }

@@ -329,25 +329,21 @@ class ArchBackdropPainter extends CustomPainter {
       ..close();
   }
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final scale = _scaleFor(size);
-    final field = Offset.zero & size;
-
-    // Rose field: a gentle fade from a deeper pink at the top to a lighter
-    // one at the bottom.
+  /// Paints the grainy pink field over [area]. The fade from deeper to
+  /// lighter pink is laid out over [fadeOver], so a strip of the field can
+  /// be painted to match the top of the full-screen one.
+  static void paintField(Canvas canvas, Rect area, {Rect? fadeOver}) {
     canvas.drawRect(
-      field,
+      area,
       Paint()
         ..shader = const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [_pinkTop, _pinkBottom],
-        ).createShader(field),
+        ).createShader(fadeOver ?? area),
     );
-
     canvas.drawRect(
-      field,
+      area,
       Paint()
         ..shader = ui.ImageShader(
           _grainImage,
@@ -362,17 +358,48 @@ class ArchBackdropPainter extends CustomPainter {
           filterQuality: FilterQuality.low,
         ),
     );
+  }
 
-    final arch = _archPath(size);
-
-    // A soft shadow lifts the cream panel off the wall.
+  /// Paints a cream panel shaped like [panel]: a soft shadow behind it and
+  /// the cream fill.
+  static void paintPanel(Canvas canvas, Path panel, double scale) {
     canvas.drawPath(
-      arch,
+      panel,
       Paint()
         ..color = _shade.withValues(alpha: 0.38)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, 7 * scale),
     );
-    canvas.drawPath(arch, Paint()..color = _cream);
+    canvas.drawPath(panel, Paint()..color = _cream);
+  }
+
+  /// Paints the thin gold rim just inside the edge of [panel], following
+  /// every scallop. The canvas must already be clipped to [panel].
+  static void paintRim(Canvas canvas, Path panel, double scale) {
+    canvas.drawPath(
+      panel,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = 9 * scale
+        ..color = _rim.withValues(alpha: 0.9),
+    );
+    canvas.drawPath(
+      panel,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = 7 * scale
+        ..color = _cream,
+    );
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = _scaleFor(size);
+    paintField(canvas, Offset.zero & size);
+
+    final arch = _archPath(size);
+    paintPanel(canvas, arch, scale);
 
     canvas.save();
     canvas.clipPath(arch);
@@ -393,27 +420,129 @@ class ArchBackdropPainter extends CustomPainter {
       canvas.drawLine(Offset(x, y), Offset(x + length, y), grainPaint);
     }
 
-    // A thin rim just inside the edge, following every scallop.
-    canvas.drawPath(
-      arch,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeJoin = StrokeJoin.round
-        ..strokeWidth = 9 * scale
-        ..color = _rim.withValues(alpha: 0.9),
-    );
-    canvas.drawPath(
-      arch,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeJoin = StrokeJoin.round
-        ..strokeWidth = 7 * scale
-        ..color = _cream,
-    );
+    paintRim(canvas, arch, scale);
     canvas.restore();
   }
 
   @override
   bool shouldRepaint(ArchBackdropPainter oldDelegate) =>
       oldDelegate.maxArchWidth != maxArchWidth || oldDelegate.top != top;
+}
+
+/// A strip of the Home backdrop for the top of the other buyer tabs: the
+/// grainy pink field behind the status bar, ending in a row of the arch's
+/// scallops where the cream page begins.
+class ScallopedHeader extends StatelessWidget {
+  const ScallopedHeader({super.key});
+
+  /// How far the strip reaches below the status bar. Content laid over the
+  /// page should start [contentInset] below the status bar.
+  static const depth = 24.0;
+  static const contentInset = 18.0;
+
+  /// Total height of the strip on this screen.
+  static double heightOf(BuildContext context) =>
+      MediaQuery.paddingOf(context).top + depth;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: heightOf(context),
+      child: RepaintBoundary(
+        child: CustomPaint(
+          painter: _ScallopedHeaderPainter(
+            safeTop: MediaQuery.paddingOf(context).top,
+            screenHeight: MediaQuery.sizeOf(context).height,
+          ),
+          child: const SizedBox.expand(),
+        ),
+      ),
+    );
+  }
+}
+
+class _ScallopedHeaderPainter extends CustomPainter {
+  const _ScallopedHeaderPainter({
+    required this.safeTop,
+    required this.screenHeight,
+  });
+
+  final double safeTop;
+  final double screenHeight;
+
+  /// The cusps sit this far below the status bar; the scallops rise from
+  /// there back up towards it.
+  static const _cuspDrop = 14.0;
+  static const _scallopWidth = 38.0;
+  static const _bulge = 0.30;
+  static const _cuspRounding = 2.4;
+
+  /// The rim and shadow are drawn as they are on a phone-sized arch.
+  static const _scale = 1.1;
+
+  Path _panel(Size size) {
+    final count = math.max(1, (size.width / _scallopWidth).round());
+    final chord = size.width / count;
+    final sagitta = chord * _bulge;
+    final r = (chord * chord / 4 + sagitta * sagitta) / (2 * sagitta);
+    final cuspY = safeTop + _cuspDrop;
+    final centreY = cuspY + (r - sagitta);
+
+    // The small circle that rounds a cusp sits straight above it and
+    // touches the scallops on either side.
+    final reach = r + _cuspRounding;
+    final filletY = centreY - math.sqrt(reach * reach - chord * chord / 4);
+    Offset touch(double cuspX, double centreX) {
+      final centre = Offset(centreX, centreY);
+      return centre + (Offset(cuspX, filletY) - centre) * (r / reach);
+    }
+
+    const overhang = 24.0;
+    final bottom = size.height + overhang;
+    final path = Path()
+      ..moveTo(-overhang, bottom)
+      ..lineTo(-overhang, cuspY)
+      ..lineTo(0, cuspY);
+    for (var i = 0; i < count; i++) {
+      final centreX = (i + 0.5) * chord;
+      final endX = (i + 1) * chord;
+      if (i == count - 1) {
+        path.arcToPoint(Offset(endX, cuspY), radius: Radius.circular(r));
+      } else {
+        path
+          ..arcToPoint(touch(endX, centreX), radius: Radius.circular(r))
+          ..arcToPoint(
+            touch(endX, centreX + chord),
+            radius: const Radius.circular(_cuspRounding),
+            clockwise: false,
+          );
+      }
+    }
+    return path
+      ..lineTo(size.width + overhang, cuspY)
+      ..lineTo(size.width + overhang, bottom)
+      ..close();
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final area = Offset.zero & size;
+    canvas.save();
+    canvas.clipRect(area);
+    ArchBackdropPainter.paintField(
+      canvas,
+      area,
+      fadeOver: Rect.fromLTWH(0, 0, size.width, screenHeight),
+    );
+    final panel = _panel(size);
+    ArchBackdropPainter.paintPanel(canvas, panel, _scale);
+    canvas.clipPath(panel);
+    ArchBackdropPainter.paintRim(canvas, panel, _scale);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_ScallopedHeaderPainter oldDelegate) =>
+      oldDelegate.safeTop != safeTop ||
+      oldDelegate.screenHeight != screenHeight;
 }

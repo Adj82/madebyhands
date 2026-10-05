@@ -2,21 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 
-/// The buyer panel's palette, taken from the Home tab and the product cards.
+/// The buyer panel's palette, taken from the Home tab: the cream of its
+/// arched panel, gold outlines and maroon accents.
 abstract final class BuyerColors {
-  /// Page background (see `BuyerBackground`).
-  static const paper = Color(0xFFFFF4F2);
+  /// Page background (see `BuyerBackground`) — the cream of the Home arch.
+  static const paper = Color(0xFFFCF0DE);
 
-  /// Cards — the product card's surface.
-  static const card = Color(0xFFFFF8F6);
+  /// Cards — a lighter ivory that lifts off the page.
+  static const card = Color(0xFFFFFAF0);
 
   /// Text fields and pill controls — the Home search bar's fill.
   static const field = Color(0xFFFFFDF8);
-  static const sand = Color(0xFFF5EFE3);
+  static const sand = Color(0xFFF4E6CF);
   static const clay = Color(0xFFEAD9C6);
 
   /// Tint behind a selected or highlighted item.
-  static const blush = Color(0xFFF2DEDD);
+  static const blush = Color(0xFFF6DCCF);
 
   /// Icons, links, prices and filled buttons.
   static const maroon = Color(0xFF8B261D);
@@ -33,8 +34,8 @@ abstract final class BuyerColors {
   /// Hints, captions and metadata.
   static const muted = Color(0xFF8A7F73);
 
-  /// Card outlines and dividers — the product card's border.
-  static const line = Color(0xFFE5DDD5);
+  /// Card outlines and dividers — the soft gold of the Home category cards.
+  static const line = Color(0xFFE3C9A1);
 
   /// Field and pill outlines — the Home search bar's border.
   static const gold = Color(0xFFC49A6C);
@@ -149,16 +150,18 @@ abstract final class BuyerTheme {
         actionsIconTheme: const IconThemeData(color: BuyerColors.maroon),
         titleTextStyle: sans(19, FontWeight.w800, color: BuyerColors.maroon),
       ),
-      // The product card: soft surface, thin warm outline, 20px corners.
+      // The product card: ivory surface, thin gold outline, 20px corners and
+      // a soft maroon-tinted shadow.
       cardTheme: CardThemeData(
         color: BuyerColors.card,
         surfaceTintColor: Colors.transparent,
-        elevation: 1,
+        shadowColor: BuyerColors.maroonDeep.withValues(alpha: 0.35),
+        elevation: 2,
         margin: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: BuyerColors.line, width: 1.5),
+          side: const BorderSide(color: BuyerColors.line, width: 1.2),
         ),
       ),
       // No textColor here: ListTile would paint it over the subtitle's own

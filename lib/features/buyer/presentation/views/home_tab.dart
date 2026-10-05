@@ -429,14 +429,14 @@ class _HomeTabState extends State<HomeTab> {
     return Container(
       height: 40,
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFDF8),
+        color: const Color(0xFFFFFAF0),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFC49A6C), width: 1.1),
+        border: Border.all(color: const Color(0xFFC49A6C), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: const Color(0xFF6B1D1D).withValues(alpha: 0.10),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -678,15 +678,21 @@ class _HomeTabState extends State<HomeTab> {
     return GestureDetector(
       onTap: () => _openCategory(category),
       child: AspectRatio(
-        aspectRatio: 3 / 4.5,
+        aspectRatio: 3 / 4.1,
         child: Container(
+          // The gold outline is drawn over the card so it stays crisp on top
+          // of the artwork behind it.
+          foregroundDecoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFDDB98A), width: 1.1),
+          ),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 6,
-                offset: const Offset(0, 3),
+                color: const Color(0xFF6B1D1D).withValues(alpha: 0.12),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -708,8 +714,7 @@ class _HomeTabState extends State<HomeTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        SizedBox(
-                          height: 150,
+                        Expanded(
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(12),
                             child: art == null
@@ -724,7 +729,10 @@ class _HomeTabState extends State<HomeTab> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Expanded(
+                        // A fixed band for the name, so the picture takes
+                        // the rest of the card on every screen size.
+                        SizedBox(
+                          height: 58,
                           child: Center(
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
@@ -735,9 +743,9 @@ class _HomeTabState extends State<HomeTab> {
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.montserrat(
                                   fontSize: 11.5,
-                                  fontWeight: FontWeight.w500,
+                                  fontWeight: FontWeight.w700,
                                   height: 1.18,
-                                  color: const Color(0xFF5C1D1D),
+                                  color: const Color(0xFF6B1D1D),
                                 ),
                                 maxLines: 4,
                                 overflow: TextOverflow.ellipsis,

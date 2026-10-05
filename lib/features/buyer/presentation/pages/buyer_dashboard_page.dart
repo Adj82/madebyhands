@@ -428,7 +428,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                       onNotificationsTap: _openNotifications,
                     ),
                   ),
-                  SafeArea(
+                  BuyerTabFrame(
                     child: SearchTab(
                       userId: _currentUser.uid,
                       onProductTap: _openProduct,
@@ -437,21 +437,21 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                       searchRequest: _shopSearch,
                     ),
                   ),
-                  SafeArea(
+                  BuyerTabFrame(
                     child: SavedTab(
                       userId: _currentUser.uid,
                       onProductTap: _openProduct,
                       onBrowse: () => _navigationCubit.changePage(1),
                     ),
                   ),
-                  SafeArea(
+                  BuyerTabFrame(
                     child: CartTab(
                       onBrowse: () => _navigationCubit.changePage(1),
                       onCheckout: _openCheckout,
                       onProductTap: _openProduct,
                     ),
                   ),
-                  SafeArea(
+                  BuyerTabFrame(
                     child: ProfileTab(
                       user: _currentUser,
                       onAccount: () => Navigator.of(context).push(
@@ -501,14 +501,27 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                 final safeIndex = selectedIndex.clamp(0, pages.length - 1);
 
                 return Scaffold(
-                  backgroundColor: const Color(0xFFFAF6EE),
+                  backgroundColor: BuyerColors.paper,
                   body: IndexedStack(index: safeIndex, children: pages),
+                  // The bar picks up the Home arch's look: the same cream,
+                  // a gold hairline along its top edge, and a solid maroon
+                  // pill behind the selected tab.
                   bottomNavigationBar: Container(
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFAF6EE),
-                      borderRadius: BorderRadius.vertical(
+                    padding: const EdgeInsets.only(top: 1.2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDDB98A),
+                      borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(20),
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(
+                            0xFF6B1D1D,
+                          ).withValues(alpha: 0.10),
+                          blurRadius: 14,
+                          offset: const Offset(0, -3),
+                        ),
+                      ],
                     ),
                     child: ClipRRect(
                       borderRadius: const BorderRadius.vertical(
@@ -517,15 +530,18 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                       child: NavigationBarTheme(
                         data: NavigationBarThemeData(
                           height: 78,
-                          backgroundColor: const Color(0xFFFAF6EE),
-                          indicatorColor: const Color(0xFFF2DEDD),
+                          elevation: 0,
+                          backgroundColor: const Color(0xFFFCF0DE),
+                          surfaceTintColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          indicatorColor: const Color(0xFF8B261D),
                           iconTheme: WidgetStateProperty.resolveWith((states) {
                             return IconThemeData(
                               color: states.contains(WidgetState.selected)
-                                  ? const Color(0xFF8B261D)
+                                  ? const Color(0xFFFCF0DE)
                                   : const Color(
                                       0xFF8B261D,
-                                    ).withValues(alpha: 0.55),
+                                    ).withValues(alpha: 0.86),
                             );
                           }),
                           labelTextStyle: WidgetStateProperty.resolveWith((
@@ -540,7 +556,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                                   ? const Color(0xFF8B261D)
                                   : const Color(
                                       0xFF8B261D,
-                                    ).withValues(alpha: 0.6),
+                                    ).withValues(alpha: 0.86),
                             );
                           }),
                         ),

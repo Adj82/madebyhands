@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
+import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_thumbnail.dart';
 
 class ProductCard extends StatelessWidget {
@@ -23,11 +24,12 @@ class ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 1,
-      color: const Color(0xFFFFF8F6),
+      elevation: 2,
+      color: BuyerColors.card,
+      shadowColor: BuyerColors.maroonDeep.withValues(alpha: 0.35),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: Color(0xFFE5DDD5), width: 1.5),
+        side: const BorderSide(color: BuyerColors.line, width: 1.2),
       ),
       clipBehavior: Clip.antiAlias,
       margin: EdgeInsets.zero,
@@ -52,9 +54,9 @@ class ProductCard extends StatelessWidget {
                           isSaved ? Icons.favorite : Icons.favorite_border,
                         ),
                         style: IconButton.styleFrom(
-                          backgroundColor: const Color(
-                            0xFFFAF6EE,
-                          ).withValues(alpha: 0.92),
+                          backgroundColor: BuyerColors.card.withValues(
+                            alpha: 0.92,
+                          ),
                           foregroundColor: isSaved
                               ? const Color(0xFF8B261D)
                               : const Color(0xFF8B261D).withValues(alpha: 0.7),
