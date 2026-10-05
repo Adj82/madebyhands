@@ -34,7 +34,8 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  final PageController _storyPageController = PageController();
+  static const int _initialStoryPage = 1000;
+  late final PageController _storyPageController;
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _homeSearchController = TextEditingController();
 
@@ -47,7 +48,7 @@ class _HomeTabState extends State<HomeTab> {
       'description':
           'Ancient folk painting tradition from Mithila celebrating nature, mythology and vibrant heritage.',
       'image':
-          'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?q=80&w=800&auto=format&fit=crop',
+          'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?q=80&w=800&auto=format&fit=crop',
     },
     {
       'title': 'The Heritage of Phulkari',
@@ -82,6 +83,9 @@ class _HomeTabState extends State<HomeTab> {
   @override
   void initState() {
     super.initState();
+    _storyPageController = PageController(
+      initialPage: _initialStoryPage * _stories.length,
+    );
     _scrollController.addListener(_onScroll);
   }
 
@@ -451,52 +455,48 @@ class _HomeTabState extends State<HomeTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Historical Art & Stories',
-              style: GoogleFonts.montserrat(
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-                color: const Color(0xFF6B1D1D),
-              ),
-            ),
-            InkWell(
-              onTap: widget.onBrowseAll,
-              child: const Icon(
-                Icons.arrow_forward_rounded,
-                size: 20,
-                color: Color(0xFF8B261D),
-              ),
-            ),
-          ],
+        Text(
+          'Interesting Facts & Stories',
+          style: GoogleFonts.montserrat(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFF6B1D1D),
+          ),
         ),
         const SizedBox(height: 10),
         SizedBox(
           height: 240,
           child: PageView.builder(
             controller: _storyPageController,
-            itemCount: _stories.length,
             itemBuilder: (context, index) {
-              final story = _stories[index];
+              final story = _stories[index % _stories.length];
               return _buildStoryCard(story);
             },
           ),
         ),
         const SizedBox(height: 10),
         Center(
-          child: SmoothPageIndicator(
-            controller: _storyPageController,
-            count: _stories.length,
-            effect: const ExpandingDotsEffect(
-              activeDotColor: Color(0xFF8B261D),
-              dotColor: Color(0xFFE2D0B5),
-              dotHeight: 7,
-              dotWidth: 7,
-              expansionFactor: 2.5,
-              spacing: 6,
-            ),
+          child: AnimatedBuilder(
+            animation: _storyPageController,
+            builder: (context, child) {
+              final page = _storyPageController.hasClients &&
+                      _storyPageController.page != null
+                  ? _storyPageController.page!
+                  : (_initialStoryPage * _stories.length).toDouble();
+              final activeIndex = (page.round()) % _stories.length;
+              return AnimatedSmoothIndicator(
+                activeIndex: activeIndex,
+                count: _stories.length,
+                effect: const ExpandingDotsEffect(
+                  activeDotColor: Color(0xFF8B261D),
+                  dotColor: Color(0xFFE2D0B5),
+                  dotHeight: 7,
+                  dotWidth: 7,
+                  expansionFactor: 2.5,
+                  spacing: 6,
+                ),
+              );
+            },
           ),
         ),
       ],
@@ -530,20 +530,23 @@ class _HomeTabState extends State<HomeTab> {
           children: [
             // 1. Artwork Image
             Positioned.fill(
-              child: Image.network(
-                story['image']!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(
-                  color: const Color(0xFFEAD9C6),
-                  child: const Center(
-                    child: Icon(
-                      Icons.image,
-                      size: 48,
-                      color: Color(0xFF8B261D),
+              child: story['image']!.startsWith('http')
+                  ? Image.network(
+                      story['image']!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Image.asset(
+                        'assets/main_page_elements/painting_main.png',
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : Image.asset(
+                      story['image']!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Image.asset(
+                        'assets/main_page_elements/painting_main.png',
+                        fit: BoxFit.cover,
+                      ),
                     ),
-                  ),
-                ),
-              ),
             ),
             // 2. Dark Gradient Overlay at Bottom
             Positioned.fill(
