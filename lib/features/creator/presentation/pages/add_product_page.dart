@@ -8,6 +8,7 @@ import 'package:madebyhands/core/constants/product_categories.dart';
 import 'package:madebyhands/core/constants/image_upload.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
@@ -376,13 +377,21 @@ class _AddProductPageState extends State<AddProductPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _isEditing ? 'Edit product' : 'Add new product',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+    return BuyerBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: Text(
+            _isEditing ? 'Edit product' : 'Add new product',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF8B261D),
+            ),
+          ),
+          iconTheme: const IconThemeData(color: Color(0xFF8B261D)),
         ),
-      ),
       body: BlocConsumer<CreatorBloc, CreatorState>(
         listenWhen: (previous, current) =>
             previous.actionId != current.actionId &&
@@ -462,6 +471,10 @@ class _AddProductPageState extends State<AddProductPage> {
                   const SizedBox(height: 50),
                   FilledButton(
                     onPressed: saving ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF8B261D),
+                      foregroundColor: Colors.white,
+                    ),
                     child: Text(_isEditing ? 'Save & send for review' : 'Submit for review'),
                   ),
                   const SizedBox(height: 30),
@@ -474,13 +487,16 @@ class _AddProductPageState extends State<AddProductPage> {
                 const Positioned.fill(
                   child: ColoredBox(
                     color: Color(0x66FFFFFF),
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(
+                      child: CircularProgressIndicator(color: Color(0xFF8B261D)),
+                    ),
                   ),
                 ),
             ],
           );
         },
       ),
+    ),
     );
   }
 
@@ -547,7 +563,7 @@ class _AddProductPageState extends State<AddProductPage> {
       style: const TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.bold,
-        color: AppColors.primary,
+        color: Color(0xFF8B261D),
       ),
     );
   }
@@ -1274,10 +1290,12 @@ class _ChoiceChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : AppColors.surface,
+          color: isSelected ? const Color(0xFF8B261D) : const Color(0xFFFAF6EE),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.outline,
+            color: isSelected
+                ? const Color(0xFF8B261D)
+                : const Color(0xFF8B261D).withValues(alpha: 0.3),
           ),
         ),
         child: Center(
