@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
@@ -125,7 +124,7 @@ class _CreatorProfileViewState extends State<CreatorProfileView> {
             Text(
               profile.location,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.mutedText, fontSize: 13),
+              style: const TextStyle(color: const Color(0xFF8A8F82), fontSize: 13),
             ),
           ],
           const SizedBox(height: 6),
@@ -163,7 +162,7 @@ class _CreatorProfileViewState extends State<CreatorProfileView> {
         ),
         subtitle: Text(
           subtitle,
-          style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+          style: const TextStyle(fontSize: 12, color: const Color(0xFF8A8F82)),
         ),
         trailing: const Icon(
           Icons.chevron_right,
