@@ -33,12 +33,13 @@ void main() {
           child: const MaterialApp(home: WelcomeScreen()),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
 
       // Swipe to the last onboarding page.
       for (var i = 0; i < 6; i++) {
         await tester.fling(find.byType(PageView), const Offset(-400, 0), 1000);
-        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pump(const Duration(seconds: 1));
       }
 
       expect(
