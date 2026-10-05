@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_order.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
@@ -8,6 +9,7 @@ import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart
 import 'package:madebyhands/features/creator/presentation/pages/creator_verification_page.dart';
 import 'package:madebyhands/features/orders/domain/order_status.dart';
 import 'package:madebyhands/init_dependencies.dart';
+import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 class CreatorHomeView extends StatefulWidget {
   final CreatorProfile profile;
@@ -33,15 +35,17 @@ class _CreatorHomeViewState extends State<CreatorHomeView> {
           padding: const EdgeInsets.all(20),
           children: [
             _StorefrontCard(profile: profile),
-            const SizedBox(height: 24),
+            const SizedBox(height: 18),
             _VerificationStatusCard(profile: profile),
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
             const Text(
               'Your performance',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 15),
+            const SizedBox(height: 10),
             _PerformanceSummary(orders: _orders),
+            const SizedBox(height: 24),
+            const _HistoricalArtSection(),
           ],
         );
       },
@@ -214,8 +218,6 @@ class _PerformanceSummary extends StatelessWidget {
         final active = all.where((o) => !OrderStatus.isRejectedOrCancelled(o.status)).toList();
         final pending = active.where((o) => OrderStatus.isNew(o.status)).length;
         final inProgress = active.where((o) => OrderStatus.isInProgress(o.status)).length;
-        // "Settled" means the payout has actually been released, matching
-        // the definition used on the Earnings tab (see creator_earnings_view.dart).
         final settled = active.where((o) => o.countsTowardEarnings && o.isPaidOut).toList();
         final totalEarned = settled.fold<int>(0, (total, o) => total + o.creatorNetAmount);
 
@@ -223,9 +225,9 @@ class _PerformanceSummary extends StatelessWidget {
           crossAxisCount: 2,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 15,
-          mainAxisSpacing: 15,
-          childAspectRatio: 1.5,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 2.2,
           children: [
             _StatCard(
               title: 'New orders',
@@ -274,10 +276,10 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.outline),
       ),
       child: Column(
@@ -292,19 +294,208 @@ class _StatCard extends StatelessWidget {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+                  style: const TextStyle(fontSize: 11, color: AppColors.mutedText),
                 ),
               ),
-              Icon(icon, color: color, size: 20),
+              Icon(icon, color: color, size: 18),
             ],
           ),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _HistoricalArtSection extends StatefulWidget {
+  const _HistoricalArtSection();
+
+  @override
+  State<_HistoricalArtSection> createState() => _HistoricalArtSectionState();
+}
+
+class _HistoricalArtSectionState extends State<_HistoricalArtSection> {
+  late final PageController _storyPageController;
+  static const int _initialStoryPage = 1000;
+
+  final List<Map<String, String>> _stories = const [
+    {
+      'title': 'The Story of Madhubani Art',
+      'description':
+          'Ancient folk painting tradition from Mithila celebrating nature, mythology and vibrant heritage.',
+      'image':
+          'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?q=80&w=800&auto=format&fit=crop',
+    },
+    {
+      'title': 'The Heritage of Phulkari',
+      'description':
+          'Handcrafted floral embroidery woven with silk threads, passing down generations of stories.',
+      'image':
+          'https://images.unsplash.com/photo-1606744888344-493238951221?q=80&w=800&auto=format&fit=crop',
+    },
+    {
+      'title': 'Royal Terracotta & Pottery',
+      'description':
+          'Earthy clay sculptures and traditional pottery shaped by hand across royal artisan guilds.',
+      'image':
+          'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?q=80&w=800&auto=format&fit=crop',
+    },
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _storyPageController = PageController(
+      initialPage: _initialStoryPage * _stories.length,
+    );
+  }
+
+  @override
+  void dispose() {
+    _storyPageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Historical art and stories',
+          style: GoogleFonts.montserrat(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: AppColors.primary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 200,
+          child: PageView.builder(
+            controller: _storyPageController,
+            itemBuilder: (context, index) {
+              final story = _stories[index % _stories.length];
+              return _buildStoryCard(story);
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+        Center(
+          child: AnimatedBuilder(
+            animation: _storyPageController,
+            builder: (context, child) {
+              final page = _storyPageController.hasClients &&
+                      _storyPageController.page != null
+                  ? _storyPageController.page!
+                  : (_initialStoryPage * _stories.length).toDouble();
+              final activeIndex = (page.round()) % _stories.length;
+              return AnimatedSmoothIndicator(
+                activeIndex: activeIndex,
+                count: _stories.length,
+                effect: const ExpandingDotsEffect(
+                  activeDotColor: AppColors.primary,
+                  dotColor: AppColors.outline,
+                  dotHeight: 7,
+                  dotWidth: 7,
+                  expansionFactor: 2.5,
+                  spacing: 6,
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStoryCard(Map<String, String> story) {
+    return Container(
+      margin: const EdgeInsets.only(right: 12, bottom: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Image.network(
+                story['image']!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: AppColors.outline,
+                  child: const Icon(Icons.brush, size: 40, color: AppColors.mutedText),
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.3),
+                      Colors.black.withValues(alpha: 0.85),
+                    ],
+                    stops: const [0.3, 0.65, 1.0],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 14,
+              right: 14,
+              bottom: 14,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    story['title']!,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      height: 1.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (story['description'] != null) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      story['description']!,
+                      style: GoogleFonts.montserrat(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.white.withValues(alpha: 0.90),
+                        height: 1.3,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
