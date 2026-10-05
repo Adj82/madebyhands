@@ -12,6 +12,8 @@ import 'package:madebyhands/features/creator/domain/entities/creator_product.dar
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
+import 'package:madebyhands/features/creator/presentation/pages/manage_bank_account_page.dart';
+import 'package:madebyhands/init_dependencies.dart';
 
 class AddProductPage extends StatefulWidget {
   final CreatorProfile profile;
@@ -24,6 +26,10 @@ class AddProductPage extends StatefulWidget {
 
 class _AddProductPageState extends State<AddProductPage> {
   final _formKey = GlobalKey<FormState>();
+
+  /// True once we know this creator has not saved payout details yet. Only
+  /// checked when listing a new product; a failed lookup shows nothing.
+  bool _payoutDetailsMissing = false;
 
   // General Controllers
   late final TextEditingController _nameController;
@@ -94,6 +100,7 @@ class _AddProductPageState extends State<AddProductPage> {
   void initState() {
     super.initState();
     final p = widget.initialProduct;
+    if (p == null) _checkPayoutDetails();
     _nameController = TextEditingController(text: p?.name);
     _descriptionController = TextEditingController(text: p?.description);
     _priceController = TextEditingController(text: p?.price.round().toString());
@@ -383,11 +390,18 @@ class _AddProductPageState extends State<AddProductPage> {
             current.actionStatus != CreatorActionStatus.inProgress,
         listener: (context, state) {
           final success = state.actionStatus == CreatorActionStatus.success;
+          final payoutReminder = success && _payoutDetailsMissing && !_isEditing
+              ? ' Add your payout details (Profile → Payout details) to receive payouts.'
+              : '';
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
+              duration: payoutReminder.isEmpty
+                  ? const Duration(seconds: 4)
+                  : const Duration(seconds: 8),
               content: Text(
-                state.actionMessage ??
-                    (success ? 'Product saved.' : 'Could not save the product.'),
+                (state.actionMessage ??
+                        (success ? 'Product saved.' : 'Could not save the product.')) +
+                    payoutReminder,
               ),
               backgroundColor: success ? null : Colors.red.shade700,
             ),
@@ -415,6 +429,10 @@ class _AddProductPageState extends State<AddProductPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (_payoutDetailsMissing) ...[
+                    _buildPayoutWarning(),
+                    const SizedBox(height: 24),
+                  ],
                   _buildSectionTitle('Product photos * (2–6)'),
                   const SizedBox(height: 10),
                   _buildProductImagePicker(),
@@ -462,6 +480,63 @@ class _AddProductPageState extends State<AddProductPage> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Future<void> _checkPayoutDetails() async {
+    final result = await serviceLocator<CreatorRepository>()
+        .getCreatorBankAccount(widget.profile.uid);
+    if (!mounted) return;
+    result.fold(
+      (_) {},
+      (account) => setState(() => _payoutDetailsMissing = account == null),
+    );
+  }
+
+  Widget _buildPayoutWarning() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.account_balance_outlined, color: Colors.orange, size: 22),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Add your payout details to get paid. You can list this '
+                  'product now, but we cannot send you earnings from your '
+                  'sales until your bank account or UPI details are added.',
+                  style: TextStyle(fontSize: 13, height: 1.4),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton(
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ManageBankAccountPage(profile: widget.profile),
+                  ),
+                );
+                if (mounted) _checkPayoutDetails();
+              },
+              child: const Text('Add payout details'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1066,8 +1141,9 @@ class _AddProductPageState extends State<AddProductPage> {
             ),
             const SizedBox(width: 8),
             Expanded(
-              flex: 2,
+              flex: 3,
               child: DropdownButtonFormField<String>(
+                isExpanded: true,
                 initialValue: _dimensionUnit,
                 items: _dimensionUnits
                     .map((u) => DropdownMenuItem(value: u, child: Text(u)))
@@ -1131,10 +1207,13 @@ class _AddProductPageState extends State<AddProductPage> {
         TextFormField(
           controller: _shippingController,
           decoration: const InputDecoration(
-            labelText: 'Shipping Information *',
-            prefixIcon: Icon(Icons.local_shipping_outlined),
+            labelText: 'Estimated shipping timeline *',
+            hintText: 'e.g. Dispatches in 2–3 working days',
+            prefixIcon: Icon(Icons.schedule_outlined),
           ),
-          validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+          validator: (v) => (v == null || v.trim().isEmpty)
+              ? 'Add an estimated shipping timeline'
+              : null,
         ),
         if (showIsFramedOption) ...[
           const SizedBox(height: 20),

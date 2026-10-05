@@ -263,7 +263,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
               if (product.shippingInfo.isNotEmpty)
                 _DetailLine(
                   icon: Icons.local_shipping_outlined,
-                  text: product.shippingInfo,
+                  text: 'Estimated shipping: ${product.shippingInfo}',
                 ),
             ],
             if (product.isCustomizable &&

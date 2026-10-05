@@ -123,7 +123,7 @@ Use Razorpay **test** credentials until checkout and verification have been exer
 
 ## Tests
 
-`test/` holds nine Flutter test files and does not initialize Firebase. Widget tests inject `MockBuyerRepository` (`lib/features/buyer/data/mock_buyer_repository.dart`) and call `SharedPreferences.setMockInitialValues({})` in `setUp`. Keep new tests off live Firebase by depending on repository interfaces.
+`test/` holds ten Flutter test files and does not initialize Firebase. Widget tests inject `MockBuyerRepository` (`lib/features/buyer/data/mock_buyer_repository.dart`) and call `SharedPreferences.setMockInitialValues({})` in `setUp`. Keep new tests off live Firebase by depending on repository interfaces.
 
 `test/api/` holds Node tests for the payment API (`npm test`) using a fake Firestore and stubbed Razorpay/auth; they need no network or credentials.
 

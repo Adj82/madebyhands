@@ -29,6 +29,8 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
   late final TextEditingController _panNumberController;
 
   String _accountType = 'Savings';
+  bool _showAccountNumber = false;
+  bool _showConfirmAccountNumber = false;
   bool _loading = true;
   String? _loadError;
 
@@ -230,10 +232,21 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
                   TextFormField(
                     controller: _accountNumberController,
                     keyboardType: TextInputType.number,
-                    obscureText: true,
-                    decoration: const InputDecoration(
+                    obscureText: !_showAccountNumber,
+                    decoration: InputDecoration(
                       hintText: 'Enter bank account number',
-                      prefixIcon: Icon(Icons.numbers_outlined),
+                      prefixIcon: const Icon(Icons.numbers_outlined),
+                      suffixIcon: IconButton(
+                        tooltip: _showAccountNumber ? 'Hide' : 'Show',
+                        icon: Icon(
+                          _showAccountNumber
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                        ),
+                        onPressed: () => setState(
+                          () => _showAccountNumber = !_showAccountNumber,
+                        ),
+                      ),
                     ),
                     validator: (v) {
                       final trimmed = v?.trim() ?? '';
@@ -252,9 +265,22 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
                   TextFormField(
                     controller: _confirmAccountNumberController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
+                    obscureText: !_showConfirmAccountNumber,
+                    decoration: InputDecoration(
                       hintText: 'Re-enter bank account number',
-                      prefixIcon: Icon(Icons.check_circle_outline),
+                      prefixIcon: const Icon(Icons.check_circle_outline),
+                      suffixIcon: IconButton(
+                        tooltip: _showConfirmAccountNumber ? 'Hide' : 'Show',
+                        icon: Icon(
+                          _showConfirmAccountNumber
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                        ),
+                        onPressed: () => setState(
+                          () => _showConfirmAccountNumber =
+                              !_showConfirmAccountNumber,
+                        ),
+                      ),
                     ),
                     validator: (v) {
                       final trimmed = v?.trim() ?? '';

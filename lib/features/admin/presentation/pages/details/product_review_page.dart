@@ -110,7 +110,7 @@ class ProductReviewPage extends StatelessWidget {
                         : '${product.editHistory!['previousStock']} units',
                   ),
                   _InfoSection(title: 'Weight', value: product.weight),
-                  _InfoSection(title: 'Shipping', value: product.shippingInfo),
+                  _InfoSection(title: 'Estimated shipping timeline', value: product.shippingInfo),
                   _InfoSection(title: 'Dimensions', value: product.dimensions),
                   _InfoSection(title: 'Materials', value: product.materials),
                   
