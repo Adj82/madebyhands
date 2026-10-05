@@ -7,6 +7,7 @@ import 'package:madebyhands/core/constants/image_upload.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
 
@@ -181,20 +182,29 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
   Widget build(BuildContext context) {
     final isEditMode = widget.existingProfile != null;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          isEditMode ? 'Edit Creator Profile' : 'Creator Onboarding',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          if (!isEditMode)
-            IconButton(
-              onPressed: () => context.read<AuthBloc>().add(AuthLogoutRequested()),
-              icon: const Icon(Icons.logout),
+    return BuyerBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: Text(
+            isEditMode ? 'Edit Creator Profile' : 'Creator Onboarding',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF8B261D),
             ),
-        ],
-      ),
+          ),
+          iconTheme: const IconThemeData(color: Color(0xFF8B261D)),
+          actions: [
+            if (!isEditMode)
+              IconButton(
+                onPressed: () =>
+                    context.read<AuthBloc>().add(AuthLogoutRequested()),
+                icon: const Icon(Icons.logout, color: Color(0xFF8B261D)),
+              ),
+          ],
+        ),
       body: BlocConsumer<CreatorBloc, CreatorState>(
         listenWhen: (previous, current) =>
             previous.actionId != current.actionId &&
@@ -246,11 +256,18 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
                     const SizedBox(height: 50),
                     FilledButton(
                       onPressed: saving ? null : _submit,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF8B261D),
+                        foregroundColor: Colors.white,
+                      ),
                       child: saving
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
                           : Text(isEditMode ? 'Save profile changes' : 'Launch my studio'),
                     ),
@@ -262,6 +279,7 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
           );
         },
       ),
+    ),
     );
   }
 
