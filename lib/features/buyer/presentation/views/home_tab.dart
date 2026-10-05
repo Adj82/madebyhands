@@ -158,6 +158,10 @@ class _HomeTabState extends State<HomeTab> {
 
     final fadeStrength = (scrollOffset / 40.0).clamp(0.0, 1.0);
 
+    // The arch starts just under the status bar; the header follows it down
+    // so the logo sits inside the crown.
+    final headerInset = ArchBackdrop.headerInset(context);
+
     return Scaffold(
       backgroundColor: const Color(0xFFFAF6EE),
       body: Stack(
@@ -194,17 +198,27 @@ class _HomeTabState extends State<HomeTab> {
                 key: const PageStorageKey('buyer-home-scroll'),
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 28.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 250.0),
-                    _buildHistoricalArtSection(),
-                    const SizedBox(height: 18),
-                    _buildCategoryDivider(),
-                    const SizedBox(height: 14),
-                    _buildCategoriesGrid(),
-                    const SizedBox(height: 36),
-                  ],
+                // On wide screens the arch stops growing, so the content is
+                // held to the same width and stays inside it.
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: ArchBackdrop.defaultMaxArchWidth - 56.0,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(height: 244.0 + headerInset),
+                        _buildHistoricalArtSection(),
+                        const SizedBox(height: 18),
+                        _buildCategoryDivider(),
+                        const SizedBox(height: 14),
+                        _buildCategoriesGrid(),
+                        const SizedBox(height: 36),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -217,47 +231,56 @@ class _HomeTabState extends State<HomeTab> {
             right: 0,
             child: SafeArea(
               bottom: false,
-              child: Column(
-                // key removed from here
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // FIXED: logo + MADE BY HANDS text
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(28.0, 6.0, 28.0, 0),
-                    child: _buildHeaderWithBrandingAndTopRightIcons(),
+              child: Align(
+                alignment: Alignment.topCenter,
+                heightFactor: 1.0,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: ArchBackdrop.defaultMaxArchWidth,
                   ),
-                  const SizedBox(height: 2),
+                  child: Column(
+                    // key removed from here
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // FIXED: logo + MADE BY HANDS text
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(28.0, headerInset, 28.0, 0),
+                        child: _buildHeaderWithBrandingAndTopRightIcons(),
+                      ),
+                      const SizedBox(height: 2),
 
-                  // COLLAPSING: Hello user, address, profile & notification icons
-                  Transform.translate(
-                    offset: const Offset(0, -30),
-                    child: ClipRect(
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        heightFactor: brandingHeightFactor,
-                        child: Opacity(
-                          opacity: brandingOpacity,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 28.0,
+                      // COLLAPSING: Hello user, address, profile & notification icons
+                      Transform.translate(
+                        offset: const Offset(0, -30),
+                        child: ClipRect(
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            heightFactor: brandingHeightFactor,
+                            child: Opacity(
+                              opacity: brandingOpacity,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 28.0,
+                                ),
+                                child: _buildGreetingAndAddress(firstName),
+                              ),
                             ),
-                            child: _buildGreetingAndAddress(firstName),
                           ),
                         ),
                       ),
-                    ),
-                  ),
 
-                  // Search Bar (lifts up as it gets pinned)
-                  Transform.translate(
-                    offset: Offset(0, -30.0 * collapseProgress),
-                    child: Padding(
-                      key: _overlayKey, // key now lives here
-                      padding: const EdgeInsets.symmetric(horizontal: 28.0),
-                      child: _buildSearchBar(),
-                    ),
+                      // Search Bar (lifts up as it gets pinned)
+                      Transform.translate(
+                        offset: Offset(0, -30.0 * collapseProgress),
+                        child: Padding(
+                          key: _overlayKey, // key now lives here
+                          padding: const EdgeInsets.symmetric(horizontal: 28.0),
+                          child: _buildSearchBar(),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
