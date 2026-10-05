@@ -37,12 +37,15 @@ class _CreatorOrdersViewState extends State<CreatorOrdersView> {
               child: Text(
                 'Could not load orders: ${friendlyErrorMessage(snapshot.error!)}',
                 textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.mutedText),
               ),
             ),
           );
         }
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFF8B261D)),
+          );
         }
         final orders = snapshot.data!;
         final newOrders = orders.where((o) => OrderStatus.isNew(o.status)).toList();
@@ -60,8 +63,9 @@ class _CreatorOrdersViewState extends State<CreatorOrdersView> {
           child: Column(
             children: [
               TabBar(
-                labelColor: AppColors.primary,
-                indicatorColor: AppColors.primary,
+                labelColor: const Color(0xFF8B261D),
+                indicatorColor: const Color(0xFF8B261D),
+                unselectedLabelColor: AppColors.mutedText,
                 tabs: [
                   Tab(text: 'New (${newOrders.length})'),
                   Tab(text: 'Active (${active.length})'),
@@ -71,9 +75,21 @@ class _CreatorOrdersViewState extends State<CreatorOrdersView> {
               Expanded(
                 child: TabBarView(
                   children: [
-                    _OrderList(orders: newOrders, emptyMessage: 'No new orders.'),
-                    _OrderList(orders: active, emptyMessage: 'No orders in progress.'),
-                    _OrderList(orders: closed, emptyMessage: 'No completed orders yet.'),
+                    _OrderList(
+                      orders: newOrders,
+                      emptyMessage: 'No new orders.',
+                      profile: widget.profile,
+                    ),
+                    _OrderList(
+                      orders: active,
+                      emptyMessage: 'No orders in progress.',
+                      profile: widget.profile,
+                    ),
+                    _OrderList(
+                      orders: closed,
+                      emptyMessage: 'No completed orders yet.',
+                      profile: widget.profile,
+                    ),
                   ],
                 ),
               ),
@@ -88,8 +104,13 @@ class _CreatorOrdersViewState extends State<CreatorOrdersView> {
 class _OrderList extends StatelessWidget {
   final List<CreatorOrder> orders;
   final String emptyMessage;
+  final CreatorProfile profile;
 
-  const _OrderList({required this.orders, required this.emptyMessage});
+  const _OrderList({
+    required this.orders,
+    required this.emptyMessage,
+    required this.profile,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +122,10 @@ class _OrderList extends StatelessWidget {
     return ListView.builder(
       padding: const EdgeInsets.all(15),
       itemCount: orders.length,
-      itemBuilder: (context, index) => _OrderCard(order: orders[index]),
+      itemBuilder: (context, index) => _OrderCard(
+        order: orders[index],
+        profile: profile,
+      ),
     );
   }
 }
@@ -115,7 +139,11 @@ Future<bool> _rejectOrder(BuildContext context, CreatorOrder order) async {
   final reason = await showDialog<String>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: Text('Reject order #${order.shortId}?'),
+      backgroundColor: const Color(0xFFFAF6EE),
+      title: Text(
+        'Reject order #${order.shortId}?',
+        style: const TextStyle(color: Color(0xFF8B261D)),
+      ),
       content: Form(
         key: formKey,
         child: Column(
@@ -163,8 +191,9 @@ Future<bool> _rejectOrder(BuildContext context, CreatorOrder order) async {
 
 class _OrderCard extends StatelessWidget {
   final CreatorOrder order;
+  final CreatorProfile profile;
 
-  const _OrderCard({required this.order});
+  const _OrderCard({required this.order, required this.profile});
 
   @override
   Widget build(BuildContext context) {
@@ -172,18 +201,25 @@ class _OrderCard extends StatelessWidget {
     final itemCount = order.items.fold<int>(0, (sum, item) => sum + item.quantity);
 
     return Card(
+      elevation: 1,
+      color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
       margin: const EdgeInsets.only(bottom: 15),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+        side: BorderSide(
+          color: const Color(0xFF8B261D).withValues(alpha: 0.3),
+        ),
+      ),
       child: InkWell(
         onTap: () => showModalBottomSheet<void>(
           context: context,
           isScrollControlled: true,
           useSafeArea: true,
-          backgroundColor: AppColors.background,
+          backgroundColor: const Color(0xFFFAF6EE),
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
           ),
-          builder: (_) => _OrderDetailSheet(order: order),
+          builder: (_) => _OrderDetailSheet(order: order, profile: profile),
         ),
         borderRadius: BorderRadius.circular(15),
         child: Padding(
@@ -196,7 +232,10 @@ class _OrderCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       'Order #${order.shortId}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF8B261D),
+                      ),
                     ),
                   ),
                   OrderStatusBadge(status: order.status),
@@ -238,7 +277,7 @@ class _OrderCard extends StatelessWidget {
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
-                      color: AppColors.primary,
+                      color: Color(0xFF8B261D),
                     ),
                   ),
                 ],
@@ -254,7 +293,10 @@ class _OrderCard extends StatelessWidget {
                       Expanded(
                         child: OutlinedButton(
                           onPressed: busy ? null : () => _rejectOrder(context, order),
-                          style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            side: const BorderSide(color: Colors.red),
+                          ),
                           child: const Text('Reject'),
                         ),
                       ),
@@ -269,6 +311,9 @@ class _OrderCard extends StatelessWidget {
                                     status: OrderStatus.confirmed,
                                   ),
                                 ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF8B261D),
+                          ),
                           child: const Text('Accept'),
                         ),
                       ),
@@ -291,20 +336,20 @@ class OrderStatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = switch (OrderStatus.normalize(status)) {
-      OrderStatus.placed => Colors.blue,
-      OrderStatus.confirmed => Colors.orange,
-      OrderStatus.processing => Colors.amber.shade800,
-      OrderStatus.inTransit => Colors.purple,
-      OrderStatus.shipped => Colors.indigo,
-      OrderStatus.outForDelivery => Colors.deepOrange,
-      OrderStatus.delivered => Colors.green,
-      OrderStatus.rejected || OrderStatus.cancelled => Colors.red,
-      _ => Colors.grey,
+      OrderStatus.placed => Colors.blue.shade800,
+      OrderStatus.confirmed => Colors.orange.shade800,
+      OrderStatus.processing => Colors.amber.shade900,
+      OrderStatus.inTransit => Colors.purple.shade800,
+      OrderStatus.shipped => Colors.indigo.shade800,
+      OrderStatus.outForDelivery => Colors.deepOrange.shade800,
+      OrderStatus.delivered => Colors.green.shade800,
+      OrderStatus.rejected || OrderStatus.cancelled => Colors.red.shade800,
+      _ => AppColors.mutedText,
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
@@ -316,9 +361,6 @@ class OrderStatusBadge extends StatelessWidget {
   }
 }
 
-/// Builds the buyer-copy invoice PDF for [order] — what the customer paid,
-/// with no fee breakdown — so the creator can print it and put it in the
-/// parcel when dispatching.
 Future<void> _downloadBuyerInvoice(BuildContext context, CreatorOrder order) async {
   final messenger = ScaffoldMessenger.of(context);
   try {
@@ -341,7 +383,6 @@ Future<void> _downloadBuyerInvoice(BuildContext context, CreatorOrder order) asy
           )
           .toList(),
       subtotal: order.totalAmount,
-      // The buyer pays the items plus the flat platform fee for this creator.
       buyerTotalPaid: order.totalAmount + order.flatFee,
     );
     await InvoicePdfService.downloadOrShare(data);
@@ -355,8 +396,6 @@ Future<void> _downloadBuyerInvoice(BuildContext context, CreatorOrder order) asy
   }
 }
 
-/// Builds the creator-copy invoice PDF for [order] — commission and the
-/// resulting payout — and hands it to the platform's share/download sheet.
 Future<void> _downloadSellerInvoice(BuildContext context, CreatorOrder order) async {
   final messenger = ScaffoldMessenger.of(context);
   try {
@@ -396,492 +435,414 @@ Future<void> _downloadSellerInvoice(BuildContext context, CreatorOrder order) as
 
 class _OrderDetailSheet extends StatelessWidget {
   final CreatorOrder order;
+  final CreatorProfile profile;
 
-  const _OrderDetailSheet({required this.order});
-
-  void _advance(BuildContext context, String nextStatus) {
-    if (nextStatus == OrderStatus.inTransit) {
-      _showDispatchDialog(context);
-      return;
-    }
-    if (nextStatus == OrderStatus.delivered) {
-      _showDeliveredDialog(context);
-      return;
-    }
-    context.read<CreatorBloc>().add(
-      CreatorUpdateOrderStatus(orderId: order.id, status: nextStatus),
-    );
-    Navigator.pop(context);
-  }
-
-  /// Marking an order delivered releases the creator's payout, so — like
-  /// dispatch — it needs an explicit confirmation that it is really true.
-  Future<void> _showDeliveredDialog(BuildContext context) async {
-    final bloc = context.read<CreatorBloc>();
-    final navigator = Navigator.of(context);
-    bool acknowledged = false;
-    bool showAcknowledgeError = false;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          scrollable: true,
-          title: const Text('Confirm delivery'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'The buyer is told their order has arrived, and your payout '
-                'becomes ready for release.',
-                style: TextStyle(fontSize: 12, color: AppColors.mutedText),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                ),
-                child: const Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.red, size: 20),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Only mark this order as delivered if it has actually '
-                        'reached the buyer. Marking an order delivered before the '
-                        'courier has handed it over, or when it was not delivered '
-                        'in good condition, may result in your payout being '
-                        'withheld.',
-                        style: TextStyle(fontSize: 12.5, color: Colors.red, height: 1.3),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              CheckboxListTile(
-                value: acknowledged,
-                onChanged: (value) => setDialogState(() {
-                  acknowledged = value ?? false;
-                  if (acknowledged) showAcknowledgeError = false;
-                }),
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                title: const Text(
-                  'I confirm this order has been delivered to the buyer and '
-                  'the product reached them genuine and in good condition.',
-                  style: TextStyle(fontSize: 12.5),
-                ),
-              ),
-              if (showAcknowledgeError)
-                const Padding(
-                  padding: EdgeInsets.only(left: 12),
-                  child: Text(
-                    'Please confirm the statement above to continue.',
-                    style: TextStyle(fontSize: 12, color: Colors.red),
-                  ),
-                ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (!acknowledged) {
-                  setDialogState(() => showAcknowledgeError = true);
-                  return;
-                }
-                Navigator.pop(dialogContext, true);
-              },
-              child: const Text('Mark delivered'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (confirmed != true) return;
-    bloc.add(
-      CreatorUpdateOrderStatus(orderId: order.id, status: OrderStatus.delivered),
-    );
-    navigator.pop();
-  }
-
-  Future<void> _showDispatchDialog(BuildContext context) async {
-    final bloc = context.read<CreatorBloc>();
-    final navigator = Navigator.of(context);
-    final consignment = TextEditingController(text: order.consignmentNumber ?? '');
-    final confirm = TextEditingController(text: order.consignmentNumber ?? '');
-    String? courier = kCourierOptions.contains(order.carrierName) ? order.carrierName : null;
-    final formKey = GlobalKey<FormState>();
-    final formatters = [
-      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9-]')),
-      LengthLimitingTextInputFormatter(30),
-    ];
-
-    bool acknowledged = false;
-    bool showAcknowledgeError = false;
-
-    final submitted = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          scrollable: true,
-          title: const Text('Dispatch details'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'The buyer gets these details and a tracking link.',
-                  style: TextStyle(fontSize: 12, color: AppColors.mutedText),
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  initialValue: courier,
-                  decoration: const InputDecoration(labelText: 'Courier partner *'),
-                  items: [
-                    for (final option in kCourierOptions)
-                      DropdownMenuItem(
-                        value: option,
-                        child: Text(option, overflow: TextOverflow.ellipsis),
-                      ),
-                  ],
-                  onChanged: (value) => courier = value,
-                  validator: (value) => value == null ? 'Select a courier.' : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: consignment,
-                  inputFormatters: formatters,
-                  decoration: const InputDecoration(
-                    labelText: 'Consignment number *',
-                    hintText: 'e.g. SP123456789IN',
-                  ),
-                  validator: (value) =>
-                      (value?.trim().isEmpty ?? true) ? 'Consignment number is required.' : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: confirm,
-                  inputFormatters: formatters,
-                  decoration: const InputDecoration(labelText: 'Confirm consignment number *'),
-                  validator: (value) => value?.trim() != consignment.text.trim()
-                      ? 'Consignment numbers do not match.'
-                      : null,
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                  ),
-                  child: const Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.warning_amber_rounded, color: Colors.red, size: 20),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Make sure you have actually dispatched the order and the '
-                          'courier/consignment details above are real, and that the '
-                          'product shipped is genuine and in good condition. False or '
-                          'incorrect dispatch details may result in your payout being '
-                          'withheld.',
-                          style: TextStyle(fontSize: 12.5, color: Colors.red, height: 1.3),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                CheckboxListTile(
-                  value: acknowledged,
-                  onChanged: (value) => setDialogState(() {
-                    acknowledged = value ?? false;
-                    if (acknowledged) showAcknowledgeError = false;
-                  }),
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  title: const Text(
-                    'I confirm the order has genuinely been dispatched with these '
-                    'real details, and the product is genuine and in good condition.',
-                    style: TextStyle(fontSize: 12.5),
-                  ),
-                ),
-                if (showAcknowledgeError)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 12),
-                    child: Text(
-                      'Please confirm the statement above to continue.',
-                      style: TextStyle(fontSize: 12, color: Colors.red),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final formValid = formKey.currentState!.validate();
-                if (!acknowledged) {
-                  setDialogState(() => showAcknowledgeError = true);
-                }
-                if (formValid && acknowledged) {
-                  Navigator.pop(dialogContext, true);
-                }
-              },
-              child: const Text('Mark in transit'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (submitted != true) return;
-    bloc.add(
-      CreatorUpdateOrderStatus(
-        orderId: order.id,
-        status: OrderStatus.inTransit,
-        consignmentNumber: consignment.text.trim(),
-        carrierName: courier,
-      ),
-    );
-    navigator.pop();
-  }
+  const _OrderDetailSheet({required this.order, required this.profile});
 
   @override
   Widget build(BuildContext context) {
     final next = OrderStatus.next(order.status);
-    final canAdvance =
-        !OrderStatus.isNew(order.status) &&
-        !OrderStatus.isRejectedOrCancelled(order.status);
+    final nextStatus = next != null ? OrderStatus.storedValue(next) : null;
+    final canAdvance = nextStatus != null;
+    final isTerminal = OrderStatus.isDelivered(order.status) ||
+        OrderStatus.isRejectedOrCancelled(order.status);
 
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.85,
       minChildSize: 0.5,
       maxChildSize: 0.95,
-      builder: (context, scrollController) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
+      builder: (context, scrollController) => Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 16, 12),
+            child: Row(
               children: [
-                const Expanded(
-                  child: Text(
-                    'Order details',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Order #${order.shortId}',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF8B261D),
+                        ),
+                      ),
+                      Text(
+                        'Placed ${DateFormat('dd MMM yyyy, hh:mm a').format(order.createdAt)}',
+                        style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+                      ),
+                    ],
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Close',
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(Icons.close, color: Color(0xFF8B261D)),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: ListView(
-                controller: scrollController,
-                children: [
-                  _infoRow('Order', '#${order.shortId}'),
-                  _infoRow('Placed', DateFormat('dd MMM yyyy, hh:mm a').format(order.createdAt)),
-                  _infoRow('Status', OrderStatus.label(order.status)),
-                  if ((order.carrierName ?? '').isNotEmpty) _infoRow('Carrier', order.carrierName!),
-                  if ((order.consignmentNumber ?? '').isNotEmpty)
-                    _infoRow('Consignment #', order.consignmentNumber!),
-                  if ((order.rejectionReason ?? '').trim().isNotEmpty)
-                    _infoRow('Rejection reason', order.rejectionReason!, isWarning: true),
-                  if (order.refundStatus != null)
-                    _infoRow(
-                      'Refund',
-                      switch (order.refundStatus) {
-                        'refunded' => 'Refunded to buyer',
-                        'failed' => 'Refund pending — our team will retry',
-                        _ => 'Processing',
-                      },
-                      isWarning: order.refundStatus == 'failed',
-                    ),
-                  const Divider(height: 32),
-                  const Text('Ship to', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text(order.buyerName, style: const TextStyle(fontSize: 16)),
-                  if (order.buyerPhone.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(order.buyerPhone),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView(
+              controller: scrollController,
+              padding: const EdgeInsets.all(20),
+              children: [
+                Row(
+                  children: [
+                    const Text('Status: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                    OrderStatusBadge(status: order.status),
                   ],
-                  const SizedBox(height: 4),
-                  Text(order.deliveryAddress, style: const TextStyle(color: AppColors.mutedText)),
-                  const Divider(height: 32),
-                  const Text('Items', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
+                ),
+                const SizedBox(height: 16),
+                _infoSection('Customer Details', [
+                  _infoRow('Name', order.buyerName),
+                  _infoRow('Phone', order.buyerPhone),
+                  _infoRow('Address', order.deliveryAddress),
+                ]),
+                const SizedBox(height: 16),
+                _infoSection('Order Items', [
                   for (final item in order.items)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.only(bottom: 8.0),
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                Text(
-                                  'Qty ${item.quantity} × ₹${item.unitPrice}',
-                                  style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
-                                ),
-                                for (final entry in item.customizations.entries)
-                                  Text(
-                                    '${entry.key}: ${entry.value.join(', ')}',
-                                    style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
-                                  ),
-                              ],
+                            child: Text(
+                              '${item.name} × ${item.quantity}',
+                              style: const TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Text('₹${item.total}'),
+                          Text(
+                            '₹${item.total}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF8B261D),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  const Divider(height: 32),
-                  _amountRow('Items total', order.totalAmount),
-                  if (order.totalAmount > order.creatorNetAmount)
-                    _amountRow('Commission', -(order.totalAmount - order.creatorNetAmount)),
-                  _amountRow('Your earnings', order.creatorNetAmount, emphasize: true),
+                ]),
+                if (order.consignmentNumber != null || order.carrierName != null) ...[
                   const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    onPressed: () => _downloadBuyerInvoice(context, order),
-                    icon: const Icon(Icons.receipt_long_outlined, size: 18),
-                    label: const Text('Buyer invoice (for the parcel)'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: AppColors.primary),
+                  _infoSection('Dispatch & Tracking', [
+                    if (order.carrierName != null)
+                      _infoRow('Carrier', order.carrierName!),
+                    if (order.consignmentNumber != null)
+                      _infoRow('Consignment #', order.consignmentNumber!),
+                  ]),
+                ],
+                const SizedBox(height: 16),
+                _infoSection('Financial Summary', [
+                  _infoRow('Subtotal', '₹${order.totalAmount}'),
+                  _infoRow('Platform Fee', '₹${order.platformFee}'),
+                  _infoRow('Net Payout', '₹${order.creatorNetAmount}', isBold: true),
+                ]),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _downloadBuyerInvoice(context, order),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFF8B261D)),
+                          foregroundColor: const Color(0xFF8B261D),
+                        ),
+                        icon: const Icon(Icons.receipt_long, size: 18),
+                        label: const Text('Buyer Invoice'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _downloadSellerInvoice(context, order),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFF8B261D)),
+                          foregroundColor: const Color(0xFF8B261D),
+                        ),
+                        icon: const Icon(Icons.picture_as_pdf, size: 18),
+                        label: const Text('Seller Invoice'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (!isTerminal) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        final rejected = await _rejectOrder(context, order);
+                        if (rejected && context.mounted) {
+                          Navigator.pop(context);
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        side: const BorderSide(color: Colors.red),
+                      ),
+                      child: const Text('Reject Order'),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: () => _downloadSellerInvoice(context, order),
-                    icon: const Icon(Icons.download_outlined, size: 18),
-                    label: const Text('Your invoice (creator copy)'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: AppColors.primary),
+                  if (canAdvance) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => _advanceStatus(context, nextStatus),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF8B261D),
+                        ),
+                        child: Text('Mark as $nextStatus'),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
-            BlocSelector<CreatorBloc, CreatorState, bool>(
-              selector: (state) =>
-                  state.isRunning(CreatorAction.updateOrder) ||
-                  state.isRunning(CreatorAction.rejectOrder),
-              builder: (context, busy) {
-                if (OrderStatus.isNew(order.status)) {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: busy
-                                ? null
-                                : () async {
-                                    final navigator = Navigator.of(context);
-                                    if (await _rejectOrder(context, order)) navigator.pop();
-                                  },
-                            style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                            child: const Text('Reject'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: busy ? null : () => _advance(context, OrderStatus.confirmed),
-                            child: const Text('Accept'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-                if (next != null && canAdvance) {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        FilledButton.icon(
-                          onPressed: busy ? null : () => _advance(context, next),
-                          icon: const Icon(Icons.arrow_forward),
-                          label: Text('Mark as ${OrderStatus.label(next).toLowerCase()}'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _infoRow(String label, String value, {bool isWarning = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(label, style: const TextStyle(color: AppColors.mutedText)),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: isWarning ? Colors.red : null,
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _amountRow(String label, int amount, {bool emphasize = false}) {
-    final style = TextStyle(
-      fontSize: emphasize ? 17 : 14,
-      fontWeight: emphasize ? FontWeight.bold : FontWeight.normal,
-      color: emphasize ? AppColors.primary : null,
+  void _advanceStatus(BuildContext context, String nextStatus) {
+    if (nextStatus == 'In-Transit') {
+      _showConsignmentDialog(context);
+    } else {
+      context.read<CreatorBloc>().add(
+            CreatorUpdateOrderStatus(
+              orderId: order.id,
+              status: nextStatus,
+              consignmentNumber: order.consignmentNumber,
+              carrierName: order.carrierName,
+            ),
+          );
+      Navigator.pop(context);
+    }
+  }
+
+  void _showConsignmentDialog(BuildContext context) {
+    final consignmentController = TextEditingController(
+      text: order.consignmentNumber ?? '',
     );
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
+    final confirmConsignmentController = TextEditingController(
+      text: order.consignmentNumber ?? '',
+    );
+    String? selectedCourier = kCourierOptions.contains(order.carrierName)
+        ? order.carrierName
+        : null;
+
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFFFAF6EE),
+            scrollable: true,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+            actionsPadding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            title: const Text(
+              'Enter Dispatch Details',
+              style: TextStyle(color: Color(0xFF8B261D)),
+            ),
+            content: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Please enter consignment details and select a courier partner to move this order to In-Transit.',
+                    style: TextStyle(fontSize: 12, color: AppColors.mutedText),
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: consignmentController,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Consignment / Reference Number *',
+                      hintText: 'e.g. SP123456789IN',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                    ),
+                    validator: (v) {
+                      final trimmed = v?.trim() ?? '';
+                      if (trimmed.isEmpty) {
+                        return 'Consignment number is required.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: confirmConsignmentController,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm Consignment Number *',
+                      hintText: 'Re-enter consignment number',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                    ),
+                    validator: (v) {
+                      final trimmed = v?.trim() ?? '';
+                      if (trimmed.isEmpty) {
+                        return 'Please confirm consignment number.';
+                      }
+                      if (trimmed != consignmentController.text.trim()) {
+                        return 'Consignment numbers do not match.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    value: selectedCourier,
+                    decoration: const InputDecoration(
+                      labelText: 'Courier / Carrier Partner *',
+                      hintText: 'Select Courier Partner',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                    ),
+                    items: kCourierOptions.map((courier) {
+                      return DropdownMenuItem<String>(
+                        value: courier,
+                        child: Text(
+                          courier,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      setDialogState(() {
+                        selectedCourier = val;
+                      });
+                    },
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) {
+                        return 'Please select a courier partner.';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (formKey.currentState!.validate()) {
+                    context.read<CreatorBloc>().add(
+                          CreatorUpdateOrderStatus(
+                            orderId: order.id,
+                            status: 'In-Transit',
+                            consignmentNumber:
+                                consignmentController.text.trim(),
+                            carrierName: selectedCourier,
+                          ),
+                        );
+                    Navigator.pop(dialogContext);
+                    Navigator.pop(context);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF8B261D),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+                child: const Text('Confirm & Move to In-Transit'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _infoSection(String title, List<Widget> children) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAF6EE),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF8B261D).withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: Text(label, style: style)),
-          Text(amount < 0 ? '−₹${-amount}' : '₹$amount', style: style),
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF8B261D),
+              fontSize: 14,
+            ),
+          ),
+          const Divider(height: 16),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(String label, String value, {bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+                color: isBold ? const Color(0xFF8B261D) : AppColors.text,
+              ),
+            ),
+          ),
         ],
       ),
     );

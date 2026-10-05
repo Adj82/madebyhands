@@ -76,10 +76,10 @@ class _CreatorProfileViewState extends State<CreatorProfileView> {
         const SizedBox(height: 30),
         OutlinedButton.icon(
           onPressed: () => context.read<AuthBloc>().add(AuthLogoutRequested()),
-          icon: const Icon(Icons.logout, color: Colors.red),
-          label: const Text('Log out', style: TextStyle(color: Colors.red)),
+          icon: const Icon(Icons.logout, color: Color(0xFF8B261D)),
+          label: const Text('Log out', style: TextStyle(color: Color(0xFF8B261D))),
           style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: Colors.red),
+            side: const BorderSide(color: Color(0xFF8B261D)),
             minimumSize: const Size(double.infinity, 52),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
           ),
@@ -94,27 +94,31 @@ class _CreatorProfileViewState extends State<CreatorProfileView> {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: AppColors.outline),
+        border: Border.all(color: const Color(0xFF8B261D), width: 1.0),
       ),
       child: Column(
         children: [
           CircleAvatar(
             radius: 46,
-            backgroundColor: AppColors.outline,
+            backgroundColor: const Color(0xFFF2DEDD),
             backgroundImage: profile.profileImage.isNotEmpty
                 ? NetworkImage(profile.profileImage)
                 : null,
             child: profile.profileImage.isEmpty
-                ? const Icon(Icons.person, size: 46, color: Colors.white)
+                ? const Icon(Icons.person, size: 46, color: Color(0xFF8B261D))
                 : null,
           ),
           const SizedBox(height: 12),
           Text(
             profile.name,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF8B261D),
+            ),
           ),
           if (profile.location.isNotEmpty) ...[
             const SizedBox(height: 2),
@@ -139,14 +143,33 @@ class _CreatorProfileViewState extends State<CreatorProfileView> {
     Color? badgeColor,
   }) {
     return Card(
+      elevation: 1,
+      color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+        side: BorderSide(
+          color: (badgeColor ?? const Color(0xFF8B261D)).withValues(alpha: 0.3),
+        ),
+      ),
       child: ListTile(
-        leading: Icon(icon, color: badgeColor ?? AppColors.primary),
-        title:
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
-        trailing: const Icon(Icons.chevron_right, size: 20),
+        leading: Icon(icon, color: badgeColor ?? const Color(0xFF8B261D)),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: badgeColor ?? const Color(0xFF8B261D),
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+        ),
+        trailing: const Icon(
+          Icons.chevron_right,
+          size: 20,
+          color: Color(0xFF8B261D),
+        ),
         onTap: onTap,
       ),
     );
@@ -158,6 +181,7 @@ class _CreatorProfileViewState extends State<CreatorProfileView> {
     final reason = await showDialog<String>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFFFAF6EE),
         title: const Row(
           children: [
             Icon(Icons.warning_amber_rounded, color: Colors.red),
