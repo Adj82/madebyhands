@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:madebyhands/core/constants/feature_flags.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/pages/buyer_privacy_policy_page.dart';
@@ -270,25 +271,39 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           ),
           if (isLastPage) ...[
             const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: isLoading ? null : _handleLogin,
-              icon: isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+            if (kGoogleSignInEnabled)
+              FilledButton.icon(
+                onPressed: isLoading ? null : _handleLogin,
+                icon: isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Image.asset(
+                        'assets/images/icon_google.png',
+                        height: 24,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.login),
                       ),
-                    )
-                  : Image.asset(
-                      'assets/images/icon_google.png',
-                      height: 24,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.login),
-                    ),
-              label: const Text('Continue with Google'),
-            ).animate().slideY(begin: 0.5).fadeIn(),
+                label: const Text('Continue with Google'),
+              ).animate().slideY(begin: 0.5).fadeIn()
+            else
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Sign-in is temporarily unavailable. Please check back shortly.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.mutedText, fontSize: 13),
+                ),
+              ),
             const SizedBox(height: 16),
             Row(
               children: [

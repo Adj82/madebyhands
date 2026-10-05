@@ -53,7 +53,7 @@ void main() {
 
     expect(find.text('Hello, Suhani'), findsOneWidget);
     expect(find.textContaining('21 Craft Lane'), findsOneWidget);
-    expect(find.text('Historical Art & Stories'), findsOneWidget);
+    expect(find.text('Interesting Facts & Stories'), findsOneWidget);
     expect(find.text('Shop by craft'), findsNothing);
 
     await tester.tap(find.text('Shop').last);

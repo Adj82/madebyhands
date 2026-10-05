@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/arch_backdrop.dart';
 
 class HomeTab extends StatefulWidget {
   final String userName;
@@ -162,13 +163,7 @@ class _HomeTabState extends State<HomeTab> {
       body: Stack(
         children: [
           // 1. Background frame overlay
-          Positioned.fill(
-            child: Image.asset(
-              'assets/main_page_elements/main_page_background.png',
-              fit: BoxFit.fill,
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
-            ),
-          ),
+          const Positioned.fill(child: ArchBackdrop()),
 
           // 2. Scrollable Body
           ShaderMask(
