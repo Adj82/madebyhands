@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:madebyhands/core/constants/image_upload.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/auth/domain/entities/user_entity.dart';
 import 'package:madebyhands/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
@@ -292,7 +291,7 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
         const Center(
           child: Text(
             'Profile Picture',
-            style: TextStyle(color: AppColors.mutedText, fontSize: 12),
+            style: TextStyle(color: Color(0xFF8A8F82), fontSize: 12),
           ),
         ),
         const SizedBox(height: 10),
@@ -301,15 +300,15 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
             children: [
               CircleAvatar(
                 radius: 60,
-                backgroundColor: AppColors.outline,
+                backgroundColor: const Color(0xFF8B261D).withValues(alpha: 0.1),
                 backgroundImage: _getProfileImageProvider(),
-                child: !hasImage ? const Icon(Icons.person, size: 60, color: Colors.white) : null,
+                child: !hasImage ? const Icon(Icons.person, size: 60, color: Color(0xFF8B261D)) : null,
               ),
               Positioned(
                 bottom: 0,
                 right: 0,
                 child: CircleAvatar(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: const Color(0xFF8B261D),
                   radius: 20,
                   child: IconButton(
                     onPressed: _pickProfileImage,
@@ -360,7 +359,7 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Social Links', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
+        const Text('Social Links', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF8B261D))),
         const SizedBox(height: 10),
         Row(
           children: [
@@ -379,7 +378,7 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
             IconButton.filled(
               onPressed: _addSocialLink,
               icon: const Icon(Icons.add),
-              style: IconButton.styleFrom(backgroundColor: AppColors.primary),
+              style: IconButton.styleFrom(backgroundColor: const Color(0xFF8B261D)),
             ),
           ],
         ),
@@ -404,7 +403,7 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Portfolio', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
+        const Text('Portfolio', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF8B261D))),
         const SizedBox(height: 10),
         SizedBox(
           height: 120,
@@ -432,11 +431,11 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
         width: 120,
         height: 120,
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: const Color(0xFFFAF6EE),
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: AppColors.outline),
+          border: Border.all(color: const Color(0xFF8B261D).withValues(alpha: 0.3)),
         ),
-        child: const Icon(Icons.add_a_photo_outlined, color: AppColors.mutedText),
+        child: const Icon(Icons.add_a_photo_outlined, color: Color(0xFF8A8F82)),
       ),
     );
   }
@@ -457,7 +456,7 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
               errorBuilder: (_, _, _) => Container(
                 width: 120,
                 height: 120,
-                color: AppColors.outline,
+                color: const Color(0xFFEAE7DC),
                 child: const Icon(Icons.broken_image, color: Colors.grey),
               ),
             ),
@@ -518,14 +517,14 @@ class _OnboardingHeader extends StatelessWidget {
       children: [
         Text(
           isEditMode ? 'Update Your Studio Profile' : 'Complete your Artisan Profile',
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary),
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF8B261D)),
         ),
         const SizedBox(height: 8),
         Text(
           isEditMode
               ? 'Keep your craft story, links, and portfolio up to date.'
               : 'Tell the world about your craft and story.',
-          style: const TextStyle(fontSize: 14, color: AppColors.mutedText),
+          style: const TextStyle(fontSize: 14, color: Color(0xFF8A8F82)),
         ),
       ],
     );
