@@ -40,7 +40,11 @@ class _CreatorHomeViewState extends State<CreatorHomeView> {
             const SizedBox(height: 20),
             const Text(
               'Your performance',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF8B261D),
+              ),
             ),
             const SizedBox(height: 10),
             _PerformanceSummary(orders: _orders),
@@ -65,11 +69,11 @@ class _StorefrontCard extends StatelessWidget {
       padding: const EdgeInsets.all(22),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: AppColors.primary,
+        color: const Color(0xFF8B261D),
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.3),
+            color: const Color(0xFF8B261D).withValues(alpha: 0.3),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -82,12 +86,16 @@ class _StorefrontCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 30,
-                backgroundColor: AppColors.surface,
+                backgroundColor: const Color(0xFFFAF6EE),
                 backgroundImage: profile.profileImage.isNotEmpty
                     ? NetworkImage(profile.profileImage)
                     : null,
                 child: profile.profileImage.isEmpty
-                    ? const Icon(Icons.person, size: 30, color: AppColors.primary)
+                    ? const Icon(
+                        Icons.person,
+                        size: 30,
+                        color: Color(0xFF8B261D),
+                      )
                     : null,
               ),
               const SizedBox(width: 15),
@@ -111,7 +119,7 @@ class _StorefrontCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
+                          color: Colors.white.withValues(alpha: 0.85),
                           fontSize: 14,
                         ),
                       ),
@@ -136,19 +144,19 @@ class _VerificationStatusCard extends StatelessWidget {
     final (IconData icon, Color color, String title, String subtitle) = switch (profile) {
       final p when p.isVerified => (
         Icons.verified,
-        Colors.green,
+        Colors.green.shade800,
         'Verified creator',
         'You can list products. Tap to view submitted documents.',
       ),
       final p when p.isUnderReview => (
         Icons.hourglass_top,
-        Colors.orange,
+        Colors.orange.shade800,
         'Verification under review',
         'An admin is reviewing your documents. Tap to update.',
       ),
       final p when p.isVerificationRejected => (
         Icons.error_outline,
-        Colors.red,
+        Colors.red.shade800,
         'Verification not approved',
         p.verificationNote.isEmpty
             ? 'Tap to update your documents and resubmit.'
@@ -156,42 +164,53 @@ class _VerificationStatusCard extends StatelessWidget {
       ),
       _ => (
         Icons.error_outline,
-        Colors.red,
+        Colors.red.shade800,
         'Get verified to start selling',
         'Tap to submit your documents.',
       ),
     };
-    return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => CreatorVerificationPage(profile: profile)),
-      ),
-      borderRadius: BorderRadius.circular(15),
-      child: Ink(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: AppColors.outline),
+    return Card(
+      elevation: 1,
+      color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+        side: BorderSide(
+          color: const Color(0xFF8B261D).withValues(alpha: 0.3),
         ),
-        child: Row(
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
-                  ),
-                ],
+      ),
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => CreatorVerificationPage(profile: profile)),
+        ),
+        borderRadius: BorderRadius.circular(15),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(icon, color: color),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-          ],
+              const Icon(Icons.arrow_forward_ios, size: 16, color: Color(0xFF8B261D)),
+            ],
+          ),
         ),
       ),
     );
@@ -233,25 +252,25 @@ class _PerformanceSummary extends StatelessWidget {
               title: 'New orders',
               value: '$pending',
               icon: Icons.new_releases_outlined,
-              color: AppColors.accent,
+              color: Colors.deepOrange.shade800,
             ),
             _StatCard(
               title: 'In progress',
               value: '$inProgress',
               icon: Icons.precision_manufacturing_outlined,
-              color: Colors.blue,
+              color: Colors.indigo.shade800,
             ),
             _StatCard(
               title: 'Total orders',
               value: '${active.length}',
               icon: Icons.shopping_bag_outlined,
-              color: AppColors.primary,
+              color: const Color(0xFF8B261D),
             ),
             _StatCard(
               title: 'Earned (settled)',
               value: '₹$totalEarned',
               icon: Icons.payments_outlined,
-              color: Colors.green,
+              color: Colors.green.shade800,
             ),
           ],
         );
@@ -278,9 +297,11 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.outline),
+        border: Border.all(
+          color: const Color(0xFF8B261D).withValues(alpha: 0.3),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -304,7 +325,11 @@ class _StatCard extends StatelessWidget {
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
         ],
       ),
@@ -367,11 +392,11 @@ class _HistoricalArtSectionState extends State<_HistoricalArtSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Historical art and stories',
+          'Interesting Facts and Stories',
           style: GoogleFonts.montserrat(
             fontSize: 15,
             fontWeight: FontWeight.w700,
-            color: AppColors.primary,
+            color: const Color(0xFF8B261D),
           ),
         ),
         const SizedBox(height: 10),
@@ -399,8 +424,8 @@ class _HistoricalArtSectionState extends State<_HistoricalArtSection> {
                 activeIndex: activeIndex,
                 count: _stories.length,
                 effect: const ExpandingDotsEffect(
-                  activeDotColor: AppColors.primary,
-                  dotColor: AppColors.outline,
+                  activeDotColor: Color(0xFF8B261D),
+                  dotColor: Color(0xFFE2D0B5),
                   dotHeight: 7,
                   dotWidth: 7,
                   expansionFactor: 2.5,
@@ -418,7 +443,7 @@ class _HistoricalArtSectionState extends State<_HistoricalArtSection> {
     return Container(
       margin: const EdgeInsets.only(right: 12, bottom: 8),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: const Color(0xFFFAF6EE),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
