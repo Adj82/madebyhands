@@ -36,7 +36,7 @@ Toolchain notes:
 - `flutter analyze` runs an implicit pub step that may rewrite `analysis_options.yaml` (adding an `analyzer.exclude` block) and `pubspec.lock`. Check `git status` afterwards and revert if you did not intend those changes.
 - `lib/firebase_options.dart`, `android/app/google-services.json`, and the iOS/macOS plist equivalents are **gitignored**. A fresh clone will not compile until `flutterfire configure` is run against Firebase project `madebyhands-77f87`.
 - `extract.ps1`, `extract_schema.ps1`, `generate_launcher_icons.ps1` and the `*_extracted.txt` files are one-off PowerShell helpers with hardcoded absolute paths. They are not part of any build.
-- Android `applicationId` is still `com.example.madebyhands`.
+- Android `applicationId` is `shop.madebyhands.app` (iOS bundle ID still `com.example.madebyhands`, pending).
 
 ## Client architecture
 
@@ -70,7 +70,7 @@ Product categories live in `lib/core/constants/product_categories.dart` (`kProdu
 
 Styling: light theme only (`AppTheme.lightThemeMode`). Take colors from `AppColors` in `lib/core/theme/app_theme.dart` (cream / sage / terracotta) rather than literals; fonts are Playfair Display + Montserrat via `google_fonts`. `flutter_screenutil` is initialized with `designSize: Size(360, 690)`, so sizes use `.sp`/`.h`/`.w`.
 
-Buyer screens have their own look, taken from the Home tab and the product cards (rose-cream page, deep-maroon heavy Montserrat headings, gold-outlined pill fields, maroon pill buttons): `BuyerTheme` / `BuyerColors` in `lib/features/buyer/presentation/theme/buyer_theme.dart`. `BuyerBackground` applies that theme along with the page colour, so wrap every buyer page in it and style through the theme (`Card`, `FilledButton`, `AppBar`, `TextField`, … need no per-widget colours); use `BuyerHeading` / `BuyerPageHeader` for headings. A page that opens dialogs or sheets from its `State` context must keep that state *below* `BuyerBackground` (see `CheckoutPage` → `_CheckoutBody`), or they fall back to the app theme. The Home tab itself is deliberately left on the app theme inside the dashboard. `SupportCenterPage` is shared with creators and takes the buyer look through a `pageWrapper`.
+Buyer screens have their own look, taken from the Home tab (the cream of its arched panel as the page colour, ivory cards with thin gold outlines, deep-maroon heavy Montserrat headings, gold-outlined pill fields, maroon pill buttons): `BuyerTheme` / `BuyerColors` in `lib/features/buyer/presentation/theme/buyer_theme.dart`. The Home backdrop (grainy pink field, scalloped cream arch) is drawn in code by `ArchBackdrop` in `widgets/arch_backdrop.dart`; the other dashboard tabs are wrapped in `BuyerTabFrame`, which puts a strip of the same pink with a scalloped edge (`ScallopedHeader`) behind the status bar. `BuyerBackground` applies that theme along with the page colour, so wrap every buyer page in it and style through the theme (`Card`, `FilledButton`, `AppBar`, `TextField`, … need no per-widget colours); use `BuyerHeading` / `BuyerPageHeader` for headings. A page that opens dialogs or sheets from its `State` context must keep that state *below* `BuyerBackground` (see `CheckoutPage` → `_CheckoutBody`), or they fall back to the app theme. The Home tab itself is deliberately left on the app theme inside the dashboard. `SupportCenterPage` is shared with creators and takes the buyer look through a `pageWrapper`.
 
 Cart contents and quantities are **buyer UI state backed by SharedPreferences**, never Firestore. Checkout re-sends the whole cart to the API.
 
@@ -123,7 +123,7 @@ Use Razorpay **test** credentials until checkout and verification have been exer
 
 ## Tests
 
-`test/` holds nine Flutter test files and does not initialize Firebase. Widget tests inject `MockBuyerRepository` (`lib/features/buyer/data/mock_buyer_repository.dart`) and call `SharedPreferences.setMockInitialValues({})` in `setUp`. Keep new tests off live Firebase by depending on repository interfaces.
+`test/` holds twelve Flutter test files and does not initialize Firebase. Widget tests inject `MockBuyerRepository` (`lib/features/buyer/data/mock_buyer_repository.dart`) and call `SharedPreferences.setMockInitialValues({})` in `setUp`. Keep new tests off live Firebase by depending on repository interfaces.
 
 `test/api/` holds Node tests for the payment API (`npm test`) using a fake Firestore and stubbed Razorpay/auth; they need no network or credentials.
 

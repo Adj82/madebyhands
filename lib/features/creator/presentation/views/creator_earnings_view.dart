@@ -32,12 +32,15 @@ class _CreatorEarningsViewState extends State<CreatorEarningsView> {
               child: Text(
                 'Could not load earnings: ${friendlyErrorMessage(snapshot.error!)}',
                 textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.mutedText),
               ),
             ),
           );
         }
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFF8B261D)),
+          );
         }
         // Same rules as Admin Finance: real paid orders, not rejected or cancelled.
         final orders = snapshot.data!
@@ -65,10 +68,15 @@ class _CreatorEarningsViewState extends State<CreatorEarningsView> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.primary, AppColors.primaryDark],
-                ),
+                color: const Color(0xFF8B261D),
                 borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF8B261D).withValues(alpha: 0.3),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,22 +116,51 @@ class _CreatorEarningsViewState extends State<CreatorEarningsView> {
             const SizedBox(height: 24),
             const Text(
               'Order earnings',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF8B261D),
+              ),
             ),
             const SizedBox(height: 12),
             if (orders.isEmpty)
-              const Card(
-                child: ListTile(
-                  leading: Icon(Icons.history),
-                  title: Text('No earnings yet'),
+              Card(
+                elevation: 1,
+                color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: const Color(0xFF8B261D).withValues(alpha: 0.3),
+                  ),
+                ),
+                child: const ListTile(
+                  leading: Icon(Icons.history, color: Color(0xFF8B261D)),
+                  title: Text(
+                    'No earnings yet',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   subtitle: Text('Paid orders will appear here.'),
                 ),
               )
             else
               for (final order in orders)
                 Card(
+                  elevation: 1,
+                  color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: const Color(0xFF8B261D).withValues(alpha: 0.3),
+                    ),
+                  ),
                   child: ListTile(
-                    title: Text('Order #${order.shortId}'),
+                    title: Text(
+                      'Order #${order.shortId}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF8B261D),
+                      ),
+                    ),
                     subtitle: Text(
                       '${OrderStatus.label(order.status)} · '
                       '${isPaidOut(order) ? 'Paid out' : 'Payout pending'}'
@@ -131,7 +168,11 @@ class _CreatorEarningsViewState extends State<CreatorEarningsView> {
                     ),
                     trailing: Text(
                       '₹${order.creatorNetAmount}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Color(0xFF8B261D),
+                      ),
                     ),
                   ),
                 ),

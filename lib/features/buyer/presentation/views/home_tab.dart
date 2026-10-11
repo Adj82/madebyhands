@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/saved_address.dart';
 import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/arch_backdrop.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
 
 class HomeTab extends StatefulWidget {
   final String userName;
+  final String userId;
+  final ValueChanged<Product> onProductTap;
   final VoidCallback onBrowseAll;
   final ValueChanged<String>? onSearchSubmitted;
   final ValueChanged<String>? onCategoryTap;
@@ -19,6 +24,8 @@ class HomeTab extends StatefulWidget {
   const HomeTab({
     super.key,
     required this.userName,
+    required this.userId,
+    required this.onProductTap,
     required this.onBrowseAll,
     this.onSearchSubmitted,
     this.onCategoryTap,
@@ -35,6 +42,20 @@ class HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<HomeTab> {
   static const int _initialStoryPage = 1000;
+  static const List<String> _homeCategoryOrder = [
+    'Paintings, Drawing, Fine Art & Traditional Art',
+    'Digital Art, Illustration, Design & Photography',
+    'Pottery, Ceramics, Clay & Sculpture',
+    'Textile, Fiber, Embroidery, Toys & Dolls',
+    'Fashion, Jewellery & Wearables',
+    'Home Décor & Lifestyle',
+    'Wood, Metal, Leather & Natural Crafts',
+    'Paper, Books & Stationery',
+    'Handicrafts & Artisan Goods',
+    'Resin & Mixed-Material Art',
+    'Other Creative Works',
+  ];
+
   late final PageController _storyPageController;
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _homeSearchController = TextEditingController();
@@ -65,20 +86,6 @@ class _HomeTabState extends State<HomeTab> {
           'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?q=80&w=800&auto=format&fit=crop',
     },
   ];
-
-  static const Map<String, String> _categoryArtByName = {
-    'Paintings, Drawing, Fine Art & Traditional Art': 'painting_main.png',
-    'Digital Art, Illustration, Design & Photography': 'digital_main.png',
-    'Pottery, Ceramics, Clay & Sculpture': 'pottery_main.png',
-    'Textile, Fiber, Embroidery, Toys & Dolls': 'textile_main.png',
-    'Fashion, Jewellery & Wearables': 'jewelry_main.png',
-    'Home Décor & Lifestyle': 'homedec_main.png',
-    'Wood, Metal, Leather & Natural Crafts': 'wood_main.png',
-    'Paper, Books & Stationery': 'paper_main.png',
-    'Handicrafts & Artisan Goods': 'handicraft_main.png',
-    'Resin & Mixed-Material Art': 'resin_main.png',
-    'Other Creative Works': 'other_main.png',
-  };
 
   @override
   void initState() {
@@ -157,18 +164,16 @@ class _HomeTabState extends State<HomeTab> {
 
     final fadeStrength = (scrollOffset / 40.0).clamp(0.0, 1.0);
 
+    // The arch starts just under the status bar; the header follows it down
+    // so the logo sits inside the crown.
+    final headerInset = ArchBackdrop.headerInset(context);
+
     return Scaffold(
       backgroundColor: const Color(0xFFFAF6EE),
       body: Stack(
         children: [
           // 1. Background frame overlay
-          Positioned.fill(
-            child: Image.asset(
-              'assets/main_page_elements/main_page_background.png',
-              fit: BoxFit.fill,
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
-            ),
-          ),
+          const Positioned.fill(child: ArchBackdrop()),
 
           // 2. Scrollable Body
           ShaderMask(
@@ -199,17 +204,27 @@ class _HomeTabState extends State<HomeTab> {
                 key: const PageStorageKey('buyer-home-scroll'),
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 28.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 250.0),
-                    _buildHistoricalArtSection(),
-                    const SizedBox(height: 18),
-                    _buildCategoryDivider(),
-                    const SizedBox(height: 14),
-                    _buildCategoriesGrid(),
-                    const SizedBox(height: 36),
-                  ],
+                // On wide screens the arch stops growing, so the content is
+                // held to the same width and stays inside it.
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: ArchBackdrop.defaultMaxArchWidth - 56.0,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(height: 244.0 + headerInset),
+                        _buildHistoricalArtSection(),
+                        const SizedBox(height: 18),
+                        _buildCategoryDivider(),
+                        const SizedBox(height: 14),
+                        _buildCategoryProductSections(),
+                        const SizedBox(height: 36),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -222,47 +237,61 @@ class _HomeTabState extends State<HomeTab> {
             right: 0,
             child: SafeArea(
               bottom: false,
-              child: Column(
-                // key removed from here
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // FIXED: logo + MADE BY HANDS text
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(28.0, 6.0, 28.0, 0),
-                    child: _buildHeaderWithBrandingAndTopRightIcons(),
+              child: Align(
+                alignment: Alignment.topCenter,
+                heightFactor: 1.0,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: ArchBackdrop.defaultMaxArchWidth,
                   ),
-                  const SizedBox(height: 2),
+                  child: Column(
+                    // key removed from here
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // FIXED: logo + MADE BY HANDS text
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          28.0,
+                          headerInset,
+                          28.0,
+                          0,
+                        ),
+                        child: _buildHeaderWithBrandingAndTopRightIcons(),
+                      ),
+                      const SizedBox(height: 2),
 
-                  // COLLAPSING: Hello user, address, profile & notification icons
-                  Transform.translate(
-                    offset: const Offset(0, -30),
-                    child: ClipRect(
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        heightFactor: brandingHeightFactor,
-                        child: Opacity(
-                          opacity: brandingOpacity,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 28.0,
+                      // COLLAPSING: Hello user, address, profile & notification icons
+                      Transform.translate(
+                        offset: const Offset(0, -30),
+                        child: ClipRect(
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            heightFactor: brandingHeightFactor,
+                            child: Opacity(
+                              opacity: brandingOpacity,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 28.0,
+                                ),
+                                child: _buildGreetingAndAddress(firstName),
+                              ),
                             ),
-                            child: _buildGreetingAndAddress(firstName),
                           ),
                         ),
                       ),
-                    ),
-                  ),
 
-                  // Search Bar (lifts up as it gets pinned)
-                  Transform.translate(
-                    offset: Offset(0, -30.0 * collapseProgress),
-                    child: Padding(
-                      key: _overlayKey, // key now lives here
-                      padding: const EdgeInsets.symmetric(horizontal: 28.0),
-                      child: _buildSearchBar(),
-                    ),
+                      // Search Bar (lifts up as it gets pinned)
+                      Transform.translate(
+                        offset: Offset(0, -30.0 * collapseProgress),
+                        child: Padding(
+                          key: _overlayKey, // key now lives here
+                          padding: const EdgeInsets.symmetric(horizontal: 28.0),
+                          child: _buildSearchBar(),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -411,14 +440,14 @@ class _HomeTabState extends State<HomeTab> {
     return Container(
       height: 40,
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFDF8),
+        color: const Color(0xFFFFFAF0),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFC49A6C), width: 1.1),
+        border: Border.all(color: const Color(0xFFC49A6C), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: const Color(0xFF6B1D1D).withValues(alpha: 0.10),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -479,7 +508,8 @@ class _HomeTabState extends State<HomeTab> {
           child: AnimatedBuilder(
             animation: _storyPageController,
             builder: (context, child) {
-              final page = _storyPageController.hasClients &&
+              final page =
+                  _storyPageController.hasClients &&
                       _storyPageController.page != null
                   ? _storyPageController.page!
                   : (_initialStoryPage * _stories.length).toDouble();
@@ -623,125 +653,107 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Widget _buildCategoriesGrid() {
+  Widget _buildCategoryProductSections() {
     return BlocBuilder<BuyerBloc, BuyerState>(
       buildWhen: (previous, current) =>
-          previous.categories != current.categories,
+          previous.categories != current.categories ||
+          previous.products != current.products ||
+          previous.favoriteIds != current.favoriteIds,
       builder: (context, state) {
-        final categories = state.categories;
-        if (categories.isEmpty) return const SizedBox.shrink();
-        final rowsCount = (categories.length / 2).ceil();
+        final sections = <({String category, List<Product> products})>[];
+        for (final category in _homeCategoryOrder) {
+          final normalizedCategory = category.trim().toLowerCase();
+          final products = state.products.where((product) {
+            return product.allCategories.any(
+              (productCategory) =>
+                  productCategory.trim().toLowerCase() == normalizedCategory,
+            );
+          }).toList();
+          if (products.isNotEmpty) {
+            sections.add((category: category, products: products));
+          }
+        }
+
+        if (sections.isEmpty) return const SizedBox.shrink();
+
         return Column(
-          children: List.generate(rowsCount, (rowIndex) {
-            final firstIndex = rowIndex * 2;
-            final secondIndex = firstIndex + 1;
+          children: sections.map((section) {
             return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
+              padding: const EdgeInsets.only(bottom: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(child: _buildCategoryCard(categories[firstIndex])),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: secondIndex < categories.length
-                        ? _buildCategoryCard(categories[secondIndex])
-                        : const SizedBox.shrink(),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          section.category,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.montserrat(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF6B1D1D),
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => _openCategory(section.category),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'See all',
+                              style: GoogleFonts.montserrat(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF8B261D),
+                              ),
+                            ),
+                            const SizedBox(width: 3),
+                            const Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 16,
+                              color: Color(0xFF8B261D),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 225,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: section.products.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        final product = section.products[index];
+                        return SizedBox(
+                          width: 145,
+                          child: ProductCard(
+                            product: product,
+                            isSaved: state.favoriteIds.contains(product.id),
+                            onTap: () => widget.onProductTap(product),
+                            onSave: () => context.read<BuyerBloc>().add(
+                              BuyerToggleFavorite(
+                                userId: widget.userId,
+                                product: product,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
             );
-          }),
+          }).toList(),
         );
       },
     );
   }
-
-  Widget _buildCategoryCard(String category) {
-    final art = _categoryArtByName[category];
-    return GestureDetector(
-      onTap: () => _openCategory(category),
-      child: AspectRatio(
-        aspectRatio: 3 / 4.5,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 6,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: Image.asset(
-                    'assets/main_page_elements/category_border.jpeg',
-                    fit: BoxFit.fill,
-                    errorBuilder: (_, _, _) =>
-                        Container(color: const Color(0xFFF5EFE3)),
-                  ),
-                ),
-                Positioned.fill(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SizedBox(
-                          height: 150,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: art == null
-                                ? _categoryPlaceholder()
-                                : Image.asset(
-                                    'assets/main_page_elements/$art',
-                                    semanticLabel: category,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, _, _) =>
-                                        _categoryPlaceholder(),
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Expanded(
-                          child: Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 2.0,
-                              ),
-                              child: Text(
-                                category,
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.montserrat(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w500,
-                                  height: 1.18,
-                                  color: const Color(0xFF5C1D1D),
-                                ),
-                                maxLines: 4,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _categoryPlaceholder() => Container(
-    color: const Color(0xFFEAD9C6),
-    alignment: Alignment.center,
-    child: const Icon(Icons.palette, color: Color(0xFF8B261D), size: 32),
-  );
 }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:madebyhands/core/theme/app_theme.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_bank_account.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
@@ -29,11 +29,13 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
   late final TextEditingController _panNumberController;
 
   String _accountType = 'Savings';
+  bool _showAccountNumber = false;
+  bool _showConfirmAccountNumber = false;
   bool _loading = true;
   String? _loadError;
 
   final RegExp _ifscRegex = RegExp(r'^[A-Z]{4}0[A-Z0-9]{6}$');
-  final RegExp _panRegex = RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$');
+  final RegExp _panRegex = RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]$');
 
   @override
   void initState() {
@@ -120,14 +122,22 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Payout details',
-          style: TextStyle(fontWeight: FontWeight.bold),
+    return BuyerBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Color(0xFF8B261D)),
+          title: const Text(
+            'Payout details',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF8B261D),
+            ),
+          ),
         ),
-      ),
-      body: BlocConsumer<CreatorBloc, CreatorState>(
+        body: BlocConsumer<CreatorBloc, CreatorState>(
         listenWhen: (previous, current) =>
             previous.actionId != current.actionId &&
             current.action == CreatorAction.saveBankAccount &&
@@ -184,22 +194,22 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.08),
+                      color: const Color(0xFF8B261D).withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.2),
+                        color: const Color(0xFF8B261D).withValues(alpha: 0.2),
                       ),
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.security, color: AppColors.primary, size: 28),
+                        Icon(Icons.security, color: Color(0xFF8B261D), size: 28),
                         SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             'Your bank account details are securely stored and strictly used by Admin for order payouts.',
                             style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.text,
+                              color: Color(0xFF2D3128),
                               height: 1.4,
                             ),
                           ),
@@ -230,10 +240,21 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
                   TextFormField(
                     controller: _accountNumberController,
                     keyboardType: TextInputType.number,
-                    obscureText: true,
-                    decoration: const InputDecoration(
+                    obscureText: !_showAccountNumber,
+                    decoration: InputDecoration(
                       hintText: 'Enter bank account number',
-                      prefixIcon: Icon(Icons.numbers_outlined),
+                      prefixIcon: const Icon(Icons.numbers_outlined),
+                      suffixIcon: IconButton(
+                        tooltip: _showAccountNumber ? 'Hide' : 'Show',
+                        icon: Icon(
+                          _showAccountNumber
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                        ),
+                        onPressed: () => setState(
+                          () => _showAccountNumber = !_showAccountNumber,
+                        ),
+                      ),
                     ),
                     validator: (v) {
                       final trimmed = v?.trim() ?? '';
@@ -252,9 +273,22 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
                   TextFormField(
                     controller: _confirmAccountNumberController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
+                    obscureText: !_showConfirmAccountNumber,
+                    decoration: InputDecoration(
                       hintText: 'Re-enter bank account number',
-                      prefixIcon: Icon(Icons.check_circle_outline),
+                      prefixIcon: const Icon(Icons.check_circle_outline),
+                      suffixIcon: IconButton(
+                        tooltip: _showConfirmAccountNumber ? 'Hide' : 'Show',
+                        icon: Icon(
+                          _showConfirmAccountNumber
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                        ),
+                        onPressed: () => setState(
+                          () => _showConfirmAccountNumber =
+                              !_showConfirmAccountNumber,
+                        ),
+                      ),
                     ),
                     validator: (v) {
                       final trimmed = v?.trim() ?? '';
@@ -384,12 +418,22 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
                     width: double.infinity,
                     height: 50,
                     child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF8B261D),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                      ),
                       onPressed: saving ? null : _submit,
                       child: saving
                           ? const SizedBox(
                               height: 22,
                               width: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
                           : const Text('Save payout details'),
                     ),
@@ -401,8 +445,9 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildFieldTitle(String title) {
     return Padding(
@@ -412,7 +457,7 @@ class _ManageBankAccountPageState extends State<ManageBankAccountPage> {
         style: const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          color: AppColors.text,
+          color: Color(0xFF2D3128),
         ),
       ),
     );

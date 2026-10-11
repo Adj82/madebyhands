@@ -52,6 +52,8 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
   final Set<String> _readNotificationIds = {};
   StreamSubscription<List<SavedAddress>>? _addressSubscription;
   StreamSubscription<List<BuyerProductNotification>>? _notificationSubscription;
+  String? _pendingSharedProductId;
+  String? _pendingSharedCreatorId;
 
   /// Category the Shop tab should filter by when opened from Home.
   final ValueNotifier<String?> _shopCategory = ValueNotifier(null);
@@ -62,6 +64,8 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
     super.initState();
     _currentUser = widget.user;
     _navigationCubit = BuyerCubit();
+    _pendingSharedProductId = Uri.base.queryParameters['product']?.trim();
+    _pendingSharedCreatorId = Uri.base.queryParameters['creator']?.trim();
     // Initialize data streaming
     context.read<BuyerBloc>()
       ..add(BuyerWatchProducts())
@@ -191,10 +195,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                 onCustomizationChanged: (selection) => buyerBloc.add(
                   BuyerUpdateProductCustomization(product, selection),
                 ),
-                onOpenCart: () {
-                  Navigator.of(context).pop();
-                  _navigationCubit.changePage(3);
-                },
+                onOpenCart: _openCart,
                 onBuyNow: (selection) => _openBuyNow(
                   product,
                   state.cartQuantities[product.id] ?? 0,
@@ -212,6 +213,66 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
         ),
       ),
     );
+  }
+
+  void _openPendingSharedProduct(BuyerState state) {
+    final productId = _pendingSharedProductId;
+    if (productId == null || productId.isEmpty) return;
+
+    final matchingProducts = state.products.where(
+      (product) => product.id == productId,
+    );
+    if (matchingProducts.isNotEmpty) {
+      final product = matchingProducts.first;
+      _pendingSharedProductId = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openProduct(product);
+      });
+      return;
+    }
+
+    if (state.isLoadingProducts) return;
+    _pendingSharedProductId = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('This shared product is no longer available'),
+          ),
+        );
+    });
+  }
+
+  void _openPendingSharedCreator(BuyerState state) {
+    final creatorId = _pendingSharedCreatorId;
+    if (creatorId == null || creatorId.isEmpty) return;
+
+    final matchingCreators = state.creators.where(
+      (creator) => creator.uid == creatorId,
+    );
+    if (matchingCreators.isNotEmpty) {
+      final creator = matchingCreators.first;
+      _pendingSharedCreatorId = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openCreator(creator);
+      });
+      return;
+    }
+
+    if (state.creators.isEmpty) return;
+    _pendingSharedCreatorId = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('This shared creator profile is no longer available'),
+          ),
+        );
+    });
   }
 
   void _openCreator(PublicCreator creator) {
@@ -232,6 +293,11 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
 
   void _openShop() {
     _navigationCubit.changePage(1);
+  }
+
+  void _openCart() {
+    _navigationCubit.changePage(3);
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   void _openShopSearch(String query) {
@@ -255,10 +321,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
             categoryTitle: category,
             userId: _currentUser.uid,
             onProductTap: _openProduct,
-            onOpenCart: () {
-              Navigator.of(context).pop();
-              _navigationCubit.changePage(3);
-            },
+            onOpenCart: _openCart,
           ),
         ),
       ),
@@ -364,13 +427,31 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
     return BlocProvider.value(
       value: _navigationCubit,
       child: BlocListener<BuyerBloc, BuyerState>(
-        listenWhen: (previous, current) =>
-            current.errorMessage != null &&
-            current.errorMessage != previous.errorMessage &&
-            current.products.isNotEmpty,
-        listener: (context, state) => ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(state.errorMessage!))),
+        listenWhen: (previous, current) {
+          final hasNewError =
+              current.errorMessage != null &&
+              current.errorMessage != previous.errorMessage &&
+              current.products.isNotEmpty;
+          final sharedProductStateChanged =
+              _pendingSharedProductId != null &&
+              (previous.products != current.products ||
+                  previous.isLoadingProducts != current.isLoadingProducts);
+          final sharedCreatorStateChanged =
+              _pendingSharedCreatorId != null &&
+              previous.creators != current.creators;
+          return hasNewError ||
+              sharedProductStateChanged ||
+              sharedCreatorStateChanged;
+        },
+        listener: (context, state) {
+          if (state.errorMessage != null && state.products.isNotEmpty) {
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(SnackBar(content: Text(state.errorMessage!)));
+          }
+          _openPendingSharedProduct(state);
+          _openPendingSharedCreator(state);
+        },
         child: BlocBuilder<BuyerCubit, int>(
           builder: (context, selectedIndex) {
             return BlocBuilder<BuyerBloc, BuyerState>(
@@ -406,6 +487,8 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                     data: appTheme,
                     child: HomeTab(
                       userName: _currentUser.name,
+                      userId: _currentUser.uid,
+                      onProductTap: _openProduct,
                       selectedAddress: _selectedAddress,
                       onAddressTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
@@ -428,7 +511,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                       onNotificationsTap: _openNotifications,
                     ),
                   ),
-                  SafeArea(
+                  BuyerTabFrame(
                     child: SearchTab(
                       userId: _currentUser.uid,
                       onProductTap: _openProduct,
@@ -437,21 +520,21 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                       searchRequest: _shopSearch,
                     ),
                   ),
-                  SafeArea(
+                  BuyerTabFrame(
                     child: SavedTab(
                       userId: _currentUser.uid,
                       onProductTap: _openProduct,
                       onBrowse: () => _navigationCubit.changePage(1),
                     ),
                   ),
-                  SafeArea(
+                  BuyerTabFrame(
                     child: CartTab(
                       onBrowse: () => _navigationCubit.changePage(1),
                       onCheckout: _openCheckout,
                       onProductTap: _openProduct,
                     ),
                   ),
-                  SafeArea(
+                  BuyerTabFrame(
                     child: ProfileTab(
                       user: _currentUser,
                       onAccount: () => Navigator.of(context).push(
@@ -501,14 +584,27 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                 final safeIndex = selectedIndex.clamp(0, pages.length - 1);
 
                 return Scaffold(
-                  backgroundColor: const Color(0xFFFAF6EE),
+                  backgroundColor: BuyerColors.paper,
                   body: IndexedStack(index: safeIndex, children: pages),
+                  // The bar picks up the Home arch's look: the same cream,
+                  // a gold hairline along its top edge, and a solid maroon
+                  // pill behind the selected tab.
                   bottomNavigationBar: Container(
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFAF6EE),
-                      borderRadius: BorderRadius.vertical(
+                    padding: const EdgeInsets.only(top: 1.2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDDB98A),
+                      borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(20),
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(
+                            0xFF6B1D1D,
+                          ).withValues(alpha: 0.10),
+                          blurRadius: 14,
+                          offset: const Offset(0, -3),
+                        ),
+                      ],
                     ),
                     child: ClipRRect(
                       borderRadius: const BorderRadius.vertical(
@@ -517,15 +613,18 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                       child: NavigationBarTheme(
                         data: NavigationBarThemeData(
                           height: 78,
-                          backgroundColor: const Color(0xFFFAF6EE),
-                          indicatorColor: const Color(0xFFF2DEDD),
+                          elevation: 0,
+                          backgroundColor: const Color(0xFFFCF0DE),
+                          surfaceTintColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          indicatorColor: const Color(0xFF8B261D),
                           iconTheme: WidgetStateProperty.resolveWith((states) {
                             return IconThemeData(
                               color: states.contains(WidgetState.selected)
-                                  ? const Color(0xFF8B261D)
+                                  ? const Color(0xFFFCF0DE)
                                   : const Color(
                                       0xFF8B261D,
-                                    ).withValues(alpha: 0.55),
+                                    ).withValues(alpha: 0.86),
                             );
                           }),
                           labelTextStyle: WidgetStateProperty.resolveWith((
@@ -540,7 +639,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                                   ? const Color(0xFF8B261D)
                                   : const Color(
                                       0xFF8B261D,
-                                    ).withValues(alpha: 0.6),
+                                    ).withValues(alpha: 0.86),
                             );
                           }),
                         ),

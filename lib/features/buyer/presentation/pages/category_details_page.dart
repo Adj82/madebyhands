@@ -268,7 +268,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
       ),
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF4F2),
+        color: BuyerColors.paper,
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(_leftCorner),
           topRight: Radius.circular(_rightCorner),
@@ -494,7 +494,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                       ? CustomPaint(
                           key: _selectedTabKey,
                           painter: const _SelectedTabPainter(
-                            color: Color(0xFFFFF4F2),
+                            color: BuyerColors.paper,
                             topRadius: 21,
                             flareRadius: _flare,
                           ),

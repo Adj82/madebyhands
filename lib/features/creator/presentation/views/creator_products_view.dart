@@ -30,6 +30,7 @@ class _CreatorProductsViewState extends State<CreatorProductsView> {
     showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
+      backgroundColor: const Color(0xFFFAF6EE),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -38,18 +39,18 @@ class _CreatorProductsViewState extends State<CreatorProductsView> {
           Widget tile(String title, ProductSortCriteria criteria) {
             final selected = _criteria == criteria;
             return ListTile(
-              tileColor: selected ? AppColors.primary.withValues(alpha: 0.1) : null,
+              tileColor: selected ? const Color(0xFFF2DEDD) : null,
               title: Text(
                 title,
                 style: TextStyle(
-                  color: selected ? AppColors.primary : AppColors.text,
+                  color: selected ? const Color(0xFF8B261D) : AppColors.text,
                   fontWeight: selected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
               trailing: selected
                   ? Icon(
                       _ascending ? Icons.arrow_upward : Icons.arrow_downward,
-                      color: AppColors.primary,
+                      color: const Color(0xFF8B261D),
                     )
                   : null,
               onTap: () {
@@ -71,7 +72,14 @@ class _CreatorProductsViewState extends State<CreatorProductsView> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Sort by', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text(
+                  'Sort by',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF8B261D),
+                  ),
+                ),
                 const SizedBox(height: 10),
                 tile('Name', ProductSortCriteria.name),
                 tile('Price', ProductSortCriteria.price),
@@ -100,7 +108,11 @@ class _CreatorProductsViewState extends State<CreatorProductsView> {
       showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('Verification required'),
+          backgroundColor: const Color(0xFFFAF6EE),
+          title: const Text(
+            'Verification required',
+            style: TextStyle(color: Color(0xFF8B261D)),
+          ),
           content: Text(
             widget.profile.isUnderReview
                 ? 'Your verification is under review. You can add products once it is approved.'
@@ -109,7 +121,7 @@ class _CreatorProductsViewState extends State<CreatorProductsView> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('OK'),
+              child: const Text('OK', style: TextStyle(color: Color(0xFF8B261D))),
             ),
           ],
         ),
@@ -131,7 +143,7 @@ class _CreatorProductsViewState extends State<CreatorProductsView> {
         onPressed: _addProduct,
         icon: const Icon(Icons.add),
         label: const Text('Add product'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: const Color(0xFF8B261D),
         foregroundColor: Colors.white,
       ),
       body: StreamBuilder<List<CreatorProduct>>(
@@ -144,12 +156,15 @@ class _CreatorProductsViewState extends State<CreatorProductsView> {
                 child: Text(
                   'Could not load your products: ${friendlyErrorMessage(snapshot.error!)}',
                   textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.mutedText),
                 ),
               ),
             );
           }
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF8B261D)),
+            );
           }
           final products = _sorted(snapshot.data!);
           final approved = products.where((p) => p.isApproved).toList();
@@ -167,21 +182,26 @@ class _CreatorProductsViewState extends State<CreatorProductsView> {
                       Expanded(
                         child: Text(
                           'Your inventory · ${products.length}',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF8B261D),
+                          ),
                         ),
                       ),
                       IconButton(
                         tooltip: 'Sort',
                         onPressed: _showSortOptions,
                         icon: const Icon(Icons.sort),
-                        color: AppColors.primary,
+                        color: const Color(0xFF8B261D),
                       ),
                     ],
                   ),
                 ),
                 TabBar(
-                  labelColor: AppColors.primary,
-                  indicatorColor: AppColors.primary,
+                  labelColor: const Color(0xFF8B261D),
+                  indicatorColor: const Color(0xFF8B261D),
+                  unselectedLabelColor: AppColors.mutedText,
                   tabs: [
                     Tab(text: 'Approved (${approved.length})'),
                     Tab(text: 'Pending (${pending.length})'),
@@ -263,7 +283,8 @@ class _ProductTile extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete product?'),
+        backgroundColor: const Color(0xFFFAF6EE),
+        title: const Text('Delete product?', style: TextStyle(color: Color(0xFF8B261D))),
         content: Text('"${product.name}" will be removed from your shop permanently.'),
         actions: [
           TextButton(
@@ -288,7 +309,8 @@ class _ProductTile extends StatelessWidget {
     final stock = await showDialog<int>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Update stock'),
+        backgroundColor: const Color(0xFFFAF6EE),
+        title: const Text('Update stock', style: TextStyle(color: Color(0xFF8B261D))),
         content: Form(
           key: formKey,
           child: TextFormField(
@@ -317,6 +339,7 @@ class _ProductTile extends StatelessWidget {
                 Navigator.pop(dialogContext, int.parse(controller.text));
               }
             },
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF8B261D)),
             child: const Text('Save'),
           ),
         ],
@@ -338,10 +361,12 @@ class _ProductTile extends StatelessWidget {
         : ('Hidden', AppColors.mutedText);
 
     return Card(
+      elevation: 1,
+      color: const Color(0xFFFAF6EE).withValues(alpha: 0.95),
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15),
-        side: BorderSide(color: AppColors.outline.withValues(alpha: 0.5)),
+        side: BorderSide(color: const Color(0xFF8B261D).withValues(alpha: 0.3)),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(15),
@@ -380,14 +405,18 @@ class _ProductTile extends StatelessWidget {
                       product.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: Color(0xFF8B261D),
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '₹${product.price.round()} · Stock ${product.stock}',
                       style: const TextStyle(
                         fontSize: 13,
-                        color: AppColors.primary,
+                        color: Color(0xFF8B261D),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -429,6 +458,7 @@ class _ProductTile extends StatelessWidget {
                 ),
               ),
               PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: Color(0xFF8B261D)),
                 tooltip: 'Product actions',
                 onSelected: (value) {
                   final bloc = context.read<CreatorBloc>();

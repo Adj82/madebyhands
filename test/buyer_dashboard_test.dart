@@ -53,7 +53,7 @@ void main() {
 
     expect(find.text('Hello, Suhani'), findsOneWidget);
     expect(find.textContaining('21 Craft Lane'), findsOneWidget);
-    expect(find.text('Historical Art & Stories'), findsOneWidget);
+    expect(find.text('Interesting Facts & Stories'), findsOneWidget);
     expect(find.text('Shop by craft'), findsNothing);
 
     await tester.tap(find.text('Shop').last);
@@ -195,6 +195,8 @@ void main() {
     await tester.tap(find.text('New in Jewellery'));
     await tester.pumpAndSettle();
     expect(find.text('Product details'), findsOneWidget);
+    await tester.drag(find.byType(ListView).last, const Offset(0, -260));
+    await tester.pumpAndSettle();
     expect(find.byTooltip('Save item'), findsOneWidget);
   });
 

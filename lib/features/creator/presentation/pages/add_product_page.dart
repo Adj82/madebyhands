@@ -8,10 +8,13 @@ import 'package:madebyhands/core/constants/product_categories.dart';
 import 'package:madebyhands/core/constants/image_upload.dart';
 import 'package:madebyhands/core/theme/app_theme.dart';
 import 'package:madebyhands/features/admin/presentation/bloc/admin_bloc.dart';
+import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_product.dart';
 import 'package:madebyhands/features/creator/domain/entities/creator_profile.dart';
 import 'package:madebyhands/features/creator/domain/repositories/creator_repository.dart';
 import 'package:madebyhands/features/creator/presentation/bloc/creator_bloc.dart';
+import 'package:madebyhands/features/creator/presentation/pages/manage_bank_account_page.dart';
+import 'package:madebyhands/init_dependencies.dart';
 
 class AddProductPage extends StatefulWidget {
   final CreatorProfile profile;
@@ -24,6 +27,10 @@ class AddProductPage extends StatefulWidget {
 
 class _AddProductPageState extends State<AddProductPage> {
   final _formKey = GlobalKey<FormState>();
+
+  /// True once we know this creator has not saved payout details yet. Only
+  /// checked when listing a new product; a failed lookup shows nothing.
+  bool _payoutDetailsMissing = false;
 
   // General Controllers
   late final TextEditingController _nameController;
@@ -94,6 +101,7 @@ class _AddProductPageState extends State<AddProductPage> {
   void initState() {
     super.initState();
     final p = widget.initialProduct;
+    if (p == null) _checkPayoutDetails();
     _nameController = TextEditingController(text: p?.name);
     _descriptionController = TextEditingController(text: p?.description);
     _priceController = TextEditingController(text: p?.price.round().toString());
@@ -369,13 +377,21 @@ class _AddProductPageState extends State<AddProductPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _isEditing ? 'Edit product' : 'Add new product',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+    return BuyerBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: Text(
+            _isEditing ? 'Edit product' : 'Add new product',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF8B261D),
+            ),
+          ),
+          iconTheme: const IconThemeData(color: Color(0xFF8B261D)),
         ),
-      ),
       body: BlocConsumer<CreatorBloc, CreatorState>(
         listenWhen: (previous, current) =>
             previous.actionId != current.actionId &&
@@ -383,11 +399,18 @@ class _AddProductPageState extends State<AddProductPage> {
             current.actionStatus != CreatorActionStatus.inProgress,
         listener: (context, state) {
           final success = state.actionStatus == CreatorActionStatus.success;
+          final payoutReminder = success && _payoutDetailsMissing && !_isEditing
+              ? ' Add your payout details (Profile → Payout details) to receive payouts.'
+              : '';
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
+              duration: payoutReminder.isEmpty
+                  ? const Duration(seconds: 4)
+                  : const Duration(seconds: 8),
               content: Text(
-                state.actionMessage ??
-                    (success ? 'Product saved.' : 'Could not save the product.'),
+                (state.actionMessage ??
+                        (success ? 'Product saved.' : 'Could not save the product.')) +
+                    payoutReminder,
               ),
               backgroundColor: success ? null : Colors.red.shade700,
             ),
@@ -415,6 +438,10 @@ class _AddProductPageState extends State<AddProductPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (_payoutDetailsMissing) ...[
+                    _buildPayoutWarning(),
+                    const SizedBox(height: 24),
+                  ],
                   _buildSectionTitle('Product photos * (2–6)'),
                   const SizedBox(height: 10),
                   _buildProductImagePicker(),
@@ -444,6 +471,10 @@ class _AddProductPageState extends State<AddProductPage> {
                   const SizedBox(height: 50),
                   FilledButton(
                     onPressed: saving ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF8B261D),
+                      foregroundColor: Colors.white,
+                    ),
                     child: Text(_isEditing ? 'Save & send for review' : 'Submit for review'),
                   ),
                   const SizedBox(height: 30),
@@ -456,12 +487,72 @@ class _AddProductPageState extends State<AddProductPage> {
                 const Positioned.fill(
                   child: ColoredBox(
                     color: Color(0x66FFFFFF),
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(
+                      child: CircularProgressIndicator(color: Color(0xFF8B261D)),
+                    ),
                   ),
                 ),
             ],
           );
         },
+      ),
+    ),
+    );
+  }
+
+  Future<void> _checkPayoutDetails() async {
+    final result = await serviceLocator<CreatorRepository>()
+        .getCreatorBankAccount(widget.profile.uid);
+    if (!mounted) return;
+    result.fold(
+      (_) {},
+      (account) => setState(() => _payoutDetailsMissing = account == null),
+    );
+  }
+
+  Widget _buildPayoutWarning() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.account_balance_outlined, color: Colors.orange, size: 22),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Add your payout details to get paid. You can list this '
+                  'product now, but we cannot send you earnings from your '
+                  'sales until your bank account or UPI details are added.',
+                  style: TextStyle(fontSize: 13, height: 1.4),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton(
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ManageBankAccountPage(profile: widget.profile),
+                  ),
+                );
+                if (mounted) _checkPayoutDetails();
+              },
+              child: const Text('Add payout details'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -472,7 +563,7 @@ class _AddProductPageState extends State<AddProductPage> {
       style: const TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.bold,
-        color: AppColors.primary,
+        color: Color(0xFF8B261D),
       ),
     );
   }
@@ -1066,8 +1157,9 @@ class _AddProductPageState extends State<AddProductPage> {
             ),
             const SizedBox(width: 8),
             Expanded(
-              flex: 2,
+              flex: 3,
               child: DropdownButtonFormField<String>(
+                isExpanded: true,
                 initialValue: _dimensionUnit,
                 items: _dimensionUnits
                     .map((u) => DropdownMenuItem(value: u, child: Text(u)))
@@ -1131,10 +1223,13 @@ class _AddProductPageState extends State<AddProductPage> {
         TextFormField(
           controller: _shippingController,
           decoration: const InputDecoration(
-            labelText: 'Shipping Information *',
-            prefixIcon: Icon(Icons.local_shipping_outlined),
+            labelText: 'Estimated shipping timeline *',
+            hintText: 'e.g. Dispatches in 2–3 working days',
+            prefixIcon: Icon(Icons.schedule_outlined),
           ),
-          validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+          validator: (v) => (v == null || v.trim().isEmpty)
+              ? 'Add an estimated shipping timeline'
+              : null,
         ),
         if (showIsFramedOption) ...[
           const SizedBox(height: 20),
@@ -1195,10 +1290,12 @@ class _ChoiceChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : AppColors.surface,
+          color: isSelected ? const Color(0xFF8B261D) : const Color(0xFFFAF6EE),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.outline,
+            color: isSelected
+                ? const Color(0xFF8B261D)
+                : const Color(0xFF8B261D).withValues(alpha: 0.3),
           ),
         ),
         child: Center(
