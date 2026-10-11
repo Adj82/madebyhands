@@ -195,6 +195,8 @@ void main() {
     await tester.tap(find.text('New in Jewellery'));
     await tester.pumpAndSettle();
     expect(find.text('Product details'), findsOneWidget);
+    await tester.drag(find.byType(ListView).last, const Offset(0, -260));
+    await tester.pumpAndSettle();
     expect(find.byTooltip('Save item'), findsOneWidget);
   });
 

@@ -52,6 +52,8 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
   final Set<String> _readNotificationIds = {};
   StreamSubscription<List<SavedAddress>>? _addressSubscription;
   StreamSubscription<List<BuyerProductNotification>>? _notificationSubscription;
+  String? _pendingSharedProductId;
+  String? _pendingSharedCreatorId;
 
   /// Category the Shop tab should filter by when opened from Home.
   final ValueNotifier<String?> _shopCategory = ValueNotifier(null);
@@ -62,6 +64,8 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
     super.initState();
     _currentUser = widget.user;
     _navigationCubit = BuyerCubit();
+    _pendingSharedProductId = Uri.base.queryParameters['product']?.trim();
+    _pendingSharedCreatorId = Uri.base.queryParameters['creator']?.trim();
     // Initialize data streaming
     context.read<BuyerBloc>()
       ..add(BuyerWatchProducts())
@@ -191,10 +195,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                 onCustomizationChanged: (selection) => buyerBloc.add(
                   BuyerUpdateProductCustomization(product, selection),
                 ),
-                onOpenCart: () {
-                  Navigator.of(context).pop();
-                  _navigationCubit.changePage(3);
-                },
+                onOpenCart: _openCart,
                 onBuyNow: (selection) => _openBuyNow(
                   product,
                   state.cartQuantities[product.id] ?? 0,
@@ -212,6 +213,66 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
         ),
       ),
     );
+  }
+
+  void _openPendingSharedProduct(BuyerState state) {
+    final productId = _pendingSharedProductId;
+    if (productId == null || productId.isEmpty) return;
+
+    final matchingProducts = state.products.where(
+      (product) => product.id == productId,
+    );
+    if (matchingProducts.isNotEmpty) {
+      final product = matchingProducts.first;
+      _pendingSharedProductId = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openProduct(product);
+      });
+      return;
+    }
+
+    if (state.isLoadingProducts) return;
+    _pendingSharedProductId = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('This shared product is no longer available'),
+          ),
+        );
+    });
+  }
+
+  void _openPendingSharedCreator(BuyerState state) {
+    final creatorId = _pendingSharedCreatorId;
+    if (creatorId == null || creatorId.isEmpty) return;
+
+    final matchingCreators = state.creators.where(
+      (creator) => creator.uid == creatorId,
+    );
+    if (matchingCreators.isNotEmpty) {
+      final creator = matchingCreators.first;
+      _pendingSharedCreatorId = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openCreator(creator);
+      });
+      return;
+    }
+
+    if (state.creators.isEmpty) return;
+    _pendingSharedCreatorId = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('This shared creator profile is no longer available'),
+          ),
+        );
+    });
   }
 
   void _openCreator(PublicCreator creator) {
@@ -232,6 +293,11 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
 
   void _openShop() {
     _navigationCubit.changePage(1);
+  }
+
+  void _openCart() {
+    _navigationCubit.changePage(3);
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   void _openShopSearch(String query) {
@@ -255,10 +321,7 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
             categoryTitle: category,
             userId: _currentUser.uid,
             onProductTap: _openProduct,
-            onOpenCart: () {
-              Navigator.of(context).pop();
-              _navigationCubit.changePage(3);
-            },
+            onOpenCart: _openCart,
           ),
         ),
       ),
@@ -364,13 +427,31 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
     return BlocProvider.value(
       value: _navigationCubit,
       child: BlocListener<BuyerBloc, BuyerState>(
-        listenWhen: (previous, current) =>
-            current.errorMessage != null &&
-            current.errorMessage != previous.errorMessage &&
-            current.products.isNotEmpty,
-        listener: (context, state) => ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(state.errorMessage!))),
+        listenWhen: (previous, current) {
+          final hasNewError =
+              current.errorMessage != null &&
+              current.errorMessage != previous.errorMessage &&
+              current.products.isNotEmpty;
+          final sharedProductStateChanged =
+              _pendingSharedProductId != null &&
+              (previous.products != current.products ||
+                  previous.isLoadingProducts != current.isLoadingProducts);
+          final sharedCreatorStateChanged =
+              _pendingSharedCreatorId != null &&
+              previous.creators != current.creators;
+          return hasNewError ||
+              sharedProductStateChanged ||
+              sharedCreatorStateChanged;
+        },
+        listener: (context, state) {
+          if (state.errorMessage != null && state.products.isNotEmpty) {
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(SnackBar(content: Text(state.errorMessage!)));
+          }
+          _openPendingSharedProduct(state);
+          _openPendingSharedCreator(state);
+        },
         child: BlocBuilder<BuyerCubit, int>(
           builder: (context, selectedIndex) {
             return BlocBuilder<BuyerBloc, BuyerState>(
@@ -406,6 +487,8 @@ class _BuyerDashboardPageState extends State<BuyerDashboardPage> {
                     data: appTheme,
                     child: HomeTab(
                       userName: _currentUser.name,
+                      userId: _currentUser.uid,
+                      onProductTap: _openProduct,
                       selectedAddress: _selectedAddress,
                       onAddressTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
