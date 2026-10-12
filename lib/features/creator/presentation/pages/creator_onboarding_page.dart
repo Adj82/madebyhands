@@ -43,6 +43,47 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
   int get _totalExhibitionPictures =>
       _existingExhibitionPictureUrls.length + _exhibitionImages.length;
 
+  String? _selectedState;
+
+  static const List<String> _indianStatesAndUTs = [
+    'Andaman and Nicobar Islands',
+    'Andhra Pradesh',
+    'Arunachal Pradesh',
+    'Assam',
+    'Bihar',
+    'Chandigarh',
+    'Chhattisgarh',
+    'Dadra and Nagar Haveli and Daman and Diu',
+    'Delhi',
+    'Goa',
+    'Gujarat',
+    'Haryana',
+    'Himachal Pradesh',
+    'Jammu and Kashmir',
+    'Jharkhand',
+    'Karnataka',
+    'Kerala',
+    'Ladakh',
+    'Lakshadweep',
+    'Madhya Pradesh',
+    'Maharashtra',
+    'Manipur',
+    'Meghalaya',
+    'Mizoram',
+    'Nagaland',
+    'Odisha',
+    'Puducherry',
+    'Punjab',
+    'Rajasthan',
+    'Sikkim',
+    'Tamil Nadu',
+    'Telangana',
+    'Tripura',
+    'Uttar Pradesh',
+    'Uttarakhand',
+    'West Bengal',
+  ];
+
   final List<String> _socialLinks = [];
   @override
   void initState() {
@@ -54,6 +95,9 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
     _storyController.text = p?.story ?? '';
 
     if (p != null) {
+      if (p.state.isNotEmpty && _indianStatesAndUTs.contains(p.state)) {
+        _selectedState = p.state;
+      }
       _socialLinks.addAll(p.socialLinks);
       _existingPortfolioUrls.addAll(p.portfolio);
       _existingExhibitionPictureUrls.addAll(p.exhibitionPictures);
@@ -205,6 +249,7 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
               profileImageFile: _profileImage,
               bio: _bioController.text.trim(),
               location: _locationController.text.trim(),
+              state: _selectedState ?? '',
               socialLinks: List.of(_socialLinks),
               portfolioImageFiles: List.of(_portfolioImages),
               exhibitionImageFiles: List.of(_exhibitionImages),
@@ -411,8 +456,36 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
         const SizedBox(height: 20),
         TextFormField(
           controller: _locationController,
-          decoration: const InputDecoration(labelText: 'Location *', hintText: 'City, Country', prefixIcon: Icon(Icons.location_on_outlined)),
+          decoration: const InputDecoration(
+            labelText: 'Complete Address *',
+            hintText: 'House/Street, Locality, City, PIN Code',
+            prefixIcon: Icon(Icons.location_on_outlined),
+            alignLabelWithHint: true,
+          ),
+          maxLines: 3,
           validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+        ),
+        const SizedBox(height: 20),
+        DropdownButtonFormField<String>(
+          value: _selectedState,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'State / Union Territory *',
+            prefixIcon: Icon(Icons.map_outlined),
+          ),
+          hint: const Text('Select State or Union Territory'),
+          items: _indianStatesAndUTs.map((state) {
+            return DropdownMenuItem<String>(
+              value: state,
+              child: Text(state),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              _selectedState = value;
+            });
+          },
+          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
         ),
         const SizedBox(height: 20),
         TextFormField(
@@ -623,8 +696,11 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
             const SizedBox(width: 10),
             IconButton.filled(
               onPressed: _addSocialLink,
-              icon: const Icon(Icons.add),
-              style: IconButton.styleFrom(backgroundColor: const Color(0xFF8B261D)),
+              icon: const Icon(Icons.add, color: Colors.white),
+              style: IconButton.styleFrom(
+                backgroundColor: const Color(0xFF8B261D),
+                foregroundColor: Colors.white,
+              ),
             ),
           ],
         ),

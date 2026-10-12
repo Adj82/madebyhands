@@ -144,6 +144,7 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
       profileImageFile: event.profileImageFile,
       bio: event.bio,
       location: event.location,
+      state: event.state,
       socialLinks: event.socialLinks,
       portfolioImageFiles: event.portfolioImageFiles,
       exhibitionImageFiles: event.exhibitionImageFiles,

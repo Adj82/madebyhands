@@ -4,6 +4,7 @@ class CreatorProfile {
   final String profileImage;
   final String bio;
   final String location;
+  final String state;
   final List<String> socialLinks;
   final List<String> portfolio;
   final List<String> exhibitionPictures;
@@ -27,6 +28,7 @@ class CreatorProfile {
     required this.profileImage,
     required this.bio,
     required this.location,
+    this.state = '',
     required this.socialLinks,
     required this.portfolio,
     this.exhibitionPictures = const [],
