@@ -7,8 +7,10 @@ class CreatorProfileModel extends CreatorProfile {
     required super.profileImage,
     required super.bio,
     required super.location,
+    super.state = '',
     required super.socialLinks,
     required super.portfolio,
+    super.exhibitionPictures = const [],
     required super.story,
     super.verificationStatus,
     super.verificationNote,
@@ -27,8 +29,10 @@ class CreatorProfileModel extends CreatorProfile {
       'profileImage': profileImage,
       'bio': bio,
       'location': location,
+      'state': state,
       'socialLinks': socialLinks,
       'portfolio': portfolio,
+      'exhibitionPictures': exhibitionPictures,
       'story': story,
     };
   }
@@ -50,8 +54,10 @@ class CreatorProfileModel extends CreatorProfile {
       profileImage: _string(json['profileImage']),
       bio: _string(json['bio']),
       location: _string(json['location']),
+      state: _string(json['state']),
       socialLinks: _strings(json['socialLinks']),
       portfolio: _strings(json['portfolio']),
+      exhibitionPictures: _strings(json['exhibitionPictures']),
       story: _string(json['story']),
       verificationStatus: _string(json['verificationStatus']).isEmpty
           ? 'Unverified'
