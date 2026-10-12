@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product_review.dart';
 import 'package:madebyhands/features/buyer/domain/repositories/buyer_repository.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_heading.dart';
+import 'package:share_plus/share_plus.dart';
 
 class ProductDetailsPage extends StatefulWidget {
   final Product product;
@@ -99,6 +101,35 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     widget.onCustomizationChanged(_customizationSelection);
   }
 
+  Future<void> _shareProduct(BuildContext shareButtonContext) async {
+    final product = widget.product;
+    final productLink = Uri.https('www.madebyhands.shop', '/', {
+      'product': product.id,
+    });
+    final renderBox = shareButtonContext.findRenderObject() as RenderBox?;
+
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          title: product.name,
+          subject: 'Check out ${product.name} on MadeByHands',
+          text:
+              'Check out ${product.name} by ${product.artisan} on '
+              'MadeByHands: $productLink',
+          sharePositionOrigin: renderBox == null
+              ? null
+              : renderBox.localToGlobal(Offset.zero) & renderBox.size,
+        ),
+      );
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: productLink.toString()));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Product link copied')));
+    }
+  }
+
   @override
   void didUpdateWidget(covariant ProductDetailsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -127,14 +158,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 child: const Icon(Icons.shopping_bag_outlined),
               ),
             ),
-            IconButton(
-              tooltip: _isSaved ? 'Remove from saved' : 'Save item',
-              onPressed: () {
-                widget.onSave();
-                setState(() => _isSaved = !_isSaved);
-              },
-              icon: Icon(_isSaved ? Icons.favorite : Icons.favorite_border),
-            ),
             const SizedBox(width: 4),
           ],
         ),
@@ -143,14 +166,51 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
           children: [
             _ProductGallery(product: product),
             const SizedBox(height: 18),
-            Text(
-              product.categoryLabel.toUpperCase(),
-              style: const TextStyle(
-                fontSize: 11,
-                color: BuyerColors.maroon,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  flex: 7,
+                  child: Text(
+                    product.categoryLabel.toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: BuyerColors.maroon,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        tooltip: _isSaved ? 'Remove from saved' : 'Save item',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () {
+                          widget.onSave();
+                          setState(() => _isSaved = !_isSaved);
+                        },
+                        icon: Icon(
+                          _isSaved ? Icons.favorite : Icons.favorite_border,
+                        ),
+                        color: BuyerColors.maroon,
+                      ),
+                      Builder(
+                        builder: (shareButtonContext) => IconButton(
+                          tooltip: 'Share product',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => _shareProduct(shareButtonContext),
+                          icon: const Icon(Icons.share_outlined),
+                          color: BuyerColors.maroon,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 6),
             BuyerHeading(

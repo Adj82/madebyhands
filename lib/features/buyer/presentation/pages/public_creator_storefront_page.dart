@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:madebyhands/features/buyer/presentation/theme/buyer_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:madebyhands/features/buyer/domain/entities/product.dart';
@@ -7,6 +8,7 @@ import 'package:madebyhands/features/buyer/presentation/bloc/buyer_bloc.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_background.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/buyer_heading.dart';
 import 'package:madebyhands/features/buyer/presentation/widgets/product_card.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class PublicCreatorStorefrontPage extends StatelessWidget {
@@ -138,12 +140,89 @@ class _CreatorHeader extends StatelessWidget {
 
   const _CreatorHeader({required this.creator});
 
+  Future<void> _shareCreator(
+    BuildContext context,
+    BuildContext shareButtonContext,
+  ) async {
+    final creatorLink = Uri.https('www.madebyhands.shop', '/', {
+      'creator': creator.uid,
+    });
+    final renderBox = shareButtonContext.findRenderObject() as RenderBox?;
+
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          title: creator.displayName,
+          subject: 'Discover ${creator.displayName} on MadeByHands',
+          text: 'Discover ${creator.displayName} on MadeByHands: $creatorLink',
+          sharePositionOrigin: renderBox == null
+              ? null
+              : renderBox.localToGlobal(Offset.zero) & renderBox.size,
+        ),
+      );
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: creatorLink.toString()));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Creator link copied')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (creator.portfolio.isNotEmpty) ...[
+          AspectRatio(
+            aspectRatio: 16 / 7,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.network(
+                    creator.portfolio.first,
+                    fit: BoxFit.cover,
+                    cacheWidth: 1200,
+                    errorBuilder: (_, _, _) => Container(
+                      color: BuyerColors.blush,
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.image_outlined,
+                        size: 38,
+                        color: BuyerColors.maroon,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Builder(
+                    builder: (shareButtonContext) => IconButton.filledTonal(
+                      tooltip: 'Share creator profile',
+                      onPressed: () =>
+                          _shareCreator(context, shareButtonContext),
+                      icon: const Icon(Icons.share_outlined, size: 14),
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(30, 30),
+                        maximumSize: const Size(30, 30),
+                        padding: EdgeInsets.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        backgroundColor: Colors.white.withValues(alpha: 0.30),
+                        foregroundColor: BuyerColors.maroon,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         Row(
           children: [
             CircleAvatar(
