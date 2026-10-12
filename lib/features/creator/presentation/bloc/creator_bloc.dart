@@ -146,9 +146,11 @@ class CreatorBloc extends Bloc<CreatorEvent, CreatorState> {
       location: event.location,
       socialLinks: event.socialLinks,
       portfolioImageFiles: event.portfolioImageFiles,
+      exhibitionImageFiles: event.exhibitionImageFiles,
       story: event.story,
       existingProfileImageUrl: event.existingProfileImageUrl,
       existingPortfolioUrls: event.existingPortfolioUrls,
+      existingExhibitionPictureUrls: event.existingExhibitionPictureUrls,
     );
     if (result.isLeft()) {
       emit(

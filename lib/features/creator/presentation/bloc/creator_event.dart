@@ -21,9 +21,11 @@ final class CreatorSubmitOnboarding extends CreatorEvent {
   final String location;
   final List<String> socialLinks;
   final List<File> portfolioImageFiles;
+  final List<File> exhibitionImageFiles;
   final String story;
   final String? existingProfileImageUrl;
   final List<String>? existingPortfolioUrls;
+  final List<String>? existingExhibitionPictureUrls;
 
   CreatorSubmitOnboarding({
     required this.uid,
@@ -33,9 +35,11 @@ final class CreatorSubmitOnboarding extends CreatorEvent {
     required this.location,
     required this.socialLinks,
     required this.portfolioImageFiles,
+    this.exhibitionImageFiles = const [],
     required this.story,
     this.existingProfileImageUrl,
     this.existingPortfolioUrls,
+    this.existingExhibitionPictureUrls,
   });
 }
 

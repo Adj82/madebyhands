@@ -6,6 +6,7 @@ class CreatorProfile {
   final String location;
   final List<String> socialLinks;
   final List<String> portfolio;
+  final List<String> exhibitionPictures;
   final String story;
   /// 'Unverified', 'In-Process', 'Verified' or 'Rejected'.
   final String verificationStatus;
@@ -28,6 +29,7 @@ class CreatorProfile {
     required this.location,
     required this.socialLinks,
     required this.portfolio,
+    this.exhibitionPictures = const [],
     required this.story,
     this.verificationStatus = 'Unverified',
     this.verificationNote = '',

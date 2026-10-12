@@ -35,6 +35,14 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
   File? _profileImage;
   final List<File> _portfolioImages = [];
   final List<String> _existingPortfolioUrls = [];
+
+  final List<File> _exhibitionImages = [];
+  final List<String> _existingExhibitionPictureUrls = [];
+  static const int _maxExhibitionPictures = 10;
+
+  int get _totalExhibitionPictures =>
+      _existingExhibitionPictureUrls.length + _exhibitionImages.length;
+
   final List<String> _socialLinks = [];
   @override
   void initState() {
@@ -48,6 +56,7 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
     if (p != null) {
       _socialLinks.addAll(p.socialLinks);
       _existingPortfolioUrls.addAll(p.portfolio);
+      _existingExhibitionPictureUrls.addAll(p.exhibitionPictures);
     }
   }
 
@@ -84,6 +93,69 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
     );
     if (pickedFile != null) {
       setState(() => _portfolioImages.add(File(pickedFile.path)));
+    }
+  }
+
+  Future<void> _pickExhibitionImage() async {
+    final remaining = _maxExhibitionPictures - _totalExhibitionPictures;
+    if (remaining <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Maximum 10 exhibition pictures allowed.'),
+        ),
+      );
+      return;
+    }
+    final picker = ImagePicker();
+    final pickedFiles = await picker.pickMultiImage(
+      imageQuality: kImageQuality,
+      maxWidth: kProfileImageMaxSide,
+      maxHeight: kProfileImageMaxSide,
+    );
+    if (pickedFiles.isEmpty) return;
+    final accepted = pickedFiles.take(remaining).toList();
+    setState(() {
+      _exhibitionImages.addAll(accepted.map((f) => File(f.path)));
+    });
+    if (pickedFiles.length > accepted.length && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Only added $remaining of ${pickedFiles.length} pictures — maximum 10 allowed.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _replaceExistingExhibitionPicture(int index) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: kImageQuality,
+      maxWidth: kProfileImageMaxSide,
+      maxHeight: kProfileImageMaxSide,
+    );
+    if (pickedFile != null) {
+      setState(() {
+        _existingExhibitionPictureUrls.removeAt(index);
+        _exhibitionImages.add(File(pickedFile.path));
+      });
+    }
+  }
+
+  Future<void> _replaceExhibitionImageFile(int index) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: kImageQuality,
+      maxWidth: kProfileImageMaxSide,
+      maxHeight: kProfileImageMaxSide,
+    );
+    if (pickedFile != null) {
+      setState(() {
+        _exhibitionImages[index] = File(pickedFile.path);
+      });
     }
   }
 
@@ -135,9 +207,12 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
               location: _locationController.text.trim(),
               socialLinks: List.of(_socialLinks),
               portfolioImageFiles: List.of(_portfolioImages),
+              exhibitionImageFiles: List.of(_exhibitionImages),
               story: _storyController.text.trim(),
               existingProfileImageUrl: widget.existingProfile?.profileImage,
               existingPortfolioUrls: List.of(_existingPortfolioUrls),
+              existingExhibitionPictureUrls:
+                  List.of(_existingExhibitionPictureUrls),
             ),
           );
     }
@@ -249,6 +324,8 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
                     const SizedBox(height: 30),
                     _buildFormFields(),
                     const SizedBox(height: 30),
+                    _buildExhibitionPicturesSection(),
+                    const SizedBox(height: 30),
                     _buildSocialLinksSection(),
                     const SizedBox(height: 30),
                     _buildPortfolioSection(),
@@ -352,6 +429,175 @@ class _CreatorOnboardingPageState extends State<CreatorOnboardingPage> {
           validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
         ),
       ],
+    );
+  }
+
+  Widget _buildExhibitionPicturesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Exhibition Pictures',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF8B261D),
+              ),
+            ),
+            Text(
+              '$_totalExhibitionPictures/$_maxExhibitionPictures',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF8A8F82),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Showcase photos of your studio, past exhibitions, or craft displays (max 10).',
+          style: TextStyle(fontSize: 12, color: Color(0xFF8A8F82)),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 120,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              if (_totalExhibitionPictures < _maxExhibitionPictures)
+                _buildAddExhibitionButton(),
+              ..._existingExhibitionPictureUrls.asMap().entries.map(
+                    (e) => _buildExistingExhibitionItem(e.key, e.value),
+                  ),
+              ..._exhibitionImages.asMap().entries.map(
+                    (e) => _buildExhibitionItem(e.key, e.value),
+                  ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAddExhibitionButton() {
+    return GestureDetector(
+      onTap: _pickExhibitionImage,
+      child: Container(
+        width: 120,
+        height: 120,
+        decoration: BoxDecoration(
+          color: const Color(0xFFFAF6EE),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: const Color(0xFF8B261D).withValues(alpha: 0.3),
+          ),
+        ),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_a_photo_outlined, color: Color(0xFF8A8F82)),
+            SizedBox(height: 4),
+            Text(
+              'Add Photo',
+              style: TextStyle(fontSize: 11, color: Color(0xFF8A8F82)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExistingExhibitionItem(int index, String url) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 12.0),
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(15),
+            child: Image.network(
+              url,
+              width: 120,
+              height: 120,
+              fit: BoxFit.cover,
+              cacheWidth: 360,
+              errorBuilder: (_, _, _) => Container(
+                width: 120,
+                height: 120,
+                color: const Color(0xFFEAE7DC),
+                child: const Icon(Icons.broken_image, color: Colors.grey),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 5,
+            right: 5,
+            child: GestureDetector(
+              onTap: () => setState(
+                () => _existingExhibitionPictureUrls.removeAt(index),
+              ),
+              child: const CircleAvatar(
+                radius: 12,
+                backgroundColor: Colors.red,
+                child: Icon(Icons.close, size: 16, color: Colors.white),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 5,
+            right: 5,
+            child: GestureDetector(
+              onTap: () => _replaceExistingExhibitionPicture(index),
+              child: const CircleAvatar(
+                radius: 12,
+                backgroundColor: Color(0xFF8B261D),
+                child: Icon(Icons.edit, size: 14, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExhibitionItem(int index, File file) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 12.0),
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(15),
+            child: _buildFileImageWidget(file, width: 120, height: 120),
+          ),
+          Positioned(
+            top: 5,
+            right: 5,
+            child: GestureDetector(
+              onTap: () => setState(() => _exhibitionImages.removeAt(index)),
+              child: const CircleAvatar(
+                radius: 12,
+                backgroundColor: Colors.red,
+                child: Icon(Icons.close, size: 16, color: Colors.white),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 5,
+            right: 5,
+            child: GestureDetector(
+              onTap: () => _replaceExhibitionImageFile(index),
+              child: const CircleAvatar(
+                radius: 12,
+                backgroundColor: Color(0xFF8B261D),
+                child: Icon(Icons.edit, size: 14, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -41,9 +41,11 @@ class CreatorRepositoryImpl implements CreatorRepository {
     required String location,
     required List<String> socialLinks,
     required List<File> portfolioImageFiles,
+    List<File> exhibitionImageFiles = const [],
     required String story,
     String? existingProfileImageUrl,
     List<String>? existingPortfolioUrls,
+    List<String>? existingExhibitionPictureUrls,
   }) => _guard<void>(() async {
     var profileImageUrl = existingProfileImageUrl ?? '';
     if (profileImageFile != null) {
@@ -60,6 +62,14 @@ class CreatorRepositoryImpl implements CreatorRepository {
           uid: uid,
         ),
     ];
+    final exhibitionUrls = [
+      ...?existingExhibitionPictureUrls,
+      if (exhibitionImageFiles.isNotEmpty)
+        ...await remoteDataSource.uploadExhibitionPictures(
+          images: exhibitionImageFiles,
+          uid: uid,
+        ),
+    ];
 
     await remoteDataSource.saveCreatorProfile(
       CreatorProfileModel(
@@ -70,6 +80,7 @@ class CreatorRepositoryImpl implements CreatorRepository {
         location: location,
         socialLinks: socialLinks,
         portfolio: portfolioUrls,
+        exhibitionPictures: exhibitionUrls,
         story: story,
       ),
     );
