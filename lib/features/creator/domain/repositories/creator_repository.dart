@@ -34,11 +34,14 @@ abstract interface class CreatorRepository {
     required File? profileImageFile,
     required String bio,
     required String location,
+    String state = '',
     required List<String> socialLinks,
     required List<File> portfolioImageFiles,
+    List<File> exhibitionImageFiles = const [],
     required String story,
     String? existingProfileImageUrl,
     List<String>? existingPortfolioUrls,
+    List<String>? existingExhibitionPictureUrls,
   });
 
   Future<Either<Failure, VerificationDocuments?>> getVerificationDocuments(

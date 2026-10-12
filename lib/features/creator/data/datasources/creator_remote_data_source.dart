@@ -39,6 +39,11 @@ abstract interface class CreatorRemoteDataSource {
     required String uid,
   });
 
+  Future<List<String>> uploadExhibitionPictures({
+    required List<File> images,
+    required String uid,
+  });
+
   Future<String> uploadVerificationFile({
     required File file,
     required String uid,
@@ -174,6 +179,21 @@ class CreatorRemoteDataSourceImpl implements CreatorRemoteDataSource {
         await _upload(
           images[i],
           'creator_profiles/$uid/portfolio/image_${stamp}_$i.jpg',
+        ),
+    ];
+  }
+
+  @override
+  Future<List<String>> uploadExhibitionPictures({
+    required List<File> images,
+    required String uid,
+  }) async {
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    return [
+      for (var i = 0; i < images.length; i++)
+        await _upload(
+          images[i],
+          'creator_profiles/$uid/exhibition/image_${stamp}_$i.jpg',
         ),
     ];
   }
